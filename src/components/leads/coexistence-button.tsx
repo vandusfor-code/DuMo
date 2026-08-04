@@ -16,7 +16,10 @@ import { cn } from "@/lib/utils";
  */
 
 const APP_ID = process.env.NEXT_PUBLIC_META_APP_ID ?? "";
-const CONFIG_ID = process.env.NEXT_PUBLIC_META_ES_CONFIG_ID ?? "";
+const CONFIG_ID =
+  process.env.NEXT_PUBLIC_META_CONFIG_ID ??
+  process.env.NEXT_PUBLIC_META_ES_CONFIG_ID ??
+  "";
 const GRAPH_VERSION = process.env.NEXT_PUBLIC_META_GRAPH_VERSION ?? "v21.0";
 // Coexistencia: mismo valor que uses en dulabs (Meta lo documenta como
 // "whatsapp_business_app_onboarding" para el flujo de coexistencia).
