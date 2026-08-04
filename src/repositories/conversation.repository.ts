@@ -14,6 +14,16 @@ export interface IncomingMessage {
   body: string;
   direction: "in" | "out";
   createdAt: string; // ISO
+  /** Número de DuMo (phone_number_id) por el que entró el mensaje. */
+  dumoPhoneId?: string;
+}
+
+/** Un número conectado a DuMo (lo registra "Conectar con DuMo"). */
+export interface ConnectedNumber {
+  phoneNumberId: string;
+  displayPhone: string;
+  wabaId: string;
+  label: string;
 }
 
 export interface ConversationRepository {
@@ -21,6 +31,9 @@ export interface ConversationRepository {
   getMessages(conversationId: string): Promise<ChatMessage[]>;
   saveMessage(msg: IncomingMessage): Promise<void>;
   markRead(conversationId: string): Promise<void>;
+  /** phone_number_id de DuMo por el que se debe responder esa conversación. */
+  getSendFromPhoneId(conversationId: string): Promise<string | null>;
+  registerNumber(number: ConnectedNumber): Promise<void>;
 }
 
 /* ----------------------------- Mock ----------------------------- */
@@ -36,6 +49,12 @@ class MockConversationRepository implements ConversationRepository {
     return Promise.resolve();
   }
   markRead() {
+    return Promise.resolve();
+  }
+  getSendFromPhoneId() {
+    return Promise.resolve(null);
+  }
+  registerNumber() {
     return Promise.resolve();
   }
 }
@@ -113,10 +132,11 @@ class PostgresConversationRepository implements ConversationRepository {
 
     await sql`
       INSERT INTO lead_conversations
-        (id, phone, customer_name, last_message, last_message_at, unread, status, online)
+        (id, phone, customer_name, last_message, last_message_at, unread, status, online, dumo_phone_id)
       VALUES (
         ${msg.conversationId}, ${msg.phone}, ${msg.customerName},
-        ${msg.body}, ${msg.createdAt}, ${incUnread}, 'new', ${msg.direction === "in"}
+        ${msg.body}, ${msg.createdAt}, ${incUnread}, 'new', ${msg.direction === "in"},
+        ${msg.dumoPhoneId ?? null}
       )
       ON CONFLICT (id) DO UPDATE SET
         last_message = EXCLUDED.last_message,
@@ -125,7 +145,8 @@ class PostgresConversationRepository implements ConversationRepository {
         online = ${msg.direction === "in"},
         customer_name = CASE
           WHEN lead_conversations.customer_name = '' THEN EXCLUDED.customer_name
-          ELSE lead_conversations.customer_name END
+          ELSE lead_conversations.customer_name END,
+        dumo_phone_id = COALESCE(lead_conversations.dumo_phone_id, EXCLUDED.dumo_phone_id)
     `;
 
     await sql`
@@ -140,6 +161,28 @@ class PostgresConversationRepository implements ConversationRepository {
     await ensureSchema();
     const sql = getSql()!;
     await sql`UPDATE lead_conversations SET unread = 0 WHERE id = ${conversationId}`;
+  }
+
+  async getSendFromPhoneId(conversationId: string): Promise<string | null> {
+    await ensureSchema();
+    const sql = getSql()!;
+    const rows = (await sql`
+      SELECT dumo_phone_id FROM lead_conversations WHERE id = ${conversationId}
+    `) as unknown as { dumo_phone_id: string | null }[];
+    return rows[0]?.dumo_phone_id ?? null;
+  }
+
+  async registerNumber(number: ConnectedNumber): Promise<void> {
+    await ensureSchema();
+    const sql = getSql()!;
+    await sql`
+      INSERT INTO connected_numbers (phone_number_id, display_phone, waba_id, label)
+      VALUES (${number.phoneNumberId}, ${number.displayPhone}, ${number.wabaId}, ${number.label})
+      ON CONFLICT (phone_number_id) DO UPDATE SET
+        display_phone = EXCLUDED.display_phone,
+        waba_id = EXCLUDED.waba_id,
+        label = EXCLUDED.label
+    `;
   }
 }
 

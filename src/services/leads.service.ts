@@ -2,6 +2,7 @@ import "server-only";
 import { getLeadRepository } from "@/repositories/leads.repository";
 import {
   getConversationRepository,
+  type ConnectedNumber,
   type IncomingMessage,
 } from "@/repositories/conversation.repository";
 import type { ChatMessage, Conversation } from "@/types/conversation";
@@ -36,13 +37,23 @@ export const leadsService = {
     return getConversationRepository().saveMessage(msg);
   },
 
+  /** Registra un número conectado a DuMo (lo llama "Conectar con DuMo"). */
+  registerNumber(number: ConnectedNumber): Promise<void> {
+    return getConversationRepository().registerNumber(number);
+  },
+
   /** Envía un mensaje por la Cloud API y lo persiste como saliente. */
   async sendMessage(input: SendMessageInput): Promise<{ id: string }> {
     const token = process.env.WHATSAPP_TOKEN;
-    const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
     const version = process.env.WHATSAPP_GRAPH_VERSION ?? "v21.0";
+    // Responder DESDE el número por el que entró la conversación (multi-número),
+    // con fallback al número por defecto.
+    const repo = getConversationRepository();
+    const phoneId =
+      (await repo.getSendFromPhoneId(input.conversationId)) ??
+      process.env.WHATSAPP_PHONE_NUMBER_ID;
     if (!token || !phoneId) {
-      throw new Error("Faltan WHATSAPP_TOKEN / WHATSAPP_PHONE_NUMBER_ID.");
+      throw new Error("Faltan WHATSAPP_TOKEN / número de envío.");
     }
 
     const res = await fetch(`${GRAPH}/${version}/${phoneId}/messages`, {
@@ -67,7 +78,7 @@ export const leadsService = {
     }
     const id = json.messages?.[0]?.id ?? `out-${Date.now()}`;
 
-    await getConversationRepository().saveMessage({
+    await repo.saveMessage({
       waMessageId: id,
       conversationId: input.conversationId,
       phone: input.to,
@@ -75,6 +86,7 @@ export const leadsService = {
       body: input.text,
       direction: "out",
       createdAt: new Date().toISOString(),
+      dumoPhoneId: phoneId,
     });
     return { id };
   },

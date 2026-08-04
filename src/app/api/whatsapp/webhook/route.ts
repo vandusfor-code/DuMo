@@ -111,6 +111,7 @@ export async function POST(request: NextRequest) {
             body: msg.text?.body ?? `[${msg.type ?? "mensaje"}]`,
             direction: "in",
             createdAt,
+            dumoPhoneId: phoneId,
           });
         }
       }

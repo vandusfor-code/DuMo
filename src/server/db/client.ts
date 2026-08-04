@@ -57,6 +57,21 @@ export function ensureSchema(): Promise<void> {
         CREATE INDEX IF NOT EXISTS idx_lead_messages_conv
         ON lead_messages (conversation_id, created_at)
       `;
+      // Número de DuMo por el que entró/sale la conversación (multi-número).
+      await sql`
+        ALTER TABLE lead_conversations
+        ADD COLUMN IF NOT EXISTS dumo_phone_id text
+      `;
+      // Números conectados a DuMo (los que "Conectar con DuMo" registra).
+      await sql`
+        CREATE TABLE IF NOT EXISTS connected_numbers (
+          phone_number_id text PRIMARY KEY,
+          display_phone text NOT NULL DEFAULT '',
+          waba_id text NOT NULL DEFAULT '',
+          label text NOT NULL DEFAULT '',
+          connected_at timestamptz NOT NULL DEFAULT now()
+        )
+      `;
     })().catch((err) => {
       schemaPromise = null;
       throw err;
