@@ -24,6 +24,8 @@ export interface ConnectedNumber {
   displayPhone: string;
   wabaId: string;
   label: string;
+  /** Token permanente de Meta con acceso a ese número (como meta_permanent_token en dulabs). */
+  accessToken?: string;
 }
 
 export interface ConversationRepository {
@@ -33,6 +35,8 @@ export interface ConversationRepository {
   markRead(conversationId: string): Promise<void>;
   /** phone_number_id de DuMo por el que se debe responder esa conversación. */
   getSendFromPhoneId(conversationId: string): Promise<string | null>;
+  /** Token de envío registrado para un phone_number_id conectado. */
+  getAccessTokenForPhoneId(phoneNumberId: string): Promise<string | null>;
   registerNumber(number: ConnectedNumber): Promise<void>;
 }
 
@@ -52,6 +56,9 @@ class MockConversationRepository implements ConversationRepository {
     return Promise.resolve();
   }
   getSendFromPhoneId() {
+    return Promise.resolve(null);
+  }
+  getAccessTokenForPhoneId() {
     return Promise.resolve(null);
   }
   registerNumber() {
@@ -172,16 +179,32 @@ class PostgresConversationRepository implements ConversationRepository {
     return rows[0]?.dumo_phone_id ?? null;
   }
 
+  async getAccessTokenForPhoneId(phoneNumberId: string): Promise<string | null> {
+    await ensureSchema();
+    const sql = getSql()!;
+    const rows = (await sql`
+      SELECT access_token FROM connected_numbers WHERE phone_number_id = ${phoneNumberId}
+    `) as unknown as { access_token: string | null }[];
+    const token = rows[0]?.access_token?.trim();
+    return token || null;
+  }
+
   async registerNumber(number: ConnectedNumber): Promise<void> {
     await ensureSchema();
     const sql = getSql()!;
+    const token = number.accessToken?.trim() || null;
     await sql`
-      INSERT INTO connected_numbers (phone_number_id, display_phone, waba_id, label)
-      VALUES (${number.phoneNumberId}, ${number.displayPhone}, ${number.wabaId}, ${number.label})
+      INSERT INTO connected_numbers
+        (phone_number_id, display_phone, waba_id, label, access_token)
+      VALUES (
+        ${number.phoneNumberId}, ${number.displayPhone}, ${number.wabaId},
+        ${number.label}, ${token}
+      )
       ON CONFLICT (phone_number_id) DO UPDATE SET
         display_phone = EXCLUDED.display_phone,
         waba_id = EXCLUDED.waba_id,
-        label = EXCLUDED.label
+        label = EXCLUDED.label,
+        access_token = COALESCE(EXCLUDED.access_token, connected_numbers.access_token)
     `;
   }
 }

@@ -72,6 +72,11 @@ export function ensureSchema(): Promise<void> {
           connected_at timestamptz NOT NULL DEFAULT now()
         )
       `;
+      // Token permanente por número (el que dulabs ya tiene en meta_permanent_token).
+      await sql`
+        ALTER TABLE connected_numbers
+        ADD COLUMN IF NOT EXISTS access_token text
+      `;
     })().catch((err) => {
       schemaPromise = null;
       throw err;

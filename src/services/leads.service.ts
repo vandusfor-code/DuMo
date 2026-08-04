@@ -7,6 +7,7 @@ import {
 } from "@/repositories/conversation.repository";
 import type { ChatMessage, Conversation } from "@/types/conversation";
 import type { Lead, Plan, SaveLeadInput } from "@/types/lead";
+import { graphVersion, resolveSendCredentials } from "@/server/whatsapp/credentials";
 
 const GRAPH = "https://graph.facebook.com";
 
@@ -44,22 +45,22 @@ export const leadsService = {
 
   /** Envía un mensaje por la Cloud API y lo persiste como saliente. */
   async sendMessage(input: SendMessageInput): Promise<{ id: string }> {
-    const token = process.env.WHATSAPP_TOKEN;
-    const version = process.env.WHATSAPP_GRAPH_VERSION ?? "v21.0";
-    // Responder DESDE el número por el que entró la conversación (multi-número),
-    // con fallback al número por defecto.
+    const version = graphVersion();
     const repo = getConversationRepository();
     const phoneId =
       (await repo.getSendFromPhoneId(input.conversationId)) ??
-      process.env.WHATSAPP_PHONE_NUMBER_ID;
-    if (!token || !phoneId) {
-      throw new Error("Faltan WHATSAPP_TOKEN / número de envío.");
+      process.env.WHATSAPP_PHONE_NUMBER_ID ??
+      "";
+    const perNumberToken = phoneId ? await repo.getAccessTokenForPhoneId(phoneId) : null;
+    const creds = resolveSendCredentials(phoneId, perNumberToken);
+    if ("error" in creds) {
+      throw new Error(creds.error);
     }
 
-    const res = await fetch(`${GRAPH}/${version}/${phoneId}/messages`, {
+    const res = await fetch(`${GRAPH}/${version}/${creds.phoneNumberId}/messages`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${creds.token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -71,10 +72,14 @@ export const leadsService = {
     });
     const json = (await res.json()) as {
       messages?: { id?: string }[];
-      error?: { message?: string };
+      error?: { message?: string; code?: number };
     };
     if (!res.ok) {
-      throw new Error(json.error?.message ?? "Error enviando el mensaje.");
+      const hint =
+        json.error?.code === 100 || json.error?.message?.includes("does not exist")
+          ? " El token no tiene permiso sobre ese phone_number_id — usa el mismo token permanente que dulabs (meta_permanent_token) o un System User con acceso al WABA."
+          : "";
+      throw new Error((json.error?.message ?? "Error enviando el mensaje.") + hint);
     }
     const id = json.messages?.[0]?.id ?? `out-${Date.now()}`;
 
@@ -86,7 +91,7 @@ export const leadsService = {
       body: input.text,
       direction: "out",
       createdAt: new Date().toISOString(),
-      dumoPhoneId: phoneId,
+      dumoPhoneId: creds.phoneNumberId,
     });
     return { id };
   },

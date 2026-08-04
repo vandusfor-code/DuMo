@@ -16,6 +16,7 @@ const schema = z.object({
   displayPhone: z.string().trim().optional().default(""),
   wabaId: z.string().trim().optional().default(""),
   label: z.string().trim().optional().default(""),
+  accessToken: z.string().trim().optional(),
 });
 
 function authorized(request: NextRequest): boolean {

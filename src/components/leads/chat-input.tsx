@@ -77,7 +77,9 @@ export function ChatInput({
       </div>
       {send.isError && (
         <p className="mt-1.5 text-[12px] text-danger-ink">
-          No se pudo enviar. Revisa la configuración de WhatsApp.
+          {send.error instanceof Error
+            ? send.error.message
+            : "No se pudo enviar. Revisa la configuración de WhatsApp."}
         </p>
       )}
     </div>
