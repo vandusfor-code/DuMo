@@ -5,12 +5,16 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Webhook de WhatsApp Cloud API.
+ * Webhook de WhatsApp — Opción A (una sola Meta App en dulabs).
  *
- * GET  -> verificación inicial de Meta (hub.challenge).
- * POST -> mensajes entrantes de los leads. Valida la firma con META_APP_SECRET
- *         y (por ahora) registra los mensajes. El siguiente paso es persistir
- *         estos mensajes y reemplazar el MockLeadRepository por datos reales.
+ * Meta entrega TODO a dulabs (webhook único de la app). dulabs reenvía a este
+ * endpoint solo los eventos de los números de DuMo. Por eso aquí aceptamos:
+ *   - la firma original de Meta `X-Hub-Signature-256` (si dulabs reenvía el
+ *     body crudo + ese header), validada con META_APP_SECRET; o
+ *   - un secreto compartido `X-DuMo-Forward-Secret` == WHATSAPP_FORWARD_SECRET
+ *     (si dulabs reenvía sin la firma original).
+ *
+ * El GET (hub.challenge) queda por si algún día Meta apunta directo a DuMo.
  */
 
 export async function GET(request: NextRequest) {
@@ -18,30 +22,51 @@ export async function GET(request: NextRequest) {
   const mode = params.get("hub.mode");
   const token = params.get("hub.verify_token");
   const challenge = params.get("hub.challenge");
+  const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
 
-  if (mode === "subscribe" && token === process.env.WHATSAPP_VERIFY_TOKEN) {
+  if (mode === "subscribe" && verifyToken && token === verifyToken) {
     return new NextResponse(challenge ?? "", { status: 200 });
   }
   return new NextResponse("Forbidden", { status: 403 });
 }
 
-function isValidSignature(rawBody: string, signature: string | null): boolean {
+function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
+}
+
+function hasValidMetaSignature(rawBody: string, signature: string | null): boolean {
   const secret = process.env.META_APP_SECRET;
-  if (!secret) return false;
-  if (!signature?.startsWith("sha256=")) return false;
+  if (!secret || !signature?.startsWith("sha256=")) return false;
   const expected =
     "sha256=" + crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
-  const a = Buffer.from(signature);
-  const b = Buffer.from(expected);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
+  return safeEqual(signature, expected);
+}
+
+function hasValidForwardSecret(request: NextRequest): boolean {
+  const expected = process.env.WHATSAPP_FORWARD_SECRET;
+  const provided = request.headers.get("x-dumo-forward-secret");
+  if (!expected || !provided) return false;
+  return safeEqual(provided, expected);
+}
+
+/** Números de DuMo permitidos (coma-separados). Vacío = acepta todos. */
+function allowedPhoneIds(): string[] {
+  return (process.env.WHATSAPP_PHONE_NUMBER_IDS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
   const signature = request.headers.get("x-hub-signature-256");
 
-  if (!isValidSignature(rawBody, signature)) {
-    return new NextResponse("Invalid signature", { status: 401 });
+  const authorized =
+    hasValidMetaSignature(rawBody, signature) || hasValidForwardSecret(request);
+  if (!authorized) {
+    return new NextResponse("Unauthorized", { status: 401 });
   }
 
   try {
@@ -63,13 +88,21 @@ export async function POST(request: NextRequest) {
       }[];
     };
 
+    const allow = allowedPhoneIds();
+
     for (const entry of payload.entry ?? []) {
       for (const change of entry.changes ?? []) {
-        const messages = change.value?.messages ?? [];
-        for (const msg of messages) {
+        const phoneId = change.value?.metadata?.phone_number_id;
+        // Ignora números que no son de DuMo (si hay lista de permitidos).
+        if (allow.length > 0 && phoneId && !allow.includes(phoneId)) continue;
+
+        const contact = change.value?.contacts?.[0];
+        for (const msg of change.value?.messages ?? []) {
           // TODO: persistir el mensaje entrante (BD) y refrescar la bandeja.
           console.info("[whatsapp/webhook] mensaje", {
+            phoneId,
             from: msg.from,
+            name: contact?.profile?.name,
             type: msg.type,
             text: msg.text?.body,
           });
@@ -78,7 +111,6 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error("[POST /api/whatsapp/webhook] parse", error);
-    // Respondemos 200 igual para que Meta no reintente en bucle.
   }
 
   return new NextResponse("EVENT_RECEIVED", { status: 200 });
