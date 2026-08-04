@@ -4,6 +4,7 @@ import { getGoogleConfig, type GoogleConfig } from "./config";
 import {
   CONFIG_KEYS,
   DEFAULT_CONFIG,
+  DEFAULT_PLANS,
   SHEET_SCHEMA,
   type TabName,
 } from "./schema";
@@ -12,6 +13,7 @@ export interface ProvisionResult {
   createdTabs: TabName[];
   createdHeaders: TabName[];
   seededConfig: boolean;
+  seededPlans: boolean;
 }
 
 /**
@@ -129,10 +131,27 @@ export class GoogleSheetsClient {
       }
     }
 
+    // 4) Seed default plans if the Planes tab is empty.
+    let seededPlans = false;
+    const plansWasCreated =
+      missingTabs.some((t) => t.name === "Planes") ||
+      createdHeaders.includes("Planes");
+    if (plansWasCreated && DEFAULT_PLANS.length > 0) {
+      await this.sheets.spreadsheets.values.append({
+        spreadsheetId: this.spreadsheetId,
+        range: "Planes!A1",
+        valueInputOption: "RAW",
+        insertDataOption: "INSERT_ROWS",
+        requestBody: { values: DEFAULT_PLANS.map(([id, nombre]) => [id, nombre]) },
+      });
+      seededPlans = true;
+    }
+
     return {
       createdTabs: missingTabs.map((t) => t.name),
       createdHeaders,
       seededConfig,
+      seededPlans,
     };
   }
 

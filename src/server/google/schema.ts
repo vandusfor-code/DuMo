@@ -15,7 +15,10 @@ export type TabName =
   | "LineasVenta"
   | "Comisiones"
   | "Configuracion"
-  | "Logs";
+  | "Logs"
+  | "Leads"
+  | "LineasLead"
+  | "Planes";
 
 export interface TabSchema {
   name: TabName;
@@ -75,6 +78,40 @@ export const SHEET_SCHEMA: TabSchema[] = [
     name: "Logs",
     headers: ["id", "fecha", "nivel", "mensaje", "contexto"],
   },
+  {
+    name: "Leads",
+    headers: [
+      "id",
+      "conversationId",
+      "telefono",
+      "cliente",
+      "rut",
+      "tipoGestion", // venta | consulta | ...
+      "asesora",
+      "notas",
+      "creadoEn",
+    ],
+  },
+  {
+    name: "LineasLead",
+    headers: ["id", "leadId", "numeroLinea", "tipoVenta", "plan", "equipo"],
+  },
+  {
+    name: "Planes",
+    headers: ["id", "nombre"],
+  },
+];
+
+/** Default plans seeded when the Planes tab is first created. */
+export const DEFAULT_PLANS: [string, string][] = [
+  ["xs", "Plan XS"],
+  ["s", "Plan S"],
+  ["m", "Plan M"],
+  ["l", "Plan L"],
+  ["xl", "Plan XL"],
+  ["fibra", "Fibra Hogar"],
+  ["prepago", "Prepago"],
+  ["postpago", "Postpago"],
 ];
 
 /** Well-known keys stored in the Configuracion tab. */
