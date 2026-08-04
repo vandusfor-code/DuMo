@@ -2,7 +2,6 @@
 
 import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
-import { cn } from "@/lib/utils";
 
 /**
  * Shared shell for every authenticated screen: fixed 260px sidebar + content.
@@ -22,12 +21,7 @@ export default function DashboardLayout({
     <div className="min-h-screen bg-canvas">
       <Sidebar />
       <div className="lg:pl-[260px]">
-        <div
-          className={cn(
-            "mx-auto w-full px-6 sm:px-8 lg:px-10",
-            fullBleed ? "max-w-none" : "max-w-[1440px]",
-          )}
-        >
+        <div className="w-full px-6 sm:px-8 lg:px-10">
           <main className={fullBleed ? "" : "py-8"}>{children}</main>
         </div>
       </div>
