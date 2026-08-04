@@ -1,0 +1,75 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/*
+ * DuMo design tokens — single source of truth for the whole product.
+ * Values come straight from the implementation specs. Do not hardcode
+ * these hex values in components; use the semantic utilities below.
+ */
+@theme {
+  /* Brand */
+  --color-brand: #6d28d9;
+  --color-brand-hover: #5b21b6;
+  --color-brand-soft: #f4f0fe; /* very light purple — row/hover surfaces */
+
+  /* Surfaces */
+  --color-canvas: #f8f8fc; /* app background */
+  --color-card: #ffffff;
+  --color-line: #ececf3; /* borders / dividers */
+
+  /* Text */
+  --color-ink: #141625; /* primary text */
+  --color-muted: #6b7280; /* secondary text */
+
+  /* Status */
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+
+  /* Status — soft backgrounds for badges */
+  --color-success-soft: #e7f8ee;
+  --color-success-ink: #16a34a;
+  --color-warning-soft: #fef3e2;
+  --color-warning-ink: #d97706;
+  --color-danger-soft: #fdeaea;
+  --color-danger-ink: #dc2626;
+
+  /* Radii */
+  --radius-input: 12px;
+  --radius-btn: 14px;
+  --radius-card: 22px;
+
+  /* Elevation */
+  --shadow-card: 0 10px 35px rgba(15, 23, 42, 0.06);
+  --shadow-pop: 0 12px 30px rgba(15, 23, 42, 0.12);
+
+  /* Typography */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  /* Motion — 180–220ms per spec */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-line);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  /* Thin, unobtrusive scrollbars to match the premium feel. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #d8d8e2 transparent;
+  }
+}
