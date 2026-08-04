@@ -11,10 +11,11 @@ import { RecentSalesTable } from "@/components/dashboard/recent-sales-table";
 import { QuickSummaryCard } from "@/components/dashboard/quick-summary-card";
 import { MonthlyProgressCard } from "@/components/dashboard/monthly-progress-card";
 import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
+import { ErrorState } from "@/components/shared/error-state";
 import { useDashboard } from "@/hooks/use-dashboard";
 
 export default function DashboardPage() {
-  const { data, isLoading } = useDashboard();
+  const { data, isLoading, isError, refetch } = useDashboard();
 
   return (
     <div className="space-y-8 pt-1">
@@ -35,7 +36,13 @@ export default function DashboardPage() {
         }
       />
 
-      {isLoading || !data ? (
+      {isError ? (
+        <ErrorState
+          title="No se pudo cargar el dashboard"
+          message="Revisa la conexión con Google Sheets e intenta nuevamente."
+          onRetry={() => refetch()}
+        />
+      ) : isLoading || !data ? (
         <DashboardSkeleton />
       ) : (
         <motion.div
