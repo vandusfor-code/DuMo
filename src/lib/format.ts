@@ -29,6 +29,19 @@ export function formatShortDate(iso: string): string {
   return `${dd}/${mm}/${date.getFullYear()}`;
 }
 
+/** "3 de agosto de 2025, 11:15 a.m." — used in the sale history timeline. */
+export function formatDateTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  const datePart = LONG_DATE.format(date);
+  const timePart = new Intl.DateTimeFormat("es-CL", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
+  return `${datePart}, ${timePart}`;
+}
+
 /** Chilean peso, no decimals: "$1.840.000". */
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("es-CL", {

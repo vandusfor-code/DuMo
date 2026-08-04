@@ -3,6 +3,7 @@ import type { DashboardData } from "@/types/dashboard";
 import type { RecentSale } from "@/types/sale";
 import { DASHBOARD_MOCK } from "@/data/mock/dashboard.mock";
 import { withLatency } from "@/lib/mock";
+import { businessDateISO, businessMonth } from "@/lib/date";
 import { CONFIG_KEYS } from "@/server/google/schema";
 import { toInt, toSaleStatus, toSaleType } from "@/server/google/parse";
 import { getSheetsClient, type GoogleSheetsClient } from "@/server/google/sheets-client";
@@ -57,8 +58,8 @@ class SheetsDashboardRepository implements DashboardRepository {
     }
 
     const now = new Date();
-    const todayIso = now.toISOString().slice(0, 10);
-    const monthKey = todayIso.slice(0, 7); // yyyy-mm
+    const todayIso = businessDateISO(now);
+    const monthKey = businessMonth(now); // yyyy-mm
 
     const monthSales = ventas.filter((v) => (v.fecha ?? "").startsWith(monthKey));
     const daySales = ventas.filter((v) => v.fecha === todayIso);

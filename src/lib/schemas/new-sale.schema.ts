@@ -1,13 +1,10 @@
 import { z } from "zod";
 import { DEVICE_REQUIRED_TYPES } from "@/types/sale";
 
-export const saleTypeSchema = z.enum([
-  "portability",
-  "portability_device",
-  "device_renewal",
-  "new_line",
-  "migration",
-]);
+export const saleTypeSchema = z.enum(
+  ["portability", "portability_device", "device_renewal", "new_line", "migration"],
+  { errorMap: () => ({ message: "Selecciona el tipo de venta." }) },
+);
 
 export const saleLineSchema = z
   .object({

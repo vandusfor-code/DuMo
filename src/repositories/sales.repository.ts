@@ -13,6 +13,7 @@ import {
   buildFallbackDetail,
 } from "@/data/mock/sales.mock";
 import { withLatency } from "@/lib/mock";
+import { businessDateISO } from "@/lib/date";
 import { CONFIG_KEYS } from "@/server/google/schema";
 import { toInt, toSaleStatus, toSaleType } from "@/server/google/parse";
 import { getSheetsClient, type GoogleSheetsClient } from "@/server/google/sheets-client";
@@ -52,7 +53,7 @@ class MockSalesRepository implements SalesRepository {
       },
       advisor: "María López",
       status: "pending",
-      createdAt: new Date().toISOString().slice(0, 10),
+      createdAt: businessDateISO(),
       notes: input.notes ?? "",
       lines: input.lines.map((l) => ({
         phoneNumber: l.phoneNumber,
@@ -150,7 +151,7 @@ class SheetsSalesRepository implements SalesRepository {
     const year = new Date().getFullYear();
     const id = `VTA-${year}-${String(ventas.length + 1).padStart(5, "0")}`;
     const nowIso = new Date().toISOString();
-    const today = nowIso.slice(0, 10);
+    const today = businessDateISO();
     const advisor = "María López";
     const status: SaleStatus = "pending";
 
