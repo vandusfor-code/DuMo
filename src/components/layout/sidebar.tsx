@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { PRIMARY_NAV, SECONDARY_NAV, SIGN_OUT_ITEM, type NavItem } from "@/lib/nav";
 import { Logo } from "./logo";
+import { SidebarUser } from "./sidebar-user";
 
 function isActive(pathname: string, href: string): boolean {
   if (href === "/dashboard") return pathname === "/dashboard";
@@ -66,7 +67,8 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className="border-t border-line p-4">
+      <div className="space-y-1 border-t border-line p-3">
+        <SidebarUser />
         <NavLink item={SIGN_OUT_ITEM} active={false} />
       </div>
     </aside>

@@ -2,13 +2,13 @@
 
 import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
-import { Header } from "@/components/layout/header";
 import { cn } from "@/lib/utils";
 
 /**
- * Shared shell for every authenticated screen: fixed 260px sidebar + a content
- * column with the top utility bar. Standard screens are capped at 1440px;
- * full-bleed screens (Leads) use the entire content width and height.
+ * Shared shell for every authenticated screen: fixed 260px sidebar + content.
+ * The user profile + notifications live at the bottom of the sidebar (no top
+ * bar), so content uses the full viewport height. Standard screens are capped
+ * at 1440px; full-bleed screens (Leads) use the entire content area.
  */
 export default function DashboardLayout({
   children,
@@ -28,8 +28,7 @@ export default function DashboardLayout({
             fullBleed ? "max-w-none" : "max-w-[1440px]",
           )}
         >
-          <Header />
-          <main className={fullBleed ? "" : "pb-16"}>{children}</main>
+          <main className={fullBleed ? "" : "py-8"}>{children}</main>
         </div>
       </div>
     </div>

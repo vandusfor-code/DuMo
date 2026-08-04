@@ -34,7 +34,7 @@ export default function LeadsPage() {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 pb-4 pt-1 lg:h-[calc(100vh-6rem)] lg:grid-cols-[24fr_41fr_35fr]">
+    <div className="grid grid-cols-1 gap-4 lg:h-screen lg:grid-cols-[24fr_41fr_35fr] lg:py-4">
       {/* Column 1 — conversations */}
       <Card className="flex min-h-0 flex-col overflow-hidden">
         <ConversationList
