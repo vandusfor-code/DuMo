@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost } from "@/lib/api-client";
 import type { ChatMessage, Conversation } from "@/types/conversation";
 import type { Lead, Plan, SaveLeadInput } from "@/types/lead";
@@ -15,6 +15,8 @@ export function useConversations() {
   return useQuery({
     queryKey: leadKeys.conversations,
     queryFn: () => apiGet<Conversation[]>("/api/leads/conversations"),
+    // Near-real-time inbox without websockets.
+    refetchInterval: 5000,
   });
 }
 
@@ -24,6 +26,7 @@ export function useConversationMessages(conversationId: string | null) {
     queryFn: () =>
       apiGet<ChatMessage[]>(`/api/leads/conversations/${conversationId}/messages`),
     enabled: Boolean(conversationId),
+    refetchInterval: 4000,
   });
 }
 
@@ -38,5 +41,23 @@ export function usePlans() {
 export function useSaveLead() {
   return useMutation({
     mutationFn: (input: SaveLeadInput) => apiPost<Lead>("/api/leads", input),
+  });
+}
+
+export function useSendMessage(conversationId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { to: string; text: string }) =>
+      apiPost<{ ok: boolean; id: string }>("/api/whatsapp/send", {
+        conversationId,
+        to: input.to,
+        text: input.text,
+      }),
+    onSuccess: () => {
+      if (conversationId) {
+        queryClient.invalidateQueries({ queryKey: leadKeys.messages(conversationId) });
+      }
+      queryClient.invalidateQueries({ queryKey: leadKeys.conversations });
+    },
   });
 }

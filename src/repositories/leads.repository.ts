@@ -1,18 +1,11 @@
 import "server-only";
-import type { ChatMessage, Conversation } from "@/types/conversation";
 import type { Lead, Plan, SaveLeadInput } from "@/types/lead";
-import {
-  CONVERSATIONS_MOCK,
-  PLANS_MOCK,
-  getMockMessages,
-} from "@/data/mock/leads.mock";
+import { PLANS_MOCK } from "@/data/mock/leads.mock";
 import { withLatency } from "@/lib/mock";
 import { businessDateISO } from "@/lib/date";
 import { getSheetsClient, type GoogleSheetsClient } from "@/server/google/sheets-client";
 
 export interface LeadRepository {
-  getConversations(): Promise<Conversation[]>;
-  getMessages(conversationId: string): Promise<ChatMessage[]>;
   getPlans(): Promise<Plan[]>;
   saveLead(input: SaveLeadInput): Promise<Lead>;
 }
@@ -37,18 +30,11 @@ function buildLead(id: string, input: SaveLeadInput): Lead {
 /* ----------------------------- Mock ----------------------------- */
 
 class MockLeadRepository implements LeadRepository {
-  getConversations() {
-    return withLatency(CONVERSATIONS_MOCK);
-  }
-  getMessages(conversationId: string) {
-    return withLatency(getMockMessages(conversationId));
-  }
   getPlans() {
     return withLatency(PLANS_MOCK);
   }
   saveLead(input: SaveLeadInput) {
-    const id = `LEAD-${Date.now()}`;
-    return withLatency(buildLead(id, input));
+    return withLatency(buildLead(`LEAD-${Date.now()}`, input));
   }
 }
 
@@ -56,14 +42,6 @@ class MockLeadRepository implements LeadRepository {
 
 class SheetsLeadRepository implements LeadRepository {
   constructor(private readonly client: GoogleSheetsClient) {}
-
-  // Conversations/messages come from WhatsApp; no source yet, so still mock.
-  getConversations() {
-    return Promise.resolve(CONVERSATIONS_MOCK);
-  }
-  getMessages(conversationId: string) {
-    return Promise.resolve(getMockMessages(conversationId));
-  }
 
   async getPlans(): Promise<Plan[]> {
     const rows = await this.client.getRecords("Planes");

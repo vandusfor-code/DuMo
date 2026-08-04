@@ -44,7 +44,7 @@ export function ChatWindow({
         )}
       </div>
 
-      <ChatInput />
+      <ChatInput conversationId={conversation.id} to={conversation.phone} />
     </div>
   );
 }

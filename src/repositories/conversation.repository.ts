@@ -1,0 +1,150 @@
+import "server-only";
+import type { ChatMessage, Conversation, ConversationStatus } from "@/types/conversation";
+import { CONVERSATIONS_MOCK, getMockMessages } from "@/data/mock/leads.mock";
+import { withLatency } from "@/lib/mock";
+import { formatChatTime } from "@/lib/format";
+import { ensureSchema, getSql } from "@/server/db/client";
+
+/** Un mensaje entrante/saliente a persistir. */
+export interface IncomingMessage {
+  waMessageId: string;
+  conversationId: string; // wa_id del cliente
+  phone: string;
+  customerName: string;
+  body: string;
+  direction: "in" | "out";
+  createdAt: string; // ISO
+}
+
+export interface ConversationRepository {
+  getConversations(): Promise<Conversation[]>;
+  getMessages(conversationId: string): Promise<ChatMessage[]>;
+  saveMessage(msg: IncomingMessage): Promise<void>;
+  markRead(conversationId: string): Promise<void>;
+}
+
+/* ----------------------------- Mock ----------------------------- */
+
+class MockConversationRepository implements ConversationRepository {
+  getConversations() {
+    return withLatency(CONVERSATIONS_MOCK);
+  }
+  getMessages(conversationId: string) {
+    return withLatency(getMockMessages(conversationId));
+  }
+  saveMessage() {
+    return Promise.resolve();
+  }
+  markRead() {
+    return Promise.resolve();
+  }
+}
+
+/* --------------------------- Postgres --------------------------- */
+
+type ConvRow = {
+  id: string;
+  phone: string;
+  customer_name: string;
+  last_message: string;
+  last_message_at: string;
+  unread: number;
+  status: string;
+  online: boolean;
+};
+
+type MsgRow = {
+  id: string;
+  conversation_id: string;
+  direction: string;
+  body: string;
+  created_at: string;
+  read: boolean;
+};
+
+function toStatus(value: string): ConversationStatus {
+  return (["new", "in_progress", "converted", "lost"] as string[]).includes(value)
+    ? (value as ConversationStatus)
+    : "new";
+}
+
+class PostgresConversationRepository implements ConversationRepository {
+  async getConversations(): Promise<Conversation[]> {
+    await ensureSchema();
+    const sql = getSql()!;
+    const rows = (await sql`
+      SELECT * FROM lead_conversations ORDER BY last_message_at DESC
+    `) as unknown as ConvRow[];
+    return rows.map((r) => ({
+      id: r.id,
+      customerName: r.customer_name || r.phone,
+      phone: r.phone,
+      rut: "",
+      lastMessage: r.last_message,
+      lastMessageTime: formatChatTime(r.last_message_at),
+      unread: Number(r.unread) || 0,
+      status: toStatus(r.status),
+      online: Boolean(r.online),
+    }));
+  }
+
+  async getMessages(conversationId: string): Promise<ChatMessage[]> {
+    await ensureSchema();
+    const sql = getSql()!;
+    const rows = (await sql`
+      SELECT * FROM lead_messages
+      WHERE conversation_id = ${conversationId}
+      ORDER BY created_at ASC
+    `) as unknown as MsgRow[];
+    return rows.map((r) => ({
+      id: r.id,
+      conversationId: r.conversation_id,
+      text: r.body,
+      time: formatChatTime(r.created_at),
+      direction: r.direction === "out" ? "out" : "in",
+      read: Boolean(r.read),
+    }));
+  }
+
+  async saveMessage(msg: IncomingMessage): Promise<void> {
+    await ensureSchema();
+    const sql = getSql()!;
+    const incUnread = msg.direction === "in" ? 1 : 0;
+
+    await sql`
+      INSERT INTO lead_conversations
+        (id, phone, customer_name, last_message, last_message_at, unread, status, online)
+      VALUES (
+        ${msg.conversationId}, ${msg.phone}, ${msg.customerName},
+        ${msg.body}, ${msg.createdAt}, ${incUnread}, 'new', ${msg.direction === "in"}
+      )
+      ON CONFLICT (id) DO UPDATE SET
+        last_message = EXCLUDED.last_message,
+        last_message_at = EXCLUDED.last_message_at,
+        unread = lead_conversations.unread + ${incUnread},
+        online = ${msg.direction === "in"},
+        customer_name = CASE
+          WHEN lead_conversations.customer_name = '' THEN EXCLUDED.customer_name
+          ELSE lead_conversations.customer_name END
+    `;
+
+    await sql`
+      INSERT INTO lead_messages (id, conversation_id, direction, body, created_at, read)
+      VALUES (${msg.waMessageId}, ${msg.conversationId}, ${msg.direction},
+              ${msg.body}, ${msg.createdAt}, ${msg.direction === "out"})
+      ON CONFLICT (id) DO NOTHING
+    `;
+  }
+
+  async markRead(conversationId: string): Promise<void> {
+    await ensureSchema();
+    const sql = getSql()!;
+    await sql`UPDATE lead_conversations SET unread = 0 WHERE id = ${conversationId}`;
+  }
+}
+
+export function getConversationRepository(): ConversationRepository {
+  return getSql()
+    ? new PostgresConversationRepository()
+    : new MockConversationRepository();
+}

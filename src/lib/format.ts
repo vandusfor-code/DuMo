@@ -42,6 +42,28 @@ export function formatDateTime(iso: string): string {
   return `${datePart}, ${timePart}`;
 }
 
+/** Chat time: "3:25 p. m." if today, else "dd/mm" — WhatsApp-style. */
+export function formatChatTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const now = new Date();
+  const sameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+  if (sameDay) {
+    return new Intl.DateTimeFormat("es-CL", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }).format(date);
+  }
+  return new Intl.DateTimeFormat("es-CL", {
+    day: "2-digit",
+    month: "2-digit",
+  }).format(date);
+}
+
 /** Chilean peso, no decimals: "$1.840.000". */
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("es-CL", {

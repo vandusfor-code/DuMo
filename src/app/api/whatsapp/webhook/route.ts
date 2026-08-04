@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import crypto from "node:crypto";
+import { leadsService } from "@/services/leads.service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -98,13 +99,18 @@ export async function POST(request: NextRequest) {
 
         const contact = change.value?.contacts?.[0];
         for (const msg of change.value?.messages ?? []) {
-          // TODO: persistir el mensaje entrante (BD) y refrescar la bandeja.
-          console.info("[whatsapp/webhook] mensaje", {
-            phoneId,
-            from: msg.from,
-            name: contact?.profile?.name,
-            type: msg.type,
-            text: msg.text?.body,
+          if (!msg.from || !msg.id) continue;
+          const createdAt = msg.timestamp
+            ? new Date(Number(msg.timestamp) * 1000).toISOString()
+            : new Date().toISOString();
+          await leadsService.receiveMessage({
+            waMessageId: msg.id,
+            conversationId: msg.from,
+            phone: msg.from,
+            customerName: contact?.profile?.name ?? "",
+            body: msg.text?.body ?? `[${msg.type ?? "mensaje"}]`,
+            direction: "in",
+            createdAt,
           });
         }
       }
