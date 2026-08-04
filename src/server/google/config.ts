@@ -18,7 +18,23 @@ function normalizePrivateKey(raw: string | undefined): string | undefined {
   ) {
     key = key.slice(1, -1);
   }
-  return key.replace(/\\n/g, "\n");
+  // Convert escaped "\n" sequences (Vercel single-line form) to real newlines.
+  key = key.replace(/\\n/g, "\n");
+
+  // Accept a base64-encoded PEM as well: it's a single continuous string with
+  // no newlines/backslashes, so it survives copy-paste into any dashboard
+  // without the first line being truncated. Decode it back to a PEM.
+  if (!key.includes("BEGIN PRIVATE KEY")) {
+    try {
+      const decoded = Buffer.from(key, "base64").toString("utf8");
+      if (decoded.includes("BEGIN PRIVATE KEY")) {
+        key = decoded;
+      }
+    } catch {
+      /* not base64 — fall through with the original value */
+    }
+  }
+  return key;
 }
 
 export interface GoogleConfig {

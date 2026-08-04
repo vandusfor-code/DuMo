@@ -40,6 +40,8 @@ yarn-error.log*
 sanguine-signal-*.json
 gcp-*.json
 credentials*.json
+GOOGLE_PRIVATE_KEY_base64.txt
+*base64*.txt
 
 # vercel
 .vercel
