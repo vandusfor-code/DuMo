@@ -111,6 +111,20 @@ export async function GET() {
       SELECT conversation_id, count(*)::int AS n FROM lead_messages
       GROUP BY conversation_id ORDER BY n DESC LIMIT 1
     `;
+    // Sonda del listado admin: reproduce la consulta real y expone el error.
+    let adminListTest: { ok: boolean; count?: number; error?: string } | null = null;
+    try {
+      const adminRows = await sql`
+        SELECT id, phone, customer_name, last_message, last_message_at, last_message_direction,
+               unread, online, assigned_advisor_id, assigned_advisor_name, admin_status
+        FROM lead_conversations
+        ORDER BY last_message_at DESC
+      `;
+      adminListTest = { ok: true, count: adminRows.length };
+    } catch (e) {
+      adminListTest = { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+
     let readTest: { conversationId: string; count: number; ms: number } | null = null;
     const topId = top[0]?.conversation_id as string | undefined;
     if (topId) {
@@ -122,6 +136,7 @@ export async function GET() {
     }
 
     return NextResponse.json({
+      adminListTest,
       readTest,
       configured: true,
       connected: true,

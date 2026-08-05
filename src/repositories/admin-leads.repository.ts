@@ -122,7 +122,8 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
   }
 
   async listConversations() {
-    await this.autoAssignAllPending();
+    // El barrido nunca debe impedir que el admin vea las conversaciones.
+    void this.autoAssignAllPending().catch(() => {});
     const rows = await this.fetchRows();
     return rows.map(mapConversation);
   }
@@ -297,7 +298,7 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
           FROM users
           WHERE role = 'asesora' AND active = true
             AND (
-              ${onlyOnline} = false
+              ${onlyOnline}::boolean IS FALSE
               OR (last_seen_at IS NOT NULL AND last_seen_at > now() - interval '10 minutes')
             )
         ),
@@ -305,7 +306,7 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
           SELECT id, (row_number() OVER (ORDER BY last_message_at)) - 1 AS rn
           FROM lead_conversations
           WHERE assigned_advisor_id IS NULL
-            AND (${conversationId}::text IS NULL OR id = ${conversationId})
+            AND (${conversationId}::text IS NULL OR id = ${conversationId}::text)
           LIMIT 200
         )
         UPDATE lead_conversations c
