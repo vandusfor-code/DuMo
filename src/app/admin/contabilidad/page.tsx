@@ -40,15 +40,24 @@ export default function AdminContabilidadPage() {
           <QueryStaleBanner visible={isError && !!data} onRetry={() => refetch()} />
           {isLoading && !data ? (
         <div className="space-y-5">
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-28 rounded-card" />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={`p-${i}`} className="h-[148px] rounded-card" />
             ))}
           </div>
-          <Skeleton className="h-72 rounded-card" />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={`s-${i}`} className="h-[168px] rounded-card" />
+            ))}
+          </div>
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <Skeleton className="h-[340px] rounded-card" />
+            <Skeleton className="h-[340px] rounded-card" />
+          </div>
+          <Skeleton className="h-80 rounded-card" />
         </div>
           ) : data ? (
-        <div className="space-y-5">
+        <div className="space-y-6">
           <AccountingKpis summary={data.summary} />
           <AccountingCharts chart={data.chart} />
           <ExpensesTable
