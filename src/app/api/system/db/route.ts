@@ -36,7 +36,10 @@ export async function GET() {
     const tables = await sql`
       SELECT table_name FROM information_schema.tables
       WHERE table_schema = 'public'
-        AND table_name IN ('users', 'lead_conversations', 'lead_messages', 'app_config')
+        AND table_name IN (
+          'users', 'lead_conversations', 'lead_messages', 'app_config',
+          'accounting_expenses', 'sales', 'sale_lines', 'commission_payments', 'lead_gestiones'
+        )
       ORDER BY table_name
     `;
     const users = await sql`SELECT count(*)::int AS n FROM users`;

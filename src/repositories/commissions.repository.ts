@@ -42,9 +42,13 @@ class SheetsCommissionsRepository implements CommissionsRepository {
   }
 }
 
+import { getPostgresSalesStore } from "@/repositories/postgres-sales.repository";
+import { hasDatabase } from "@/server/db/client";
+
 export function getCommissionsRepository(): CommissionsRepository {
-  const client = getSheetsClient();
-  return client
-    ? new SheetsCommissionsRepository(client)
-    : new MockCommissionsRepository();
+  if (hasDatabase()) {
+    const store = getPostgresSalesStore();
+    return { list: (month) => store.listAdvisorCommissions(month) };
+  }
+  return new MockCommissionsRepository();
 }

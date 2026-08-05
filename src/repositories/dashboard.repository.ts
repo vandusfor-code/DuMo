@@ -160,9 +160,13 @@ class SheetsDashboardRepository implements DashboardRepository {
   }
 }
 
+import { getPostgresSalesStore } from "@/repositories/postgres-sales.repository";
+import { hasDatabase } from "@/server/db/client";
+
 export function getDashboardRepository(): DashboardRepository {
-  const client = getSheetsClient();
-  return client
-    ? new SheetsDashboardRepository(client)
-    : new MockDashboardRepository();
+  if (hasDatabase()) {
+    const store = getPostgresSalesStore();
+    return { getDashboard: () => store.getAdvisorDashboard() };
+  }
+  return new MockDashboardRepository();
 }

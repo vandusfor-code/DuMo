@@ -13,11 +13,13 @@ class MockAdminDashboardRepository implements AdminDashboardRepository {
   }
 }
 
-/**
- * Fábrica del repositorio. Por ahora mock; cuando existan las variables de
- * Google Sheets se agregará `SheetsAdminDashboardRepository` (derivando los
- * KPIs de Ventas/Comisiones/Contabilidad) y se elige aquí.
- */
+import { getPostgresSalesStore } from "@/repositories/postgres-sales.repository";
+import { hasDatabase } from "@/server/db/client";
+
 export function getAdminDashboardRepository(): AdminDashboardRepository {
+  if (hasDatabase()) {
+    const store = getPostgresSalesStore();
+    return { getDashboard: () => store.getAdminDashboard() };
+  }
   return new MockAdminDashboardRepository();
 }

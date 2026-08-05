@@ -31,18 +31,15 @@ export function getSql(): Sql | null {
   if (!url) return null;
 
   const isLocal = url.includes("localhost") || url.includes("127.0.0.1");
-  const isPooler =
-    url.includes("pooler.supabase.com") ||
-    url.includes(":6543") ||
-    url.includes("pgbouncer=true");
 
   sqlSingleton = postgres(url, {
     ssl: isLocal ? false : "require",
     max: 1,
-    idle_timeout: 20,
-    connect_timeout: 20,
-    // Obligatorio con Supabase Transaction pooler (PgBouncer).
-    prepare: !isPooler ? true : false,
+    idle_timeout: 10,
+    connect_timeout: 15,
+    max_lifetime: 60 * 5,
+    // Supabase pooler y serverless: sin prepared statements.
+    prepare: false,
   });
   return sqlSingleton;
 }
@@ -153,6 +150,66 @@ async function runMigrations(sql: Sql) {
   await sql`
     CREATE INDEX IF NOT EXISTS idx_lead_notes_conv
     ON lead_notes (conversation_id, created_at DESC)
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS sales (
+      id text PRIMARY KEY,
+      customer_name text NOT NULL,
+      rut text NOT NULL DEFAULT '',
+      phone text NOT NULL DEFAULT '',
+      email text NOT NULL DEFAULT '',
+      advisor_id text,
+      advisor_name text NOT NULL DEFAULT '',
+      status text NOT NULL DEFAULT 'registrada',
+      sale_type text NOT NULL DEFAULT 'portabilidad',
+      plan text NOT NULL DEFAULT '',
+      operator_value numeric NOT NULL DEFAULT 0,
+      sale_date date NOT NULL DEFAULT CURRENT_DATE,
+      notes text NOT NULL DEFAULT '',
+      created_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS sale_lines (
+      id text PRIMARY KEY,
+      sale_id text NOT NULL,
+      phone_number text NOT NULL DEFAULT '',
+      sale_type text NOT NULL DEFAULT 'portability',
+      device_name text NOT NULL DEFAULT '',
+      plan_id text NOT NULL DEFAULT '',
+      status text NOT NULL DEFAULT 'pending'
+    )
+  `;
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_sale_lines_sale ON sale_lines (sale_id)
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS commission_payments (
+      id text PRIMARY KEY,
+      advisor_id text NOT NULL,
+      period_month int NOT NULL,
+      period_year int NOT NULL,
+      amount numeric NOT NULL DEFAULT 0,
+      status text NOT NULL DEFAULT 'pending',
+      paid_at timestamptz,
+      note text NOT NULL DEFAULT '',
+      UNIQUE (advisor_id, period_month, period_year)
+    )
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS lead_gestiones (
+      id text PRIMARY KEY,
+      conversation_id text NOT NULL,
+      phone text NOT NULL,
+      customer_name text NOT NULL DEFAULT '',
+      rut text NOT NULL DEFAULT '',
+      gestion_type text NOT NULL,
+      notes text NOT NULL DEFAULT '',
+      advisor_id text,
+      advisor_name text NOT NULL DEFAULT '',
+      lines jsonb NOT NULL DEFAULT '[]',
+      created_at timestamptz NOT NULL DEFAULT now()
+    )
   `;
 }
 

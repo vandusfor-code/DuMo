@@ -232,9 +232,17 @@ class SheetsSalesRepository implements SalesRepository {
   }
 }
 
+import { getPostgresSalesStore } from "@/repositories/postgres-sales.repository";
+import { hasDatabase } from "@/server/db/client";
+
 export function getSalesRepository(): SalesRepository {
-  const client = getSheetsClient();
-  return client
-    ? new SheetsSalesRepository(client)
-    : new MockSalesRepository();
+  if (hasDatabase()) {
+    const store = getPostgresSalesStore();
+    return {
+      list: () => store.listSummaries(),
+      getById: (id) => store.getSaleDetail(id),
+      create: (input) => store.createSale(input),
+    };
+  }
+  return new MockSalesRepository();
 }

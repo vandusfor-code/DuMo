@@ -63,7 +63,9 @@ class PostgresSettingsRepository implements SettingsRepository {
 
   async getSnapshot() {
     const stored = await this.loadStored();
-    return mergeSnapshot(stored);
+    const snapshot = mergeSnapshot(stored);
+    snapshot.system.googleSheetsStatus = "disconnected";
+    return snapshot;
   }
 
   async updateCompany(input: UpdateCompanyInput) {
@@ -90,20 +92,17 @@ class PostgresSettingsRepository implements SettingsRepository {
   async updateGoogleSheets(input: UpdateGoogleSheetsInput) {
     const snapshot = await this.getSnapshot();
     snapshot.googleSheets = { ...snapshot.googleSheets, ...input };
-    snapshot.system.googleSheetsStatus = input.spreadsheetId ? "connected" : "disconnected";
+    snapshot.system.googleSheetsStatus = "disconnected";
     await this.saveStored(snapshot);
     return { ...snapshot.googleSheets };
   }
 
   testGoogleSheetsConnection() {
-    const client = getSheetsClient();
-    if (!client) {
-      return Promise.resolve({
-        ok: false,
-        message: "Google Sheets no está configurado. Revisa las variables de entorno.",
-      });
-    }
-    return Promise.resolve({ ok: true, message: "Conexión exitosa con Google Sheets." });
+    return Promise.resolve({
+      ok: true,
+      message:
+        "DuMo guarda los datos en Supabase/Postgres. Google Sheets ya no es necesario para el funcionamiento.",
+    });
   }
 }
 

@@ -2,7 +2,8 @@ import "server-only";
 import type { User } from "@/types/user";
 import { USERS_MOCK } from "@/data/mock/users.mock";
 import { withLatency } from "@/lib/mock";
-import { getSheetsClient, type GoogleSheetsClient } from "@/server/google/sheets-client";
+import { getAuthRepository } from "@/repositories/auth.repository";
+import { hasDatabase } from "@/server/db/client";
 
 export interface UsersRepository {
   listUsers(): Promise<User[]>;
@@ -18,30 +19,18 @@ class MockUsersRepository implements UsersRepository {
   }
 }
 
-class SheetsUsersRepository implements UsersRepository {
-  constructor(private readonly client: GoogleSheetsClient) {}
-
-  async listUsers(): Promise<User[]> {
-    const records = await this.client.getRecords("Usuarios");
-    return records.map((r) => ({
-      id: r.id,
-      name: r.nombre,
-      role: r.cargo,
-      email: r.email,
-      avatarUrl: r.avatarUrl,
-    }));
+class PostgresUsersRepository implements UsersRepository {
+  listUsers() {
+    return getAuthRepository().listUsers();
   }
-
-  async getCurrentUser(): Promise<User> {
-    const users = await this.listUsers();
-    // No auth yet: the first advisor is the "current" user. Falls back to the
-    // default advisor when the Usuarios tab is still empty.
+  async getCurrentUser() {
+    const users = await getAuthRepository().listUsers();
     return users[0] ?? USERS_MOCK[0];
   }
 }
 
-/** Picks the Sheets repo when credentials exist, otherwise the mock. */
+/** Usa Postgres (auth) cuando hay DATABASE_URL; evita Google Sheets. */
 export function getUsersRepository(): UsersRepository {
-  const client = getSheetsClient();
-  return client ? new SheetsUsersRepository(client) : new MockUsersRepository();
+  if (hasDatabase()) return new PostgresUsersRepository();
+  return new MockUsersRepository();
 }

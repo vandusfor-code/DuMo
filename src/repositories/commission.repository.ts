@@ -137,12 +137,23 @@ class MockCommissionRepository implements CommissionRepository {
     });
   }
 
-  markPaid(advisorId: string) {
+  markPaid(advisorId: string, _filters: AdminCommissionFilters) {
     this.paidAdvisors.add(advisorId);
     return withLatency(undefined);
   }
 }
 
+import { getPostgresSalesStore } from "@/repositories/postgres-sales.repository";
+import { hasDatabase } from "@/server/db/client";
+
 export function getCommissionRepository(): CommissionRepository {
+  if (hasDatabase()) {
+    const store = getPostgresSalesStore();
+    return {
+      list: (filters) => store.listAdminCommissions(filters),
+      getDetail: (advisorId, filters) => store.getCommissionDetail(advisorId, filters),
+      markPaid: (advisorId, filters) => store.markCommissionPaid(advisorId, filters),
+    };
+  }
   return new MockCommissionRepository();
 }

@@ -52,7 +52,14 @@ class MockAdminSalesRepository implements AdminSalesRepository {
   }
 }
 
-/** Fábrica; Sheets se agregará después con la misma interfaz. */
+import { getPostgresSalesStore } from "@/repositories/postgres-sales.repository";
+import { hasDatabase } from "@/server/db/client";
+
+/** Fábrica — Supabase/Postgres cuando DATABASE_URL está configurada. */
 export function getAdminSalesRepository(): AdminSalesRepository {
+  if (hasDatabase()) {
+    const store = getPostgresSalesStore();
+    return { list: (filters) => store.listAdminSales(filters) };
+  }
   return new MockAdminSalesRepository();
 }

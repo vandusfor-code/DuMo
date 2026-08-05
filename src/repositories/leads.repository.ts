@@ -237,7 +237,10 @@ class SheetsLeadRepository implements LeadRepository {
   }
 }
 
+import { PostgresLeadRepository } from "@/repositories/postgres-leads.repository";
+import { hasDatabase } from "@/server/db/client";
+
 export function getLeadRepository(): LeadRepository {
-  const client = getSheetsClient();
-  return client ? new SheetsLeadRepository(client) : new MockLeadRepository();
+  if (hasDatabase()) return new PostgresLeadRepository();
+  return new MockLeadRepository();
 }
