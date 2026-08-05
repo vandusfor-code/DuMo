@@ -31,7 +31,7 @@ export function ChatInput({
   };
 
   return (
-    <div className="shrink-0 border-t border-[#e9edef] bg-[#f0f2f5] px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
+    <div className="shrink-0 border-t border-line bg-card px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -57,7 +57,7 @@ export function ChatInput({
             }
           }}
           placeholder="Escribe un mensaje..."
-          className="h-11 flex-1 rounded-full border border-[#e9edef] bg-white px-4 text-[14px] text-ink outline-none transition-colors focus-visible:border-brand"
+          className="h-11 flex-1 rounded-full border border-line bg-canvas px-4 text-[14px] text-ink outline-none transition-colors focus-visible:border-brand"
         />
         <button
           type="button"

@@ -74,11 +74,9 @@
   }
 }
 
-/* WhatsApp Web — fondo de conversación (beige + patrón de íconos). */
+/* Área de conversación — fondo sólido alineado al canvas de DuMo. */
 @layer utilities {
-  .wa-chat-bg {
-    background-color: #efeae2;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260' viewBox='0 0 260 260'%3E%3Cg fill='%23d6cfc7' fill-opacity='0.45'%3E%3Cpath d='M40 28h8v8h-8zM72 44h6v6h-6zM28 72h10v10H28zM96 24h5v5h-5zM120 56h7v7h-7zM148 32h6v6h-6zM180 68h8v8h-8zM208 36h5v5h-5zM232 80h6v6h-6zM56 108h7v7h-7zM88 132h8v8h-8zM116 96h6v6h-6zM144 124h5v5h-5zM172 104h7v7h-7zM200 128h8v8h-8zM228 112h6v6h-6zM36 156h6v6h-6zM64 184h8v8h-8zM104 168h5v5h-5zM136 192h7v7h-7zM168 160h6v6h-6zM196 188h8v8h-8zM224 164h5v5h-5zM48 220h7v7h-7zM80 204h6v6h-6zM128 224h8v8h-8zM160 208h6v6h-6zM192 232h5v5h-5z'/%3E%3Ccircle cx='52' cy='52' r='3'/%3E%3Ccircle cx='132' cy='88' r='2.5'/%3E%3Ccircle cx='188' cy='52' r='3'/%3E%3Ccircle cx='220' cy='156' r='2.5'/%3E%3Ccircle cx='76' cy='172' r='3'/%3E%3Ccircle cx='156' cy='148' r='2.5'/%3E%3C/g%3E%3C/svg%3E");
-    background-size: 412px 412px;
+  .chat-bg {
+    background-color: var(--color-canvas);
   }
 }

@@ -56,9 +56,9 @@ export function AdminChatPanel({
         <ChatHeader conversation={headerConv} />
       </div>
 
-      <div className="wa-chat-bg min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+      <div className="chat-bg min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
         <div className="flex justify-center">
-          <span className="rounded-full bg-card px-3 py-1 text-[11px] font-medium text-muted shadow-sm">
+          <span className="rounded-full border border-line bg-card px-3 py-1 text-[11px] font-medium text-muted">
             Hoy
           </span>
         </div>
@@ -73,7 +73,7 @@ export function AdminChatPanel({
         )}
       </div>
 
-      <div className="shrink-0 border-t border-[#e9edef] bg-[#f0f2f5] px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
+      <div className="shrink-0 border-t border-line bg-card px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
         {(error || sendError) && (
           <p className="mb-2 rounded-lg bg-danger-soft px-3 py-2 text-[12px] font-medium text-danger-ink">
             {error ?? sendError}
@@ -92,7 +92,7 @@ export function AdminChatPanel({
             onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && void handleSend()}
             placeholder="Escribe un mensaje..."
             disabled={isSending}
-            className="min-h-10 flex-1 rounded-2xl border-0 bg-white px-4 text-[14px] outline-none ring-0 placeholder:text-muted disabled:opacity-60"
+            className="min-h-10 flex-1 rounded-2xl border border-line bg-canvas px-4 text-[14px] outline-none ring-0 placeholder:text-muted disabled:opacity-60"
           />
           {value.trim() ? (
             <button

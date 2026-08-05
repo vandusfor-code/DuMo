@@ -22,15 +22,15 @@ export function ChatWindow({
         <ChatHeader conversation={conversation} />
       </div>
 
-      <div className="wa-chat-bg min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+      <div className="chat-bg min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
         <div className="flex justify-center">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-soft px-3 py-1 text-[11px] font-medium text-warning-ink">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-3 py-1 text-[11px] font-medium text-brand">
             <Lock className="size-3" />
             Los mensajes están cifrados de extremo a extremo.
           </span>
         </div>
         <div className="flex justify-center">
-          <span className="rounded-full bg-card px-3 py-1 text-[11px] font-medium text-muted shadow-sm">
+          <span className="rounded-full border border-line bg-card px-3 py-1 text-[11px] font-medium text-muted">
             Hoy
           </span>
         </div>
