@@ -83,19 +83,20 @@ export async function withQueryTimeout<T>(promise: Promise<T>, ms = 8000): Promi
   }
 }
 
-/**
- * Versión del esquema. Súbela al agregar/alterar tablas para que la migración
- * vuelva a correr una vez. Si no cambia, los cold-starts saltan todo el DDL.
- */
-const SCHEMA_VERSION = 2;
 /** Clave del advisory lock que serializa la migración entre instancias. */
 const MIGRATION_LOCK_KEY = 828171;
 
 /**
- * Ejecuta las migraciones DDL UNA sola vez, serializadas entre todas las
- * instancias serverless con un advisory lock transaccional. Tras la primera
- * migración, cada cold-start solo lee la versión y sale (sin DDL), lo que
- * elimina las carreras de CREATE/ALTER que causaban fallos intermitentes.
+ * Migraciones AUTORREPARABLES.
+ *
+ * Todo el DDL es idempotente (`IF NOT EXISTS`) y se ejecuta una vez por
+ * cold-start, serializado con un advisory lock transaccional para que dos
+ * instancias serverless nunca compitan.
+ *
+ * Antes existía un "candado por versión" que saltaba el DDL si la versión
+ * coincidía: al añadir una columna sin subir ese número, el ALTER nunca corría
+ * y la app fallaba con "column ... does not exist". Ahora no hay forma de que
+ * el esquema quede desactualizado: si falta algo, se crea solo.
  */
 async function runMigrations(sql: Sql) {
   await sql.begin(async (tx) => {
@@ -109,9 +110,6 @@ async function runMigrations(sql: Sql) {
         updated_at timestamptz NOT NULL DEFAULT now()
       )
     `;
-    const versionRows = await tx`SELECT value FROM app_config WHERE key = 'schema_version'`;
-    const current = versionRows[0]?.value != null ? Number(versionRows[0].value) : 0;
-    if (current >= SCHEMA_VERSION) return; // ya migrado: nada de DDL
 
     await tx`
       CREATE TABLE IF NOT EXISTS lead_conversations (
@@ -259,7 +257,7 @@ async function runMigrations(sql: Sql) {
 
     await tx`
       INSERT INTO app_config (key, value)
-      VALUES ('schema_version', ${String(SCHEMA_VERSION)}::jsonb)
+      VALUES ('schema_migrated_at', ${JSON.stringify(new Date().toISOString())}::jsonb)
       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()
     `;
   });
