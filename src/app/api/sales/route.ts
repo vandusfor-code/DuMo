@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { advisorScopeFromUser } from "@/lib/advisor-scope";
+import { withAdvisorFallback } from "@/lib/advisor-api-fallbacks";
 import { authService } from "@/services/auth.service";
 import { salesService } from "@/services/sales.service";
 import { newSaleSchema } from "@/lib/schemas/new-sale.schema";
@@ -7,18 +8,19 @@ import type { NewSaleInput } from "@/types/sale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 15;
+export const maxDuration = 30;
 
 export async function GET() {
-  try {
-    const user = await authService.getSessionUser();
-    const scope = advisorScopeFromUser(user);
-    const sales = await salesService.list(scope);
-    return NextResponse.json(sales);
-  } catch (error) {
-    console.error("[GET /api/sales]", error);
-    return NextResponse.json([]);
-  }
+  const sales = await withAdvisorFallback(
+    async () => {
+      const user = await authService.getSessionUser();
+      const scope = advisorScopeFromUser(user);
+      return salesService.list(scope);
+    },
+    [],
+    "sales-list",
+  );
+  return NextResponse.json(sales);
 }
 
 export async function POST(request: NextRequest) {

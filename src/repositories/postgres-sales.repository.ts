@@ -22,6 +22,7 @@ import { matchesAdvisor } from "@/lib/advisor-scope";
 import { getAuthRepository } from "@/repositories/auth.repository";
 import { getCommercialConfigurationRepository } from "@/repositories/commercial-configuration.repository";
 import { buildPlanValueIndex } from "@/lib/commercial-plan";
+import { findPlanCommission } from "@/data/mock/commercial-config.mock";
 import {
   economicProgress,
   perAdvisorEconomicGoal,
@@ -148,22 +149,44 @@ function summarizeAdmin(rows: AdminSale[]): AdminSalesSummary {
   return s;
 }
 
-async function fetchSalesWithLineCounts(): Promise<SaleRow[]> {
+async function fetchSalesWithLineCounts(
+  scope: AdvisorScope | null = null,
+): Promise<SaleRow[]> {
   await ensureSchema();
   const sql = getSql();
   if (!sql) return [];
-  return withQueryTimeout(
-    withDbRetry(() =>
-      sql<SaleRow[]>`
+
+  const runQuery = () => {
+    if (scope?.id) {
+      return sql<SaleRow[]>`
         SELECT s.*, COUNT(l.id)::int AS line_count
         FROM sales s
         LEFT JOIN sale_lines l ON l.sale_id = s.id
+        WHERE s.advisor_id = ${scope.id}
         GROUP BY s.id
         ORDER BY s.sale_date DESC, s.created_at DESC
-      `,
-    ),
-    8000,
-  );
+      `;
+    }
+    if (scope?.name) {
+      return sql<SaleRow[]>`
+        SELECT s.*, COUNT(l.id)::int AS line_count
+        FROM sales s
+        LEFT JOIN sale_lines l ON l.sale_id = s.id
+        WHERE s.advisor_name = ${scope.name}
+        GROUP BY s.id
+        ORDER BY s.sale_date DESC, s.created_at DESC
+      `;
+    }
+    return sql<SaleRow[]>`
+      SELECT s.*, COUNT(l.id)::int AS line_count
+      FROM sales s
+      LEFT JOIN sale_lines l ON l.sale_id = s.id
+      GROUP BY s.id
+      ORDER BY s.sale_date DESC, s.created_at DESC
+    `;
+  };
+
+  return withQueryTimeout(withDbRetry(runQuery), 8000);
 }
 
 function monthExpenseBounds(monthKey: string): { start: string; end: string } {
@@ -180,17 +203,20 @@ function monthExpenseBounds(monthKey: string): { start: string; end: string } {
 
 export class PostgresSalesStore {
   async listSummaries(scope: AdvisorScope | null = null): Promise<SaleSummary[]> {
-    const rows = await fetchSalesWithLineCounts();
-    return rows
-      .filter((row) => matchesAdvisor(row, scope))
-      .map((row) => ({
-      id: row.id,
-      customerName: row.customer_name,
-      rut: row.rut,
-      date: isoFromRow(row),
-      lines: lineCount(row),
-      status: toAdvisorStatus(row.status),
-    }));
+    try {
+      const rows = await fetchSalesWithLineCounts(scope);
+      return rows.map((row) => ({
+        id: row.id,
+        customerName: row.customer_name,
+        rut: row.rut,
+        date: isoFromRow(row),
+        lines: lineCount(row),
+        status: toAdvisorStatus(row.status),
+      }));
+    } catch (err) {
+      console.error("[listSummaries]", err);
+      return [];
+    }
   }
 
   async getSaleDetail(id: string): Promise<SaleDetail | null> {
@@ -347,7 +373,7 @@ export class PostgresSalesStore {
         const finalized = advisorSales.filter((s) => s.status === "finalizada");
         let calculatedCommission = 0;
         for (const sale of finalized) {
-          const perLine = await configRepo.resolveCommissionForPlan(sale.plan);
+          const perLine = findPlanCommission(sale.plan, config.plans);
           calculatedCommission += perLine * sale.lines;
         }
 
@@ -409,7 +435,8 @@ export class PostgresSalesStore {
     const advisor = list.rows[0];
     if (!advisor) throw new Error("Asesora no encontrada");
 
-    const planIndex = buildPlanValueIndex((await configRepo.getSnapshot()).plans);
+    const config = await configRepo.getSnapshot();
+    const planIndex = buildPlanValueIndex(config.plans);
     const sales = (await fetchSalesWithLineCounts())
       .map((r) => rowToAdminSale(r, planIndex))
       .filter(
@@ -419,20 +446,18 @@ export class PostgresSalesStore {
           adminDateInPeriod(s.date, filters.month, filters.year),
       );
 
-    const saleDetails = await Promise.all(
-      sales.map(async (s) => {
-        const commission = (await configRepo.resolveCommissionForPlan(s.plan)) * s.lines;
-        return {
-          saleId: s.id,
-          customerName: s.customerName,
-          date: s.date,
-          plan: s.plan,
-          lines: s.lines,
-          womValue: s.womValue,
-          commission,
-        };
-      }),
-    );
+    const saleDetails = sales.map((s) => {
+      const commission = findPlanCommission(s.plan, config.plans) * s.lines;
+      return {
+        saleId: s.id,
+        customerName: s.customerName,
+        date: s.date,
+        plan: s.plan,
+        lines: s.lines,
+        womValue: s.womValue,
+        commission,
+      };
+    });
 
     return {
       advisor,
@@ -503,41 +528,52 @@ export class PostgresSalesStore {
     month?: string,
     scope: AdvisorScope | null = null,
   ): Promise<Commission[]> {
-    const configRepo = getCommercialConfigurationRepository();
-    const rows = (await fetchSalesWithLineCounts()).filter((row) => matchesAdvisor(row, scope));
-    const monthKey = month ?? businessMonth();
-    const paidByAdvisorMonth = new Map<string, boolean>();
+    try {
+      const configRepo = getCommercialConfigurationRepository();
+      const config = await withQueryTimeout(configRepo.getSnapshot(), 6000);
+      const plans = config.plans;
 
-    const monthNum = Number(monthKey.slice(5, 7));
-    const yearNum = Number(monthKey.slice(0, 4));
-    const payments = await this.loadCommissionPayments(String(monthNum), String(yearNum));
-    for (const p of payments) {
-      if (p.status === "paid") {
-        paidByAdvisorMonth.set(p.advisor_id, true);
+      const rows = await fetchSalesWithLineCounts(scope);
+      const monthKey = month ?? businessMonth();
+      const paidByAdvisorMonth = new Map<string, boolean>();
+
+      const monthNum = Number(monthKey.slice(5, 7));
+      const yearNum = Number(monthKey.slice(0, 4));
+      const payments = await withQueryTimeout(
+        this.loadCommissionPayments(String(monthNum), String(yearNum)),
+        5000,
+      );
+      for (const p of payments) {
+        if (p.status === "paid") {
+          paidByAdvisorMonth.set(p.advisor_id, true);
+        }
       }
-    }
 
-    const commissions: Commission[] = [];
-    for (const row of rows) {
-      const iso = isoFromRow(row);
-      if (!isoDateInMonth(iso, monthKey)) continue;
-      const lines = lineCount(row);
-      const perLine = await configRepo.resolveCommissionForPlan(row.plan);
-      const amount = perLine * lines;
-      const paid = row.advisor_id ? paidByAdvisorMonth.get(row.advisor_id) : false;
-      commissions.push({
-        id: `COM-${row.id.replace(/^VTA-/, "")}`,
-        saleId: row.id,
-        customerName: row.customer_name,
-        date: iso,
-        lines,
-        amount,
-        status: paid ? "paid" : "pending",
-        paymentDate: paid ? `${monthKey}-05` : null,
-      });
-    }
+      const commissions: Commission[] = [];
+      for (const row of rows) {
+        const iso = isoFromRow(row);
+        if (!isoDateInMonth(iso, monthKey)) continue;
+        const lines = lineCount(row);
+        const perLine = findPlanCommission(row.plan ?? "", plans);
+        const amount = perLine * lines;
+        const paid = row.advisor_id ? paidByAdvisorMonth.get(row.advisor_id) : false;
+        commissions.push({
+          id: `COM-${row.id.replace(/^VTA-/, "")}`,
+          saleId: row.id,
+          customerName: row.customer_name,
+          date: iso,
+          lines,
+          amount,
+          status: paid ? "paid" : "pending",
+          paymentDate: paid ? `${monthKey}-05` : null,
+        });
+      }
 
-    return commissions.sort((a, b) => b.date.localeCompare(a.date));
+      return commissions.sort((a, b) => b.date.localeCompare(a.date));
+    } catch (err) {
+      console.error("[listAdvisorCommissions]", err);
+      return [];
+    }
   }
 
   async getAdvisorDashboard(scope: AdvisorScope | null = null): Promise<DashboardData> {

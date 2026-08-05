@@ -62,7 +62,7 @@ export default function SaleDetailPage() {
       <div className="pt-1">
         <ErrorState
           title="No se pudo cargar la venta"
-          message="Revisa la conexión con Google Sheets e intenta nuevamente."
+          message="Intenta nuevamente en unos segundos."
           onRetry={() => refetch()}
         />
       </div>

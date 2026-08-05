@@ -9,6 +9,7 @@ import { SalesSummary } from "@/components/sales/sales-summary";
 import { SalesFilters, type SalesRange } from "@/components/sales/sales-filters";
 import { SalesTable } from "@/components/sales/sales-table";
 import { ErrorState } from "@/components/shared/error-state";
+import { QueryStaleBanner, shouldShowFatalQueryError } from "@/components/shared/query-state";
 import { useSales } from "@/hooks/use-sales";
 import { businessDateISO } from "@/lib/date";
 import type { SaleSummary } from "@/types/sale";
@@ -35,7 +36,9 @@ function inRange(dateIso: string, range: SalesRange): boolean {
 }
 
 export default function MisVentasPage() {
-  const { data, isLoading, isError, refetch } = useSales();
+  const query = useSales();
+  const { data, isLoading, isError, refetch } = query;
+  const fatal = shouldShowFatalQueryError(query);
   const [range, setRange] = useState<SalesRange>("today");
 
   const filtered = useMemo<SaleSummary[]>(
@@ -53,13 +56,16 @@ export default function MisVentasPage() {
         actions={<SalesFilters range={range} onRangeChange={setRange} />}
       />
 
-      {isError && !data ? (
+      {fatal ? (
         <ErrorState
           title="No se pudieron cargar las ventas"
-          message="Revisa la conexión con Google Sheets e intenta nuevamente."
+          message="Intenta nuevamente en unos segundos."
           onRetry={() => refetch()}
         />
-      ) : isLoading || !data ? (
+      ) : (
+        <>
+          <QueryStaleBanner visible={isError && !!data} onRetry={() => refetch()} />
+          {isLoading && data === undefined ? (
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <Skeleton className="h-28 rounded-card" />
@@ -67,7 +73,7 @@ export default function MisVentasPage() {
           </div>
           <Skeleton className="h-96 rounded-card" />
         </div>
-      ) : (
+          ) : (
         <motion.div
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
@@ -79,6 +85,8 @@ export default function MisVentasPage() {
             <SalesTable data={filtered} />
           </Card>
         </motion.div>
+          )}
+        </>
       )}
     </div>
   );

@@ -33,24 +33,31 @@ const SETTINGS_KEY = "commercial_settings";
 const LEGACY_BUDGET_KEY = "accounting_monthly_budget";
 
 class PostgresCommercialConfigurationRepository implements CommercialConfigurationRepository {
+  private plansCache: CommercialPlan[] | null = null;
+  private settingsCache: CommercialGlobalSettings | null = null;
+
   private async loadPlans(): Promise<CommercialPlan[]> {
+    if (this.plansCache) return this.plansCache;
     const stored = await getConfig<(CommercialPlan & { operatorPayment?: number })[] | null>(
       PLANS_KEY,
       null,
     );
     if (stored !== null) {
       const normalized = normalizeCommercialPlans(stored);
-      return normalized.length > 0 ? normalized : [...COMMERCIAL_PLANS_MOCK];
+      this.plansCache = normalized.length > 0 ? normalized : [...COMMERCIAL_PLANS_MOCK];
+      return this.plansCache;
     }
     try {
       await setConfig(PLANS_KEY, COMMERCIAL_PLANS_MOCK);
     } catch (err) {
       console.error("[commercial-config] seed plans", err);
     }
-    return [...COMMERCIAL_PLANS_MOCK];
+    this.plansCache = [...COMMERCIAL_PLANS_MOCK];
+    return this.plansCache;
   }
 
   private async loadSettings(): Promise<CommercialGlobalSettings> {
+    if (this.settingsCache) return this.settingsCache;
     const [stored, legacyBudget] = await Promise.all([
       getConfig<Parameters<typeof normalizeCommercialSettings>[0] | null>(SETTINGS_KEY, null),
       getConfig<number>(LEGACY_BUDGET_KEY, 0),
@@ -59,15 +66,23 @@ class PostgresCommercialConfigurationRepository implements CommercialConfigurati
     if (stored !== null) {
       const settings = normalizeCommercialSettings(stored);
       if (!settings.monthlyBudget && legacyBudget > 0) {
-        return { ...settings, monthlyBudget: legacyBudget };
+        this.settingsCache = { ...settings, monthlyBudget: legacyBudget };
+        return this.settingsCache;
       }
+      this.settingsCache = settings;
       return settings;
     }
 
-    return {
+    this.settingsCache = {
       ...COMMERCIAL_SETTINGS_MOCK,
       monthlyBudget: legacyBudget || COMMERCIAL_SETTINGS_MOCK.monthlyBudget,
     };
+    return this.settingsCache;
+  }
+
+  private invalidateCache() {
+    this.plansCache = null;
+    this.settingsCache = null;
   }
 
   private async savePlans(plans: CommercialPlan[]) {
@@ -84,6 +99,7 @@ class PostgresCommercialConfigurationRepository implements CommercialConfigurati
     const plan: CommercialPlan = { id: `plan-${Date.now()}`, ...input };
     plans.push(plan);
     await this.savePlans(plans);
+    this.invalidateCache();
     return plan;
   }
 
@@ -93,6 +109,7 @@ class PostgresCommercialConfigurationRepository implements CommercialConfigurati
     if (idx === -1) throw new Error("Plan no encontrado");
     plans[idx] = { ...plans[idx], ...input };
     await this.savePlans(plans);
+    this.invalidateCache();
     return plans[idx];
   }
 
@@ -107,12 +124,14 @@ class PostgresCommercialConfigurationRepository implements CommercialConfigurati
     };
     plans.push(copy);
     await this.savePlans(plans);
+    this.invalidateCache();
     return copy;
   }
 
   async deletePlan(id: string) {
     const plans = await this.loadPlans();
     await this.savePlans(plans.filter((p) => p.id !== id));
+    this.invalidateCache();
   }
 
   async updateSettings(input: UpdateCommercialSettingsInput) {
@@ -121,6 +140,7 @@ class PostgresCommercialConfigurationRepository implements CommercialConfigurati
       setConfig(SETTINGS_KEY, next),
       setConfig(LEGACY_BUDGET_KEY, next.monthlyBudget),
     ]);
+    this.invalidateCache();
     return { ...next };
   }
 

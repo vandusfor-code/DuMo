@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ErrorState } from "@/components/shared/error-state";
+import { QueryStaleBanner, shouldShowFatalQueryError } from "@/components/shared/query-state";
 import {
   CommissionCards,
   type CommissionTotals,
@@ -65,7 +66,9 @@ function exportCsv(rows: Commission[], month: string) {
 export default function ComisionesPage() {
   const [month, setMonth] = useState<string>(currentMonth());
   const [tab, setTab] = useState<Tab>("all");
-  const { data, isLoading, isError, refetch } = useCommissions(month);
+  const query = useCommissions(month);
+  const { data, isLoading, isError, refetch } = query;
+  const fatal = shouldShowFatalQueryError(query);
 
   const commissions = useMemo(() => data ?? [], [data]);
 
@@ -96,13 +99,16 @@ export default function ComisionesPage() {
         actions={<CommissionMonthFilter month={month} onMonthChange={setMonth} />}
       />
 
-      {isError && !data ? (
+      {fatal ? (
         <ErrorState
           title="No se pudieron cargar las comisiones"
           message="Intenta nuevamente en unos segundos."
           onRetry={() => refetch()}
         />
-      ) : isLoading || !data ? (
+      ) : (
+        <>
+          <QueryStaleBanner visible={isError && !!data} onRetry={() => refetch()} />
+          {isLoading && data === undefined ? (
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
             {[0, 1, 2, 3].map((i) => (
@@ -111,7 +117,7 @@ export default function ComisionesPage() {
           </div>
           <Skeleton className="h-96 rounded-card" />
         </div>
-      ) : (
+          ) : (
         <motion.div
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
@@ -150,6 +156,8 @@ export default function ComisionesPage() {
             nextPaymentLabel={nextPaymentLabel(month)}
           />
         </motion.div>
+          )}
+        </>
       )}
     </div>
   );
