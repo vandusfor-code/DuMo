@@ -13,6 +13,7 @@ let schemaReady = false;
 export function getDatabaseUrl(): string | null {
   const candidates = [
     process.env.DATABASE_URL,
+    process.env.DATABASE_URL1,
     process.env.SUPABASE_DATABASE_URL,
     process.env.POSTGRES_URL,
     process.env.POSTGRES_PRISMA_URL,
