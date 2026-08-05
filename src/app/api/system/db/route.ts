@@ -54,8 +54,23 @@ export async function GET() {
       SELECT count(*)::int AS n FROM lead_conversations c
       WHERE EXISTS (SELECT 1 FROM lead_messages m WHERE m.conversation_id = c.id)
     `;
+    // Prueba directa del read-path: lee los mensajes de la conversación con más.
+    const top = await sql`
+      SELECT conversation_id, count(*)::int AS n FROM lead_messages
+      GROUP BY conversation_id ORDER BY n DESC LIMIT 1
+    `;
+    let readTest: { conversationId: string; count: number; ms: number } | null = null;
+    const topId = top[0]?.conversation_id as string | undefined;
+    if (topId) {
+      const t0 = Date.now();
+      const msgs = await sql`
+        SELECT id FROM lead_messages WHERE conversation_id = ${topId} ORDER BY created_at ASC
+      `;
+      readTest = { conversationId: topId, count: msgs.length, ms: Date.now() - t0 };
+    }
 
     return NextResponse.json({
+      readTest,
       configured: true,
       connected: true,
       mode: "postgres",
