@@ -1,4 +1,5 @@
 import "server-only";
+import type postgres from "postgres";
 import { ensureSchema, getSql, hasDatabase } from "@/server/db/client";
 
 export function configRequiresDatabase(): boolean {
@@ -33,7 +34,7 @@ export async function setConfig<T>(key: string, value: T): Promise<void> {
   await ensureSchema();
   await sql`
     INSERT INTO app_config (key, value, updated_at)
-    VALUES (${key}, ${JSON.stringify(value)}, now())
+    VALUES (${key}, ${sql.json(value as postgres.JSONValue)}, now())
     ON CONFLICT (key) DO UPDATE
     SET value = EXCLUDED.value, updated_at = now()
   `;

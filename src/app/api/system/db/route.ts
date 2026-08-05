@@ -1,42 +1,55 @@
 import { NextResponse } from "next/server";
-import { ensureSchema, getSql, hasDatabase } from "@/server/db/client";
+import { ensureSchema, getDatabaseUrl, getSql, hasDatabase, pingDatabase } from "@/server/db/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/**
- * Diagnóstico de la base de datos del chat. Confirma si DATABASE_URL está
- * presente, si conecta y si las tablas existen (las crea si faltan). Solo
- * devuelve estado y conteos — nunca datos ni credenciales.
- */
 export async function GET() {
+  const url = getDatabaseUrl();
   if (!hasDatabase()) {
-    return NextResponse.json({ configured: false, mode: "mock" });
+    return NextResponse.json({
+      configured: false,
+      mode: "mock",
+      hint:
+        "Configura DATABASE_URL con la URI de Postgres. En Supabase: Settings → Database → Connection string → Transaction pooler (puerto 6543). Las variables SUPABASE_ANON_KEY no sirven para SQL.",
+    });
+  }
+
+  const ping = await pingDatabase();
+  if (!ping.ok) {
+    return NextResponse.json(
+      {
+        configured: true,
+        connected: false,
+        provider: url?.includes("supabase") ? "supabase" : "postgres",
+        error: ping.message,
+        hint:
+          "Si usas Supabase, la URI debe ser del Transaction pooler (6543), no la conexión directa (5432).",
+      },
+      { status: 500 },
+    );
   }
 
   try {
     await ensureSchema();
     const sql = getSql()!;
-    const tables = (await sql`
+    const tables = await sql`
       SELECT table_name FROM information_schema.tables
       WHERE table_schema = 'public'
-        AND table_name IN ('lead_conversations', 'lead_messages')
+        AND table_name IN ('users', 'lead_conversations', 'lead_messages', 'app_config')
       ORDER BY table_name
-    `) as unknown as { table_name: string }[];
-    const convCount = (await sql`SELECT count(*)::int AS n FROM lead_conversations`) as unknown as {
-      n: number;
-    }[];
-    const msgCount = (await sql`SELECT count(*)::int AS n FROM lead_messages`) as unknown as {
-      n: number;
-    }[];
+    `;
+    const users = await sql`SELECT count(*)::int AS n FROM users`;
+    const convCount = await sql`SELECT count(*)::int AS n FROM lead_conversations`;
 
     return NextResponse.json({
       configured: true,
       connected: true,
       mode: "postgres",
+      provider: url?.includes("supabase") ? "supabase" : "postgres",
       tables: tables.map((t) => t.table_name),
+      users: users[0]?.n ?? 0,
       conversations: convCount[0]?.n ?? 0,
-      messages: msgCount[0]?.n ?? 0,
     });
   } catch (error) {
     return NextResponse.json(

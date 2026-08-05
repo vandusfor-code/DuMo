@@ -1,23 +1,56 @@
 import "server-only";
-import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
+import postgres, { type Sql } from "postgres";
 
-let sqlSingleton: NeonQueryFunction<false, false> | null = null;
+let sqlSingleton: Sql | null = null;
 let schemaPromise: Promise<void> | null = null;
 let schemaReady = false;
 
-export function getSql(): NeonQueryFunction<false, false> | null {
+/**
+ * DuMo usa Postgres directo (compatible con Supabase, Neon, Vercel Postgres).
+ * Supabase: usa la URI del **Transaction pooler** (puerto 6543) en DATABASE_URL.
+ * Las variables NEXT_PUBLIC_SUPABASE_* / ANON_KEY no son la conexión SQL.
+ */
+export function getDatabaseUrl(): string | null {
+  const candidates = [
+    process.env.DATABASE_URL,
+    process.env.SUPABASE_DATABASE_URL,
+    process.env.POSTGRES_URL,
+    process.env.POSTGRES_PRISMA_URL,
+  ];
+  for (const value of candidates) {
+    const trimmed = value?.trim();
+    if (trimmed) return trimmed;
+  }
+  return null;
+}
+
+export function getSql(): Sql | null {
   if (sqlSingleton) return sqlSingleton;
-  const url = process.env.DATABASE_URL;
+  const url = getDatabaseUrl();
   if (!url) return null;
-  sqlSingleton = neon(url);
+
+  const isLocal = url.includes("localhost") || url.includes("127.0.0.1");
+  const isPooler =
+    url.includes("pooler.supabase.com") ||
+    url.includes(":6543") ||
+    url.includes("pgbouncer=true");
+
+  sqlSingleton = postgres(url, {
+    ssl: isLocal ? false : "require",
+    max: 1,
+    idle_timeout: 20,
+    connect_timeout: 20,
+    // Obligatorio con Supabase Transaction pooler (PgBouncer).
+    prepare: !isPooler ? true : false,
+  });
   return sqlSingleton;
 }
 
 export function hasDatabase(): boolean {
-  return Boolean(process.env.DATABASE_URL);
+  return Boolean(getDatabaseUrl());
 }
 
-/** Reintenta consultas ante timeouts transitorios de Neon/Vercel. */
+/** Reintenta consultas ante timeouts transitorios en serverless. */
 export async function withDbRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
   let lastError: unknown;
   for (let attempt = 0; attempt < retries; attempt++) {
@@ -26,14 +59,14 @@ export async function withDbRetry<T>(fn: () => Promise<T>, retries = 3): Promise
     } catch (err) {
       lastError = err;
       if (attempt < retries - 1) {
-        await new Promise((r) => setTimeout(r, 250 * (attempt + 1)));
+        await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
       }
     }
   }
   throw lastError;
 }
 
-async function runMigrations(sql: NeonQueryFunction<false, false>) {
+async function runMigrations(sql: Sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS lead_conversations (
       id text PRIMARY KEY,
@@ -141,13 +174,19 @@ export function ensureSchema(): Promise<void> {
   return schemaPromise;
 }
 
-/** Comprueba conectividad — útil para diagnóstico. */
 export async function pingDatabase(): Promise<{ ok: boolean; message: string }> {
-  const sql = getSql();
-  if (!sql) return { ok: false, message: "DATABASE_URL no configurada." };
+  const url = getDatabaseUrl();
+  if (!url) {
+    return {
+      ok: false,
+      message:
+        "DATABASE_URL no configurada. En Supabase: Project Settings → Database → Transaction pooler → copia la URI y ponla en DATABASE_URL.",
+    };
+  }
   try {
     await withDbRetry(async () => {
       await ensureSchema();
+      const sql = getSql()!;
       await sql`SELECT 1 AS ok`;
     });
     return { ok: true, message: "Conexión OK." };
