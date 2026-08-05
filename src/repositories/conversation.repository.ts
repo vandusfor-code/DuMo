@@ -74,6 +74,7 @@ type ConvRow = {
   customer_name: string;
   last_message: string;
   last_message_at: string;
+  last_message_direction?: string;
   unread: number;
   status: string;
   online: boolean;
@@ -119,6 +120,7 @@ class PostgresConversationRepository implements ConversationRepository {
       rut: "",
       lastMessage: r.last_message,
       lastMessageTime: formatChatTime(r.last_message_at),
+      lastMessageDirection: r.last_message_direction === "out" ? "out" : "in",
       unread: Number(r.unread) || 0,
       status: toStatus(r.status),
       online: Boolean(r.online),
@@ -155,15 +157,16 @@ class PostgresConversationRepository implements ConversationRepository {
 
     await sql`
       INSERT INTO lead_conversations
-        (id, phone, customer_name, last_message, last_message_at, unread, status, online, dumo_phone_id)
+        (id, phone, customer_name, last_message, last_message_at, unread, status, online, dumo_phone_id, last_message_direction)
       VALUES (
         ${msg.conversationId}, ${msg.phone}, ${msg.customerName},
         ${msg.body}, ${msg.createdAt}, ${incUnread}, 'new', ${msg.direction === "in"},
-        ${msg.dumoPhoneId ?? null}
+        ${msg.dumoPhoneId ?? null}, ${msg.direction}
       )
       ON CONFLICT (id) DO UPDATE SET
         last_message = EXCLUDED.last_message,
         last_message_at = EXCLUDED.last_message_at,
+        last_message_direction = EXCLUDED.last_message_direction,
         unread = lead_conversations.unread + ${incUnread},
         online = ${msg.direction === "in"},
         customer_name = CASE

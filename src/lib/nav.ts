@@ -35,7 +35,7 @@ export const PRIMARY_NAV: NavItem[] = [
   { label: "Clientes", href: "/dashboard/clientes", icon: Users },
   { label: "Reportes", href: "/dashboard/reportes", icon: LineChart },
   { label: "Comisiones", href: "/dashboard/comisiones", icon: CircleDollarSign },
-  { label: "Notificaciones", href: "/dashboard/notificaciones", icon: Bell, badge: 3 },
+  { label: "Notificaciones", href: "/dashboard/notificaciones", icon: Bell },
 ];
 
 /** Secondary navigation — visually separated from the primary group. */

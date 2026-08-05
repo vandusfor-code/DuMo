@@ -17,6 +17,7 @@ export function useAdminConversations() {
     queryKey: ["admin", "leads", "conversations"],
     queryFn: () => apiGet<AdminConversation[]>("/api/admin/leads"),
     refetchInterval: 5000,
+    refetchIntervalInBackground: true,
     retry: 1,
   });
 }
@@ -42,6 +43,7 @@ export function useAdminMessages(conversationId: string | null) {
     queryFn: () => apiGet<ChatMessage[]>(`/api/admin/leads?conversationId=${conversationId}&messages=1`),
     enabled: !!conversationId,
     refetchInterval: 2000,
+    refetchIntervalInBackground: true,
   });
 }
 

@@ -4,6 +4,7 @@ import { Bell, Calendar, ChevronDown } from "lucide-react";
 import { PhotoAvatar, InitialsAvatar } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/format";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useUnreadMessageCount } from "@/hooks/use-unread-messages";
 
 function todayLabel(): string {
   const now = new Date();
@@ -21,6 +22,7 @@ export function AdminPageHeader({
   subtitle?: string;
 }) {
   const { data: user } = useCurrentUser();
+  const unread = useUnreadMessageCount("admin");
   const name = user?.name ?? "Administrador";
   const role = user?.role ?? "Admin";
 
@@ -49,9 +51,11 @@ export function AdminPageHeader({
           className="relative grid size-11 place-items-center rounded-full text-muted transition-colors hover:bg-brand-soft hover:text-brand"
         >
           <Bell className="size-[21px]" />
-          <span className="absolute right-2 top-2 grid size-[18px] place-items-center rounded-full border-2 border-canvas bg-brand text-[10px] font-semibold text-white">
-            3
-          </span>
+          {unread > 0 ? (
+            <span className="absolute right-2 top-2 grid size-[18px] min-w-[18px] place-items-center rounded-full border-2 border-canvas bg-brand px-0.5 text-[10px] font-semibold text-white">
+              {unread > 9 ? "9+" : unread}
+            </span>
+          ) : null}
         </button>
 
         <div className="flex items-center gap-2.5 border-l border-line pl-3">

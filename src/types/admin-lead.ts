@@ -33,6 +33,7 @@ export interface AdminConversation {
   avatarUrl?: string;
   lastMessage: string;
   lastMessageTime: string;
+  lastMessageDirection?: "in" | "out";
   unread: number;
   status: AdminLeadStatus;
   online: boolean;

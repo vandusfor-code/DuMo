@@ -18,6 +18,8 @@ export interface Conversation {
   lastMessage: string;
   /** Hora legible del último mensaje, ej. "3:25 p. m.". */
   lastMessageTime: string;
+  /** Dirección del último mensaje en la bandeja. */
+  lastMessageDirection?: "in" | "out";
   unread: number;
   status: ConversationStatus;
   online: boolean;

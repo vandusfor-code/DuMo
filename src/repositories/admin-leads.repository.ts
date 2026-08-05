@@ -49,6 +49,7 @@ type ConvRow = {
   customer_name: string;
   last_message: string;
   last_message_at: string;
+  last_message_direction?: string;
   unread: number;
   online: boolean;
   assigned_advisor_id: string | null;
@@ -76,6 +77,7 @@ function mapConversation(r: ConvRow): AdminConversation {
     rut: "",
     lastMessage: r.last_message,
     lastMessageTime: formatChatTime(r.last_message_at),
+    lastMessageDirection: r.last_message_direction === "out" ? "out" : "in",
     unread: Number(r.unread) || 0,
     status: toAdminStatus(r.admin_status),
     online: Boolean(r.online),
@@ -102,15 +104,15 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
       withDbRetry(() =>
         advisorId
           ? sql`
-              SELECT id, phone, customer_name, last_message, last_message_at, unread, online,
-                     assigned_advisor_id, assigned_advisor_name, admin_status
+              SELECT id, phone, customer_name, last_message, last_message_at, last_message_direction,
+                     unread, online, assigned_advisor_id, assigned_advisor_name, admin_status
               FROM lead_conversations
               WHERE assigned_advisor_id = ${advisorId}
               ORDER BY last_message_at DESC
             `
           : sql`
-              SELECT id, phone, customer_name, last_message, last_message_at, unread, online,
-                     assigned_advisor_id, assigned_advisor_name, admin_status
+              SELECT id, phone, customer_name, last_message, last_message_at, last_message_direction,
+                     unread, online, assigned_advisor_id, assigned_advisor_name, admin_status
               FROM lead_conversations
               ORDER BY last_message_at DESC
             `,

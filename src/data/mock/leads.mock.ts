@@ -13,8 +13,8 @@ export const PLANS_MOCK: Plan[] = [
 ];
 
 export const CONVERSATIONS_MOCK: Conversation[] = [
-  { id: "c1", customerName: "Juan Sebastián Pérez", phone: "300 123 4567", rut: "10.123.456-7", lastMessage: "Gracias, me gustaría saber más sobre los planes", lastMessageTime: "3:25 p. m.", unread: 2, status: "in_progress", online: true },
-  { id: "c2", customerName: "María Fernanda Gómez", phone: "300 234 5678", rut: "12.345.678-9", lastMessage: "¿Tienen planes para portabilidad?", lastMessageTime: "3:18 p. m.", unread: 1, status: "new", online: true },
+  { id: "c1", customerName: "Juan Sebastián Pérez", phone: "300 123 4567", rut: "10.123.456-7", lastMessage: "Gracias, me gustaría saber más sobre los planes", lastMessageTime: "3:25 p. m.", lastMessageDirection: "in", unread: 2, status: "in_progress", online: true },
+  { id: "c2", customerName: "María Fernanda Gómez", phone: "300 234 5678", rut: "12.345.678-9", lastMessage: "¿Tienen planes para portabilidad?", lastMessageTime: "3:18 p. m.", lastMessageDirection: "in", unread: 1, status: "new", online: true },
   { id: "c3", customerName: "Andrés Felipe Ramírez", phone: "300 345 6789", rut: "9.876.543-2", lastMessage: "Perfecto, muchas gracias.", lastMessageTime: "3:10 p. m.", unread: 0, status: "converted", online: false },
   { id: "c4", customerName: "Laura Camila Díaz", phone: "300 456 7890", rut: "11.222.333-4", lastMessage: "Me interesa la oferta de internet hogar", lastMessageTime: "2:45 p. m.", unread: 0, status: "in_progress", online: false },
   { id: "c5", customerName: "Carlos Eduardo Torres", phone: "300 567 8901", rut: "13.444.555-6", lastMessage: "¿Pueden ayudarme con una factura?", lastMessageTime: "2:30 p. m.", unread: 0, status: "new", online: true },

@@ -5,6 +5,7 @@ import { Bell } from "lucide-react";
 import { PhotoAvatar, InitialsAvatar } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/format";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useUnreadMessageCount } from "@/hooks/use-unread-messages";
 
 /**
  * User profile block shown at the bottom of the sidebar (avatar, name, role)
@@ -12,6 +13,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
  */
 export function SidebarUser() {
   const { data: user } = useCurrentUser();
+  const unread = useUnreadMessageCount("advisor");
   const name = user?.name ?? "Asesora";
   const role = user?.role ?? "Asesora Comercial";
 
@@ -32,9 +34,11 @@ export function SidebarUser() {
         className="relative grid size-8 shrink-0 place-items-center rounded-lg text-muted transition-colors hover:bg-brand-soft hover:text-brand"
       >
         <Bell className="size-[18px]" />
-        <span className="absolute right-1 top-1 grid size-[15px] place-items-center rounded-full border-2 border-canvas bg-brand text-[9px] font-semibold text-white">
-          3
-        </span>
+        {unread > 0 ? (
+          <span className="absolute right-1 top-1 grid size-[15px] min-w-[15px] place-items-center rounded-full border-2 border-canvas bg-brand px-0.5 text-[9px] font-semibold text-white">
+            {unread > 9 ? "9+" : unread}
+          </span>
+        ) : null}
       </Link>
     </div>
   );

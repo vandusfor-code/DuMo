@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { PRIMARY_NAV, SECONDARY_NAV, SIGN_OUT_ITEM, type NavItem } from "@/lib/nav";
+import { useUnreadMessageCount } from "@/hooks/use-unread-messages";
 import { Logo } from "./logo";
 import { SidebarUser } from "./sidebar-user";
 
@@ -48,6 +49,18 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
 
 export function Sidebar() {
   const pathname = usePathname();
+  const unread = useUnreadMessageCount("advisor");
+
+  const navWithBadges = (items: NavItem[]) =>
+    items.map((item) => {
+      if (item.href === "/dashboard/leads" && unread > 0) {
+        return { ...item, badge: unread > 99 ? 99 : unread };
+      }
+      if (item.href === "/dashboard/notificaciones" && unread > 0) {
+        return { ...item, badge: unread > 99 ? 99 : unread };
+      }
+      return item;
+    });
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-[260px] flex-col border-r border-line bg-card lg:flex">
@@ -56,7 +69,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-4 pb-4">
-        {PRIMARY_NAV.map((item) => (
+        {navWithBadges(PRIMARY_NAV).map((item) => (
           <NavLink key={item.href} item={item} active={isActive(pathname, item.href)} />
         ))}
 
