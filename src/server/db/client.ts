@@ -87,6 +87,46 @@ export async function withQueryTimeout<T>(promise: Promise<T>, ms = 8000): Promi
 const MIGRATION_LOCK_KEY = 828171;
 
 /**
+ * Huella del esquema: columnas que deben existir. Se comprueban con UNA
+ * consulta barata en cada cold-start; si están todas, se salta el DDL. Si
+ * falta cualquiera (p. ej. una columna nueva), la migración corre sola.
+ *
+ * Al añadir una columna nueva, agrégala aquí para que se autorrepare.
+ */
+const REQUIRED_COLUMNS = [
+  "app_config.key",
+  "users.last_seen_at",
+  "lead_conversations.dumo_phone_id",
+  "lead_conversations.assigned_advisor_id",
+  "lead_conversations.assigned_advisor_name",
+  "lead_conversations.admin_status",
+  "lead_conversations.last_message_direction",
+  "lead_messages.conversation_id",
+  "connected_numbers.access_token",
+  "lead_notes.conversation_id",
+  "accounting_expenses.amount",
+  "sales.advisor_id",
+  "sale_lines.sale_id",
+  "commission_payments.advisor_id",
+  "lead_gestiones.conversation_id",
+];
+
+/** ¿Está el esquema completo? Una sola consulta al catálogo. */
+async function schemaIsComplete(sql: Sql): Promise<boolean> {
+  try {
+    const rows = (await sql`
+      SELECT count(*)::int AS n
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND (table_name || '.' || column_name) = ANY(${REQUIRED_COLUMNS})
+    `) as unknown as { n: number }[];
+    return (rows[0]?.n ?? 0) >= REQUIRED_COLUMNS.length;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Migraciones AUTORREPARABLES.
  *
  * Todo el DDL es idempotente (`IF NOT EXISTS`) y se ejecuta una vez por
@@ -270,7 +310,12 @@ export function ensureSchema(): Promise<void> {
 
   if (!schemaPromise) {
     schemaPromise = withQueryTimeout(
-      withDbRetry(() => runMigrations(sql)),
+      withDbRetry(async () => {
+        // Cold-start rápido: si el esquema ya está completo, no se ejecuta DDL.
+        // Si falta algo, se migra (autorreparable).
+        if (await schemaIsComplete(sql)) return;
+        await runMigrations(sql);
+      }),
       12_000,
     )
       .then(() => {
