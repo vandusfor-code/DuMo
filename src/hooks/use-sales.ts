@@ -1,7 +1,8 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiPost } from "@/lib/api-client";
+import { apiPost } from "@/lib/api-client";
+import { ADVISOR_QUERY_OPTIONS, advisorApiGet } from "@/lib/advisor-query";
 import type { NewSaleInput, SaleDetail, SaleSummary } from "@/types/sale";
 
 export const salesKeys = {
@@ -13,18 +14,18 @@ export const salesKeys = {
 export function useSales() {
   return useQuery({
     queryKey: salesKeys.list(),
-    queryFn: () => apiGet<SaleSummary[]>("/api/sales"),
-    retry: 2,
-    staleTime: 30_000,
+    queryFn: () => advisorApiGet<SaleSummary[]>("/api/sales", []),
     placeholderData: [],
+    ...ADVISOR_QUERY_OPTIONS,
   });
 }
 
 export function useSale(id: string) {
   return useQuery({
     queryKey: salesKeys.detail(id),
-    queryFn: () => apiGet<SaleDetail>(`/api/sales/${id}`),
+    queryFn: () => advisorApiGet<SaleDetail | null>(`/api/sales/${id}`, null),
     enabled: Boolean(id),
+    ...ADVISOR_QUERY_OPTIONS,
   });
 }
 

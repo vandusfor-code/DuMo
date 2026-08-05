@@ -11,14 +11,16 @@ import { RecentSalesTable } from "@/components/dashboard/recent-sales-table";
 import { QuickSummaryCard } from "@/components/dashboard/quick-summary-card";
 import { MonthlyProgressCard } from "@/components/dashboard/monthly-progress-card";
 import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
-import { ErrorState } from "@/components/shared/error-state";
+import { EMPTY_ADVISOR_DASHBOARD } from "@/data/advisor-fallbacks";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useDashboard } from "@/hooks/use-dashboard";
 
 export default function DashboardPage() {
   const { data: user } = useCurrentUser();
-  const { data, isLoading, isError, refetch } = useDashboard();
+  const { data, isLoading, isFetching } = useDashboard();
   const firstName = user?.name?.split(" ")[0] ?? "Asesora";
+  const dashboard = data ?? EMPTY_ADVISOR_DASHBOARD;
+  const showSkeleton = isLoading && isFetching && !data;
 
   return (
     <div className="space-y-8 pt-1">
@@ -39,15 +41,9 @@ export default function DashboardPage() {
         }
       />
 
-      {isError && !data ? (
-        <ErrorState
-          title="No se pudo cargar el dashboard"
-          message="Intenta nuevamente en unos segundos."
-          onRetry={() => refetch()}
-        />
-      ) : isLoading && !data ? (
+      {showSkeleton ? (
         <DashboardSkeleton />
-      ) : data ? (
+      ) : (
         <motion.div
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
@@ -57,43 +53,43 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <SalesTrendCard
               title="Ventas del día"
-              dateLabel={data.dailySales.dateLabel}
-              count={data.dailySales.count}
-              goal={data.dailySales.goal}
-              series={data.dailySales.series}
+              dateLabel={dashboard.dailySales.dateLabel}
+              count={dashboard.dailySales.count}
+              goal={dashboard.dailySales.goal}
+              series={dashboard.dailySales.series}
               yTicks={[5, 10, 15, 20]}
               gradientId="dailyGradient"
             />
             <SalesTrendCard
               title="Ventas del mes"
-              dateLabel={data.monthlySales.monthLabel}
-              count={data.monthlySales.count}
-              goal={data.monthlySales.goal}
-              series={data.monthlySales.series}
+              dateLabel={dashboard.monthlySales.monthLabel}
+              count={dashboard.monthlySales.count}
+              goal={dashboard.monthlySales.goal}
+              series={dashboard.monthlySales.series}
               yTicks={[75, 150, 225, 300]}
               gradientId="monthlyGradient"
             />
             <CommissionCard
-              estimated={data.commission.estimated}
-              generated={data.commission.generated}
-              paid={data.commission.paid}
+              estimated={dashboard.commission.estimated}
+              generated={dashboard.commission.generated}
+              paid={dashboard.commission.paid}
             />
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div className="lg:col-span-2">
-              <RecentSalesTable sales={data.recentSales} />
+              <RecentSalesTable sales={dashboard.recentSales} />
             </div>
             <div className="space-y-6">
-              <QuickSummaryCard summary={data.quickSummary} />
+              <QuickSummaryCard summary={dashboard.quickSummary} />
               <MonthlyProgressCard
-                progress={data.monthlyProgress}
-                economicProgress={data.economicTarget?.progress}
+                progress={dashboard.monthlyProgress}
+                economicProgress={dashboard.economicTarget?.progress}
               />
             </div>
           </div>
         </motion.div>
-      ) : null}
+      )}
     </div>
   );
 }

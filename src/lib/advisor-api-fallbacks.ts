@@ -5,7 +5,7 @@ export async function withAdvisorFallback<T>(
   fn: () => Promise<T>,
   fallback: T,
   label: string,
-  timeoutMs = 12_000,
+  timeoutMs = 25_000,
 ): Promise<T> {
   try {
     return await Promise.race([

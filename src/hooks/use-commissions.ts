@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { apiGet } from "@/lib/api-client";
+import { ADVISOR_QUERY_OPTIONS, advisorApiGet } from "@/lib/advisor-query";
 import type { Commission } from "@/types/commission";
 
 export const commissionsKeys = {
@@ -14,9 +14,11 @@ export function useCommissions(month: string) {
   return useQuery({
     queryKey: commissionsKeys.byMonth(month),
     queryFn: () =>
-      apiGet<Commission[]>(`/api/commissions?month=${encodeURIComponent(month)}`),
-    retry: 2,
-    staleTime: 30_000,
+      advisorApiGet<Commission[]>(
+        `/api/commissions?month=${encodeURIComponent(month)}`,
+        [],
+      ),
     placeholderData: [],
+    ...ADVISOR_QUERY_OPTIONS,
   });
 }

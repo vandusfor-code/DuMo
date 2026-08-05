@@ -1,14 +1,15 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { apiGet } from "@/lib/api-client";
+import { EMPTY_ADVISOR_DASHBOARD } from "@/data/advisor-fallbacks";
+import { ADVISOR_QUERY_OPTIONS, advisorApiGet } from "@/lib/advisor-query";
 import type { DashboardData } from "@/types/dashboard";
 
 export function useDashboard() {
   return useQuery({
     queryKey: ["dashboard"],
-    queryFn: () => apiGet<DashboardData>("/api/dashboard"),
-    retry: 1,
-    staleTime: 30_000,
+    queryFn: () => advisorApiGet<DashboardData>("/api/dashboard", EMPTY_ADVISOR_DASHBOARD),
+    placeholderData: EMPTY_ADVISOR_DASHBOARD,
+    ...ADVISOR_QUERY_OPTIONS,
   });
 }

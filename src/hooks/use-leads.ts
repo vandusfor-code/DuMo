@@ -1,7 +1,8 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiPost } from "@/lib/api-client";
+import { apiPost } from "@/lib/api-client";
+import { ADVISOR_QUERY_OPTIONS, advisorApiGet } from "@/lib/advisor-query";
 import type { ChatMessage, Conversation } from "@/types/conversation";
 import type { Lead, Plan, SaveLeadInput } from "@/types/lead";
 
@@ -14,11 +15,12 @@ export const leadKeys = {
 export function useConversations() {
   return useQuery({
     queryKey: leadKeys.conversations,
-    queryFn: () => apiGet<Conversation[]>("/api/leads/conversations"),
+    queryFn: () => advisorApiGet<Conversation[]>("/api/leads/conversations", []),
+    placeholderData: [],
     refetchInterval: 5000,
     refetchIntervalInBackground: true,
-    retry: 1,
     staleTime: 2000,
+    retry: false,
   });
 }
 
@@ -26,19 +28,25 @@ export function useConversationMessages(conversationId: string | null) {
   return useQuery({
     queryKey: leadKeys.messages(conversationId ?? ""),
     queryFn: () =>
-      apiGet<ChatMessage[]>(`/api/leads/conversations/${conversationId}/messages`),
+      advisorApiGet<ChatMessage[]>(
+        `/api/leads/conversations/${conversationId}/messages`,
+        [],
+      ),
     enabled: Boolean(conversationId),
+    placeholderData: [],
     refetchInterval: 5000,
     refetchIntervalInBackground: true,
-    retry: 1,
+    staleTime: 2000,
+    retry: false,
   });
 }
 
 export function usePlans() {
   return useQuery({
     queryKey: leadKeys.plans,
-    queryFn: () => apiGet<Plan[]>("/api/leads/plans"),
+    queryFn: () => advisorApiGet<Plan[]>("/api/leads/plans", []),
     staleTime: 5 * 60_000,
+    retry: false,
   });
 }
 

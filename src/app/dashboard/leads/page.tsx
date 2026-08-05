@@ -6,12 +6,11 @@ import { ConversationList } from "@/components/leads/conversation-list";
 import { ChatWindow } from "@/components/leads/chat-window";
 import { LeadFormPanel } from "@/components/leads/lead-form-panel";
 import { EmptyConversation } from "@/components/leads/empty-conversation";
-import { ErrorState } from "@/components/shared/error-state";
 import { useConversations, useConversationMessages } from "@/hooks/use-leads";
 import type { Conversation } from "@/types/conversation";
 
 export default function LeadsPage() {
-  const { data: conversations, isLoading, isError, refetch } = useConversations();
+  const { data: conversations, isLoading } = useConversations();
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const selected = useMemo<Conversation | null>(
@@ -20,20 +19,6 @@ export default function LeadsPage() {
   );
 
   const messages = useConversationMessages(selectedId);
-
-  // Solo error total si nunca cargó. Si ya hay datos, un fallo transitorio de
-  // un refetch en segundo plano NO debe borrar la pantalla.
-  if (isError && !conversations) {
-    return (
-      <div className="pt-4">
-        <ErrorState
-          title="No se pudieron cargar las conversaciones"
-          message="Revisa la conexión e intenta nuevamente."
-          onRetry={() => refetch()}
-        />
-      </div>
-    );
-  }
 
   return (
     <div className="grid h-full grid-cols-1 lg:grid-cols-[24fr_41fr_35fr]">

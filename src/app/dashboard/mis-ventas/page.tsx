@@ -8,8 +8,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SalesSummary } from "@/components/sales/sales-summary";
 import { SalesFilters, type SalesRange } from "@/components/sales/sales-filters";
 import { SalesTable } from "@/components/sales/sales-table";
-import { ErrorState } from "@/components/shared/error-state";
-import { QueryStaleBanner, shouldShowFatalQueryError } from "@/components/shared/query-state";
 import { useSales } from "@/hooks/use-sales";
 import { businessDateISO } from "@/lib/date";
 import type { SaleSummary } from "@/types/sale";
@@ -22,12 +20,11 @@ function inRange(dateIso: string, range: SalesRange): boolean {
   if (range === "today") return dateIso === todayStr;
   if (range === "month") return dateIso.slice(0, 7) === todayStr.slice(0, 7);
 
-  // week: Monday–Sunday around today (anchored on the business date).
   const [y, m, d] = todayStr.split("-").map(Number);
   const today = new Date(y, m - 1, d);
   const [sy, sm, sd] = dateIso.split("-").map(Number);
   const date = new Date(sy, (sm ?? 1) - 1, sd ?? 1);
-  const dayOfWeek = (today.getDay() + 6) % 7; // 0 = Monday
+  const dayOfWeek = (today.getDay() + 6) % 7;
   const monday = new Date(today);
   monday.setDate(today.getDate() - dayOfWeek);
   const sunday = new Date(monday);
@@ -36,17 +33,18 @@ function inRange(dateIso: string, range: SalesRange): boolean {
 }
 
 export default function MisVentasPage() {
-  const query = useSales();
-  const { data, isLoading, isError, refetch } = query;
-  const fatal = shouldShowFatalQueryError(query);
+  const { data, isLoading, isFetching } = useSales();
   const [range, setRange] = useState<SalesRange>("today");
 
+  const sales = data ?? [];
+
   const filtered = useMemo<SaleSummary[]>(
-    () => (data ?? []).filter((s) => inRange(s.date, range)),
-    [data, range],
+    () => sales.filter((s) => inRange(s.date, range)),
+    [sales, range],
   );
 
   const totalLines = filtered.reduce((sum, s) => sum + s.lines, 0);
+  const showSkeleton = isLoading && isFetching && sales.length === 0;
 
   return (
     <div className="space-y-6 pt-1">
@@ -56,16 +54,7 @@ export default function MisVentasPage() {
         actions={<SalesFilters range={range} onRangeChange={setRange} />}
       />
 
-      {fatal ? (
-        <ErrorState
-          title="No se pudieron cargar las ventas"
-          message="Intenta nuevamente en unos segundos."
-          onRetry={() => refetch()}
-        />
-      ) : (
-        <>
-          <QueryStaleBanner visible={isError && !!data} onRetry={() => refetch()} />
-          {isLoading && data === undefined ? (
+      {showSkeleton ? (
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <Skeleton className="h-28 rounded-card" />
@@ -73,7 +62,7 @@ export default function MisVentasPage() {
           </div>
           <Skeleton className="h-96 rounded-card" />
         </div>
-          ) : (
+      ) : (
         <motion.div
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
@@ -85,8 +74,6 @@ export default function MisVentasPage() {
             <SalesTable data={filtered} />
           </Card>
         </motion.div>
-          )}
-        </>
       )}
     </div>
   );
