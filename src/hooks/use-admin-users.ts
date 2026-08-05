@@ -83,6 +83,8 @@ export function useProfile() {
   return useQuery({
     queryKey: ["profile"],
     queryFn: () => apiGet<PublicUser>("/api/auth/profile"),
+    retry: 1,
+    staleTime: 60_000,
   });
 }
 

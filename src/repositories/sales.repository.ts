@@ -18,10 +18,12 @@ import { CONFIG_KEYS } from "@/server/google/schema";
 import { toInt, toSaleStatus, toSaleType } from "@/server/google/parse";
 import { getSheetsClient, type GoogleSheetsClient } from "@/server/google/sheets-client";
 
+import type { AdvisorScope } from "@/lib/advisor-scope";
+
 export interface SalesRepository {
-  list(): Promise<SaleSummary[]>;
+  list(scope?: AdvisorScope | null): Promise<SaleSummary[]>;
   getById(id: string): Promise<SaleDetail | null>;
-  create(input: NewSaleInput): Promise<SaleDetail>;
+  create(input: NewSaleInput, scope?: AdvisorScope | null): Promise<SaleDetail>;
 }
 
 /* ----------------------------- Mock ----------------------------- */
@@ -239,9 +241,9 @@ export function getSalesRepository(): SalesRepository {
   if (hasDatabase()) {
     const store = getPostgresSalesStore();
     return {
-      list: () => store.listSummaries(),
+      list: (scope) => store.listSummaries(scope ?? null),
       getById: (id) => store.getSaleDetail(id),
-      create: (input) => store.createSale(input),
+      create: (input, scope) => store.createSale(input, scope ?? null),
     };
   }
   return new MockSalesRepository();

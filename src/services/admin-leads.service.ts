@@ -62,4 +62,7 @@ export const adminLeadsService = {
   autoAssignIfNeeded(conversationId: string) {
     return getAdminLeadsRepository().autoAssignIfNeeded(conversationId);
   },
+  autoAssignAllPending() {
+    return getAdminLeadsRepository().autoAssignAllPending();
+  },
 };

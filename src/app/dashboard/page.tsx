@@ -12,15 +12,18 @@ import { QuickSummaryCard } from "@/components/dashboard/quick-summary-card";
 import { MonthlyProgressCard } from "@/components/dashboard/monthly-progress-card";
 import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
 import { ErrorState } from "@/components/shared/error-state";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { useDashboard } from "@/hooks/use-dashboard";
 
 export default function DashboardPage() {
+  const { data: user } = useCurrentUser();
   const { data, isLoading, isError, refetch } = useDashboard();
+  const firstName = user?.name?.split(" ")[0] ?? "Asesora";
 
   return (
     <div className="space-y-8 pt-1">
       <PageHeader
-        title={<span>👋 ¡Bienvenida, María!</span>}
+        title={<span>👋 ¡Bienvenida, {firstName}!</span>}
         subtitle="Aquí tienes un resumen de tu actividad comercial."
         actions={
           <Button
@@ -39,19 +42,18 @@ export default function DashboardPage() {
       {isError ? (
         <ErrorState
           title="No se pudo cargar el dashboard"
-          message="Revisa la conexión con Google Sheets e intenta nuevamente."
+          message="Intenta nuevamente en unos segundos."
           onRetry={() => refetch()}
         />
-      ) : isLoading || !data ? (
+      ) : isLoading && !data ? (
         <DashboardSkeleton />
-      ) : (
+      ) : data ? (
         <motion.div
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
           className="space-y-6"
         >
-          {/* KPI row */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <SalesTrendCard
               title="Ventas del día"
@@ -78,7 +80,6 @@ export default function DashboardPage() {
             />
           </div>
 
-          {/* Table + right rail */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div className="lg:col-span-2">
               <RecentSalesTable sales={data.recentSales} />
@@ -89,7 +90,7 @@ export default function DashboardPage() {
             </div>
           </div>
         </motion.div>
-      )}
+      ) : null}
     </div>
   );
 }

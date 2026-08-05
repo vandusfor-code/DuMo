@@ -15,7 +15,9 @@ export function useConversations() {
   return useQuery({
     queryKey: leadKeys.conversations,
     queryFn: () => apiGet<Conversation[]>("/api/leads/conversations"),
-    refetchInterval: 2000,
+    refetchInterval: 5000,
+    retry: 1,
+    staleTime: 2000,
   });
 }
 
@@ -25,7 +27,8 @@ export function useConversationMessages(conversationId: string | null) {
     queryFn: () =>
       apiGet<ChatMessage[]>(`/api/leads/conversations/${conversationId}/messages`),
     enabled: Boolean(conversationId),
-    refetchInterval: 2000,
+    refetchInterval: 5000,
+    retry: 1,
   });
 }
 

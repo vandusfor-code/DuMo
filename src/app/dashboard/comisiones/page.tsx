@@ -99,7 +99,7 @@ export default function ComisionesPage() {
       {isError ? (
         <ErrorState
           title="No se pudieron cargar las comisiones"
-          message="Revisa la conexión con Google Sheets e intenta nuevamente."
+          message="Intenta nuevamente en unos segundos."
           onRetry={() => refetch()}
         />
       ) : isLoading || !data ? (

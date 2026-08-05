@@ -8,8 +8,10 @@ import { CONFIG_KEYS } from "@/server/google/schema";
 import { toInt, toSaleStatus, toSaleType } from "@/server/google/parse";
 import { getSheetsClient, type GoogleSheetsClient } from "@/server/google/sheets-client";
 
+import type { AdvisorScope } from "@/lib/advisor-scope";
+
 export interface DashboardRepository {
-  getDashboard(): Promise<DashboardData>;
+  getDashboard(scope?: AdvisorScope | null): Promise<DashboardData>;
 }
 
 /* ----------------------------- Mock ----------------------------- */
@@ -166,7 +168,7 @@ import { hasDatabase } from "@/server/db/client";
 export function getDashboardRepository(): DashboardRepository {
   if (hasDatabase()) {
     const store = getPostgresSalesStore();
-    return { getDashboard: () => store.getAdvisorDashboard() };
+    return { getDashboard: (scope) => store.getAdvisorDashboard(scope ?? null) };
   }
   return new MockDashboardRepository();
 }

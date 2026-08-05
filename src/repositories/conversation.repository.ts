@@ -3,7 +3,7 @@ import type { ChatMessage, Conversation, ConversationStatus } from "@/types/conv
 import { CONVERSATIONS_MOCK, getMockMessages } from "@/data/mock/leads.mock";
 import { withLatency } from "@/lib/mock";
 import { formatChatTime } from "@/lib/format";
-import { ensureSchema, getSql } from "@/server/db/client";
+import { ensureSchema, getSql, hasDatabase, withDbRetry, withQueryTimeout } from "@/server/db/client";
 
 /** Un mensaje entrante/saliente a persistir. */
 export interface IncomingMessage {
@@ -98,16 +98,21 @@ class PostgresConversationRepository implements ConversationRepository {
   async getConversations(advisorId?: string): Promise<Conversation[]> {
     await ensureSchema();
     const sql = getSql()!;
-    const rows = advisorId
-      ? ((await sql`
-          SELECT * FROM lead_conversations
-          WHERE assigned_advisor_id = ${advisorId}
-          ORDER BY last_message_at DESC
-        `) as unknown as ConvRow[])
-      : ((await sql`
-          SELECT * FROM lead_conversations ORDER BY last_message_at DESC
-        `) as unknown as ConvRow[]);
-    return rows.map((r) => ({
+    const rows = await withQueryTimeout(
+      withDbRetry(() =>
+        advisorId
+          ? sql`
+              SELECT * FROM lead_conversations
+              WHERE assigned_advisor_id = ${advisorId}
+              ORDER BY last_message_at DESC
+            `
+          : sql`
+              SELECT * FROM lead_conversations ORDER BY last_message_at DESC
+            `,
+      ),
+      8000,
+    );
+    return (rows as unknown as ConvRow[]).map((r) => ({
       id: r.id,
       customerName: r.customer_name || r.phone,
       phone: r.phone,
@@ -123,12 +128,17 @@ class PostgresConversationRepository implements ConversationRepository {
   async getMessages(conversationId: string): Promise<ChatMessage[]> {
     await ensureSchema();
     const sql = getSql()!;
-    const rows = (await sql`
-      SELECT * FROM lead_messages
-      WHERE conversation_id = ${conversationId}
-      ORDER BY created_at ASC
-    `) as unknown as MsgRow[];
-    return rows.map((r) => ({
+    const rows = await withQueryTimeout(
+      withDbRetry(() =>
+        sql`
+          SELECT * FROM lead_messages
+          WHERE conversation_id = ${conversationId}
+          ORDER BY created_at ASC
+        `,
+      ),
+      8000,
+    );
+    return (rows as unknown as MsgRow[]).map((r) => ({
       id: r.id,
       conversationId: r.conversation_id,
       text: r.body,
@@ -216,7 +226,7 @@ class PostgresConversationRepository implements ConversationRepository {
 }
 
 export function getConversationRepository(): ConversationRepository {
-  return getSql()
+  return hasDatabase()
     ? new PostgresConversationRepository()
     : new MockConversationRepository();
 }

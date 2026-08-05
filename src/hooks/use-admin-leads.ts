@@ -16,7 +16,8 @@ export function useAdminConversations() {
   return useQuery({
     queryKey: ["admin", "leads", "conversations"],
     queryFn: () => apiGet<AdminConversation[]>("/api/admin/leads"),
-    refetchInterval: 2000,
+    refetchInterval: 5000,
+    retry: 1,
   });
 }
 

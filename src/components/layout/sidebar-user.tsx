@@ -2,26 +2,29 @@
 
 import Link from "next/link";
 import { Bell } from "lucide-react";
-import { PhotoAvatar } from "@/components/ui/avatar";
-import { CURRENT_USER } from "@/lib/session";
+import { PhotoAvatar, InitialsAvatar } from "@/components/ui/avatar";
+import { getInitials } from "@/lib/format";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 /**
  * User profile block shown at the bottom of the sidebar (avatar, name, role)
- * plus the notifications bell. Replaces the former top utility header.
+ * plus the notifications bell.
  */
 export function SidebarUser() {
+  const { data: user } = useCurrentUser();
+  const name = user?.name ?? "Asesora";
+  const role = user?.role ?? "Asesora Comercial";
+
   return (
     <div className="flex items-center gap-2.5 rounded-2xl border border-line bg-canvas/60 px-2.5 py-2">
-      <PhotoAvatar
-        src={CURRENT_USER.avatarUrl}
-        alt={CURRENT_USER.name}
-        className="size-9"
-      />
+      {user?.avatarUrl ? (
+        <PhotoAvatar src={user.avatarUrl} alt={name} className="size-9" />
+      ) : (
+        <InitialsAvatar initials={getInitials(name)} className="size-9 text-[12px]" />
+      )}
       <div className="min-w-0 flex-1 leading-tight">
-        <p className="truncate text-[13px] font-semibold text-ink">
-          {CURRENT_USER.name}
-        </p>
-        <p className="truncate text-[11px] text-muted">{CURRENT_USER.role}</p>
+        <p className="truncate text-[13px] font-semibold text-ink">{name}</p>
+        <p className="truncate text-[11px] text-muted">{role}</p>
       </div>
       <Link
         href="/dashboard/notificaciones"

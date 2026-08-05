@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyConversation } from "@/components/leads/empty-conversation";
 import { shouldShowFatalQueryError } from "@/components/shared/query-state";
 import { ErrorState } from "@/components/shared/error-state";
@@ -79,7 +80,13 @@ export default function AdminLeadsPage() {
               />
             </Card>
             <Card className="flex min-h-0 flex-col overflow-hidden rounded-none border-y-0 border-r-0 shadow-none">
-              {detail.data ? (
+              {detail.isLoading && !detail.data ? (
+                <div className="flex flex-1 flex-col gap-3 p-6">
+                  <Skeleton className="h-8 w-2/3" />
+                  <Skeleton className="h-32 rounded-card" />
+                  <Skeleton className="h-48 rounded-card" />
+                </div>
+              ) : detail.data ? (
                 <AdminLeadFormPanel
                   key={selected.id}
                   conversation={detail.data.conversation}

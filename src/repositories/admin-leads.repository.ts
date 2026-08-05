@@ -17,7 +17,7 @@ import { getConversationRepository } from "@/repositories/conversation.repositor
 import { formatChatTime } from "@/lib/format";
 import { withLatency } from "@/lib/mock";
 import { getConfig, setConfig } from "@/server/db/app-config";
-import { ensureSchema, getSql, hasDatabase } from "@/server/db/client";
+import { ensureSchema, getSql, hasDatabase, withDbRetry, withQueryTimeout } from "@/server/db/client";
 
 export interface AutoAssignSettings {
   enabled: boolean;
@@ -40,6 +40,7 @@ export interface AdminLeadsRepository {
   getAutoAssignSettings(): Promise<AutoAssignSettings>;
   setAutoAssignEnabled(enabled: boolean): Promise<AutoAssignSettings>;
   autoAssignIfNeeded(conversationId: string): Promise<void>;
+  autoAssignAllPending(): Promise<void>;
 }
 
 type ConvRow = {
@@ -97,24 +98,29 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
   private async fetchRows(advisorId?: string): Promise<ConvRow[]> {
     await ensureSchema();
     const sql = requireSql();
-    if (advisorId) {
-      return (await sql`
-        SELECT id, phone, customer_name, last_message, last_message_at, unread, online,
-               assigned_advisor_id, assigned_advisor_name, admin_status
-        FROM lead_conversations
-        WHERE assigned_advisor_id = ${advisorId}
-        ORDER BY last_message_at DESC
-      `) as unknown as ConvRow[];
-    }
-    return (await sql`
-      SELECT id, phone, customer_name, last_message, last_message_at, unread, online,
-             assigned_advisor_id, assigned_advisor_name, admin_status
-      FROM lead_conversations
-      ORDER BY last_message_at DESC
-    `) as unknown as ConvRow[];
+    return withQueryTimeout(
+      withDbRetry(() =>
+        advisorId
+          ? sql`
+              SELECT id, phone, customer_name, last_message, last_message_at, unread, online,
+                     assigned_advisor_id, assigned_advisor_name, admin_status
+              FROM lead_conversations
+              WHERE assigned_advisor_id = ${advisorId}
+              ORDER BY last_message_at DESC
+            `
+          : sql`
+              SELECT id, phone, customer_name, last_message, last_message_at, unread, online,
+                     assigned_advisor_id, assigned_advisor_name, admin_status
+              FROM lead_conversations
+              ORDER BY last_message_at DESC
+            `,
+      ),
+      8000,
+    ) as Promise<ConvRow[]>;
   }
 
   async listConversations() {
+    await this.autoAssignAllPending();
     const rows = await this.fetchRows();
     return rows.map(mapConversation);
   }
@@ -245,7 +251,17 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
   }
 
   async getAutoAssignSettings() {
-    return getConfig(AUTO_ASSIGN_KEY, { enabled: false, lastAdvisorIndex: 0 });
+    const stored = await getConfig<AutoAssignSettings | null>(AUTO_ASSIGN_KEY, null);
+    if (stored === null) {
+      const initial = { enabled: true, lastAdvisorIndex: 0 };
+      try {
+        await setConfig(AUTO_ASSIGN_KEY, initial);
+      } catch {
+        /* ignore seed errors */
+      }
+      return initial;
+    }
+    return stored;
   }
 
   async setAutoAssignEnabled(enabled: boolean) {
@@ -308,6 +324,26 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
         admin_status = 'asignado'
       WHERE id = ${conversationId}
     `;
+  }
+
+  async autoAssignAllPending() {
+    const settings = await this.getAutoAssignSettings();
+    if (!settings.enabled) return;
+
+    await ensureSchema();
+    const sql = requireSql();
+    const pending = await withQueryTimeout(
+      sql<{ id: string }[]>`
+        SELECT id FROM lead_conversations
+        WHERE assigned_advisor_id IS NULL
+        ORDER BY last_message_at DESC
+        LIMIT 50
+      `,
+      5000,
+    );
+    for (const row of pending) {
+      await this.autoAssignIfNeeded(row.id);
+    }
   }
 }
 
@@ -401,6 +437,10 @@ class MockAdminLeadsRepository implements AdminLeadsRepository {
   }
 
   autoAssignIfNeeded() {
+    return Promise.resolve();
+  }
+
+  autoAssignAllPending() {
     return Promise.resolve();
   }
 }

@@ -69,7 +69,7 @@ export class PostgresLeadRepository {
       await withDbRetry(() =>
         sql`
           UPDATE lead_conversations
-          SET admin_status = ${"gestionado"}
+          SET admin_status = ${"contactado"}
           WHERE id = ${input.conversationId}
         `,
       );

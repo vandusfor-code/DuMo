@@ -17,10 +17,13 @@ import type { DashboardData } from "@/types/dashboard";
 import type { NewSaleInput, SaleDetail, SaleSummary } from "@/types/sale";
 import { businessDateISO, businessMonth } from "@/lib/date";
 import { formatCurrency } from "@/lib/format";
+import type { AdvisorScope } from "@/lib/advisor-scope";
+import { matchesAdvisor } from "@/lib/advisor-scope";
 import { getAuthRepository } from "@/repositories/auth.repository";
 import { getCommercialConfigurationRepository } from "@/repositories/commercial-configuration.repository";
 import { getConfig } from "@/server/db/app-config";
 import { ADMIN_DASHBOARD_MOCK } from "@/data/mock/admin-dashboard.mock";
+import { DASHBOARD_MOCK } from "@/data/mock/dashboard.mock";
 import { ensureSchema, getSql, withDbRetry, withQueryTimeout } from "@/server/db/client";
 import {
   adminDateInPeriod,
@@ -150,9 +153,11 @@ function monthExpenseBounds(monthKey: string): { start: string; end: string } {
 }
 
 export class PostgresSalesStore {
-  async listSummaries(): Promise<SaleSummary[]> {
+  async listSummaries(scope: AdvisorScope | null = null): Promise<SaleSummary[]> {
     const rows = await fetchSalesWithLineCounts();
-    return rows.map((row) => ({
+    return rows
+      .filter((row) => matchesAdvisor(row, scope))
+      .map((row) => ({
       id: row.id,
       customerName: row.customer_name,
       rut: row.rut,
@@ -217,10 +222,16 @@ export class PostgresSalesStore {
     };
   }
 
-  async createSale(input: NewSaleInput, advisorName = "Asesora"): Promise<SaleDetail> {
+  async createSale(
+    input: NewSaleInput,
+    advisor: AdvisorScope | null = null,
+  ): Promise<SaleDetail> {
     await ensureSchema();
     const sql = getSql();
     if (!sql) throw new Error("Base de datos no configurada");
+
+    const advisorName = advisor?.name ?? "Asesora";
+    const advisorId = advisor?.id ?? null;
 
     const year = new Date().getFullYear();
     const countRows = await withDbRetry(() => sql`SELECT count(*)::int AS n FROM sales`);
@@ -234,11 +245,11 @@ export class PostgresSalesStore {
     await withDbRetry(async () => {
       await sql`
         INSERT INTO sales (
-          id, customer_name, rut, phone, email, advisor_name,
+          id, customer_name, rut, phone, email, advisor_id, advisor_name,
           status, sale_type, plan, operator_value, sale_date, notes, created_at
         ) VALUES (
           ${id}, ${input.customerName}, ${input.rut}, ${input.phone},
-          ${input.email ?? ""}, ${advisorName}, ${"registrada"},
+          ${input.email ?? ""}, ${advisorId}, ${advisorName}, ${"registrada"},
           ${adminType}, ${""}, ${0}, ${today}, ${input.notes ?? ""}, ${now.toISOString()}
         )
       `;
@@ -462,9 +473,12 @@ export class PostgresSalesStore {
     );
   }
 
-  async listAdvisorCommissions(month?: string): Promise<Commission[]> {
+  async listAdvisorCommissions(
+    month?: string,
+    scope: AdvisorScope | null = null,
+  ): Promise<Commission[]> {
     const configRepo = getCommercialConfigurationRepository();
-    const rows = await fetchSalesWithLineCounts();
+    const rows = (await fetchSalesWithLineCounts()).filter((row) => matchesAdvisor(row, scope));
     const monthKey = month ?? businessMonth();
     const paidByAdvisorMonth = new Map<string, boolean>();
 
@@ -500,108 +514,114 @@ export class PostgresSalesStore {
     return commissions.sort((a, b) => b.date.localeCompare(a.date));
   }
 
-  async getAdvisorDashboard(): Promise<DashboardData> {
-    const configRepo = getCommercialConfigurationRepository();
-    const config = await configRepo.getSnapshot();
-    const rows = await fetchSalesWithLineCounts();
+  async getAdvisorDashboard(scope: AdvisorScope | null = null): Promise<DashboardData> {
+    try {
+      const configRepo = getCommercialConfigurationRepository();
+      const config = await withQueryTimeout(configRepo.getSnapshot(), 8000);
+      const allRows = await fetchSalesWithLineCounts();
+      const rows = allRows.filter((row) => matchesAdvisor(row, scope));
 
-    const now = new Date();
-    const todayIso = businessDateISO(now);
-    const monthKey = businessMonth(now);
+      const now = new Date();
+      const todayIso = businessDateISO(now);
+      const monthKey = businessMonth(now);
 
-    const monthSales = rows.filter((r) => isoFromRow(r).startsWith(monthKey));
-    const daySales = rows.filter((r) => isoFromRow(r) === todayIso);
+      const monthSales = rows.filter((r) => isoFromRow(r).startsWith(monthKey));
+      const daySales = rows.filter((r) => isoFromRow(r) === todayIso);
 
-    const monthlyGoal = config.settings.monthlyGoal || 300;
-    const dailyGoal = Math.max(1, Math.round(monthlyGoal / 20)) || 15;
+      const monthlyGoal = config.settings.monthlyGoal || 300;
+      const dailyGoal = Math.max(1, Math.round(monthlyGoal / 20)) || 15;
 
-    const dailySeries = DAILY_BUCKETS.map((b) => ({
-      label: b.label,
-      value: daySales.filter((v) => {
-        const created =
-          v.created_at instanceof Date ? v.created_at : new Date(String(v.created_at));
-        return created.getHours() <= b.hour;
-      }).length,
-    }));
-
-    const monthlySeries = MONTH_BUCKETS.map((day) => ({
-      label: String(day),
-      value: monthSales.filter((v) => {
-        const d = Number(isoFromRow(v).slice(8, 10));
-        return d > 0 && d <= day;
-      }).length,
-    }));
-
-    const monthCommissions = await this.listAdvisorCommissions(monthKey);
-    const generated = monthCommissions.reduce((s, c) => s + c.amount, 0);
-    const paid = monthCommissions
-      .filter((c) => c.status === "paid")
-      .reduce((s, c) => s + c.amount, 0);
-
-    const recentSales = [...rows]
-      .sort((a, b) => {
-        const aT =
-          a.created_at instanceof Date
-            ? a.created_at.toISOString()
-            : String(a.created_at);
-        const bT =
-          b.created_at instanceof Date
-            ? b.created_at.toISOString()
-            : String(b.created_at);
-        return bT.localeCompare(aT);
-      })
-      .slice(0, 5)
-      .map((v) => ({
-        id: v.id,
-        customerName: v.customer_name,
-        rut: v.rut,
-        date: isoFromRow(v),
-        lines: lineCount(v),
-        status: toAdvisorStatus(v.status),
-        saleType: adminTypeToCanonical(toAdminSaleType(v.sale_type)),
-        plan: v.plan ?? "",
+      const dailySeries = DAILY_BUCKETS.map((b) => ({
+        label: b.label,
+        value: daySales.filter((v) => {
+          const created =
+            v.created_at instanceof Date ? v.created_at : new Date(String(v.created_at));
+          return created.getHours() <= b.hour;
+        }).length,
       }));
 
-    const pending = rows.filter((v) => toAdvisorStatus(v.status) === "pending").length;
-    const newClients = new Set(monthSales.map((v) => v.rut)).size;
-    const monthlyProgress = monthlyGoal
-      ? Math.round((monthSales.length / monthlyGoal) * 100)
-      : 0;
+      const monthlySeries = MONTH_BUCKETS.map((day) => ({
+        label: String(day),
+        value: monthSales.filter((v) => {
+          const d = Number(isoFromRow(v).slice(8, 10));
+          return d > 0 && d <= day;
+        }).length,
+      }));
 
-    const dateFmt = new Intl.DateTimeFormat("es-CL", {
-      day: "numeric",
-      month: "long",
-    });
-    const monthName = new Intl.DateTimeFormat("es-CL", { month: "long" }).format(now);
-    const monthLabel = `${monthName.charAt(0).toUpperCase()}${monthName.slice(1)} ${now.getFullYear()}`;
+      const monthCommissions = await this.listAdvisorCommissions(monthKey, scope);
+      const generated = monthCommissions.reduce((s, c) => s + c.amount, 0);
+      const paid = monthCommissions
+        .filter((c) => c.status === "paid")
+        .reduce((s, c) => s + c.amount, 0);
 
-    return {
-      dailySales: {
-        count: daySales.length,
-        goal: dailyGoal,
-        dateLabel: `Hoy, ${dateFmt.format(now)}`,
-        series: dailySeries,
-      },
-      monthlySales: {
-        count: monthSales.length,
-        goal: monthlyGoal,
-        monthLabel,
-        series: monthlySeries,
-      },
-      commission: {
-        estimated: generated,
-        generated,
-        paid,
-      },
-      recentSales,
-      quickSummary: {
-        dailySales: daySales.length,
-        monthlySales: monthSales.length,
-        newClients,
-        pending,
-      },
-      monthlyProgress,
-    };
+      const recentSales = [...rows]
+        .sort((a, b) => {
+          const aT =
+            a.created_at instanceof Date
+              ? a.created_at.toISOString()
+              : String(a.created_at);
+          const bT =
+            b.created_at instanceof Date
+              ? b.created_at.toISOString()
+              : String(b.created_at);
+          return bT.localeCompare(aT);
+        })
+        .slice(0, 5)
+        .map((v) => ({
+          id: v.id,
+          customerName: v.customer_name,
+          rut: v.rut,
+          date: isoFromRow(v),
+          lines: lineCount(v),
+          status: toAdvisorStatus(v.status),
+          saleType: adminTypeToCanonical(toAdminSaleType(v.sale_type)),
+          plan: v.plan ?? "",
+        }));
+
+      const pending = rows.filter((v) => toAdvisorStatus(v.status) === "pending").length;
+      const newClients = new Set(monthSales.map((v) => v.rut)).size;
+      const monthlyProgress = monthlyGoal
+        ? Math.round((monthSales.length / monthlyGoal) * 100)
+        : 0;
+
+      const dateFmt = new Intl.DateTimeFormat("es-CL", {
+        day: "numeric",
+        month: "long",
+      });
+      const monthName = new Intl.DateTimeFormat("es-CL", { month: "long" }).format(now);
+      const monthLabel = `${monthName.charAt(0).toUpperCase()}${monthName.slice(1)} ${now.getFullYear()}`;
+
+      return {
+        dailySales: {
+          count: daySales.length,
+          goal: dailyGoal,
+          dateLabel: `Hoy, ${dateFmt.format(now)}`,
+          series: dailySeries,
+        },
+        monthlySales: {
+          count: monthSales.length,
+          goal: monthlyGoal,
+          monthLabel,
+          series: monthlySeries,
+        },
+        commission: {
+          estimated: generated,
+          generated,
+          paid,
+        },
+        recentSales,
+        quickSummary: {
+          dailySales: daySales.length,
+          monthlySales: monthSales.length,
+          newClients,
+          pending,
+        },
+        monthlyProgress,
+      };
+    } catch (err) {
+      console.error("[getAdvisorDashboard]", err);
+      return { ...DASHBOARD_MOCK };
+    }
   }
 
   async getAdminDashboard(): Promise<AdminDashboardData> {

@@ -17,6 +17,8 @@ export function useCurrentUser() {
   return useQuery({
     queryKey: userKeys.me,
     queryFn: () => apiGet<User>("/api/users/me"),
+    retry: 1,
+    staleTime: 60_000,
     placeholderData: {
       id: "me",
       name: CURRENT_USER.name,

@@ -5,9 +5,11 @@ import { withLatency } from "@/lib/mock";
 import { toCommissionStatus, toInt } from "@/server/google/parse";
 import { getSheetsClient, type GoogleSheetsClient } from "@/server/google/sheets-client";
 
+import type { AdvisorScope } from "@/lib/advisor-scope";
+
 export interface CommissionsRepository {
   /** All commissions, optionally filtered to a month (yyyy-mm). */
-  list(month?: string): Promise<Commission[]>;
+  list(month?: string, scope?: AdvisorScope | null): Promise<Commission[]>;
 }
 
 function inMonth(date: string, month?: string): boolean {
@@ -48,7 +50,7 @@ import { hasDatabase } from "@/server/db/client";
 export function getCommissionsRepository(): CommissionsRepository {
   if (hasDatabase()) {
     const store = getPostgresSalesStore();
-    return { list: (month) => store.listAdvisorCommissions(month) };
+    return { list: (month, scope) => store.listAdvisorCommissions(month, scope ?? null) };
   }
   return new MockCommissionsRepository();
 }

@@ -15,5 +15,7 @@ export function useCommissions(month: string) {
     queryKey: commissionsKeys.byMonth(month),
     queryFn: () =>
       apiGet<Commission[]>(`/api/commissions?month=${encodeURIComponent(month)}`),
+    retry: 1,
+    staleTime: 30_000,
   });
 }

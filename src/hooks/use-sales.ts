@@ -14,6 +14,8 @@ export function useSales() {
   return useQuery({
     queryKey: salesKeys.list(),
     queryFn: () => apiGet<SaleSummary[]>("/api/sales"),
+    retry: 1,
+    staleTime: 30_000,
   });
 }
 

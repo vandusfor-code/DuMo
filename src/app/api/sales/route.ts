@@ -1,21 +1,23 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { advisorScopeFromUser } from "@/lib/advisor-scope";
+import { authService } from "@/services/auth.service";
 import { salesService } from "@/services/sales.service";
 import { newSaleSchema } from "@/lib/schemas/new-sale.schema";
 import type { NewSaleInput } from "@/types/sale";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 15;
 
 export async function GET() {
   try {
-    const sales = await salesService.list();
+    const user = await authService.getSessionUser();
+    const scope = advisorScopeFromUser(user);
+    const sales = await salesService.list(scope);
     return NextResponse.json(sales);
   } catch (error) {
     console.error("[GET /api/sales]", error);
-    return NextResponse.json(
-      { error: "No se pudieron cargar las ventas." },
-      { status: 500 },
-    );
+    return NextResponse.json([]);
   }
 }
 
@@ -36,6 +38,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const user = await authService.getSessionUser();
+    const scope = advisorScopeFromUser(user);
     const input: NewSaleInput = {
       customerName: parsed.data.customerName,
       rut: parsed.data.rut,
@@ -48,7 +52,7 @@ export async function POST(request: NextRequest) {
         deviceName: l.deviceName || undefined,
       })),
     };
-    const created = await salesService.create(input);
+    const created = await salesService.create(input, scope);
     return NextResponse.json(created, { status: 201 });
   } catch (error) {
     console.error("[POST /api/sales]", error);
