@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { authService } from "@/services/auth.service";
 import { leadsService } from "@/services/leads.service";
 
@@ -11,11 +11,18 @@ export async function GET() {
     const user = await authService.getSessionUser();
     const advisorId = user?.role === "asesora" ? user.id : undefined;
 
-    // El barrido de auto-asignación NO debe bloquear la bandeja: va en segundo
-    // plano y además está limitado por throttle dentro del repositorio.
+    // El barrido de auto-asignación corre DESPUÉS de responder, con `after()`:
+    // no retrasa la bandeja y Next mantiene viva la función hasta terminarlo
+    // (lanzarlo con `void` podía cortarse y dañar la conexión del pool).
     if (advisorId) {
-      const { adminLeadsService } = await import("@/services/admin-leads.service");
-      void adminLeadsService.autoAssignAllPending().catch(() => {});
+      after(async () => {
+        try {
+          const { adminLeadsService } = await import("@/services/admin-leads.service");
+          await adminLeadsService.autoAssignAllPending();
+        } catch (err) {
+          console.error("[autoAssign sweep]", err);
+        }
+      });
     }
 
     const conversations = await Promise.race([

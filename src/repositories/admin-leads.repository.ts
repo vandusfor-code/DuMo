@@ -122,8 +122,10 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
   }
 
   async listConversations() {
-    // El barrido nunca debe impedir que el admin vea las conversaciones.
-    void this.autoAssignAllPending().catch(() => {});
+    // El barrido de auto-asignación NO se dispara aquí: lo programan las rutas
+    // con `after()` de Next. Lanzarlo sin esperar (void) dentro de una función
+    // serverless puede cortarse al responder y dejar la conexión del pool en
+    // mal estado, provocando fallos intermitentes en el listado.
     const rows = await this.fetchRows();
     return rows.map(mapConversation);
   }

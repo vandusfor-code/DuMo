@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
 import { withAdminFallback } from "@/lib/admin-api-fallbacks";
 import { requireAdminSession } from "@/lib/require-admin";
 import { adminLeadsService } from "@/services/admin-leads.service";
@@ -62,6 +62,16 @@ export async function GET(request: NextRequest) {
       if (!data) return NextResponse.json({ error: "Conversación no encontrada." }, { status: 404 });
       return NextResponse.json(data);
     }
+
+    // El barrido de auto-asignación va después de responder (no retrasa la
+    // lista y Next mantiene viva la función hasta terminarlo).
+    after(async () => {
+      try {
+        await adminLeadsService.autoAssignAllPending();
+      } catch (err) {
+        console.error("[autoAssign sweep admin]", err);
+      }
+    });
 
     const data = await withAdminFallback(
       () => adminLeadsService.listConversations(),
