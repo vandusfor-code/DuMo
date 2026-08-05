@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { authService } from "@/services/auth.service";
 import { authUserToPublicUser } from "@/repositories/auth.repository";
 import { SESSION_COOKIE, createSessionToken, sessionCookieOptions } from "@/lib/auth/session-cookie";
+import { isSecureRequest } from "@/lib/auth/session-edge";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,11 +29,15 @@ export async function POST(request: NextRequest) {
     }
 
     const token = createSessionToken(result.user.id);
+    const secure = isSecureRequest(
+      request.headers.get("x-forwarded-proto"),
+      request.nextUrl.protocol,
+    );
     const res = NextResponse.json({
       user: authUserToPublicUser(result.user),
       redirectTo: result.redirectTo,
     });
-    res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
+    res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions(secure));
     return res;
   } catch (error) {
     console.error("[POST /api/auth/login]", error);

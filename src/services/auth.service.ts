@@ -40,9 +40,8 @@ export const authService = {
     const payload = verifySessionToken(token);
     if (!payload) return null;
     const user = await getAuthRepository().findById(payload.userId);
-    if (user) {
-      void getAuthRepository().touchLastSeen(user.id);
-    }
+    if (!user || !user.active) return null;
+    void getAuthRepository().touchLastSeen(user.id);
     return user;
   },
 

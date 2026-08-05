@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { SESSION_COOKIE } from "@/lib/auth/constants";
+import {
+  SESSION_COOKIE,
+  createSessionTokenEdge,
+  isSecureRequest,
+  sessionCookieOptionsEdge,
+  verifySessionTokenEdge,
+} from "@/lib/auth/session-edge";
 
 const PUBLIC_PREFIXES = [
   "/login",
@@ -10,7 +16,7 @@ const PUBLIC_PREFIXES = [
   "/api/system",
 ];
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (
@@ -25,22 +31,58 @@ export function middleware(request: NextRequest) {
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/api/admin") ||
     pathname.startsWith("/api/leads") ||
+    pathname.startsWith("/api/sales") ||
+    pathname.startsWith("/api/commissions") ||
+    pathname.startsWith("/api/dashboard") ||
     pathname.startsWith("/api/whatsapp/send") ||
-    pathname.startsWith("/api/users/me");
+    pathname.startsWith("/api/users/me") ||
+    pathname.startsWith("/api/auth/profile");
 
   if (!needsAuth) return NextResponse.next();
 
-  const session = request.cookies.get(SESSION_COOKIE)?.value;
-  if (!session) {
+  const token = request.cookies.get(SESSION_COOKIE)?.value;
+  const payload = token ? await verifySessionTokenEdge(token) : null;
+
+  if (!payload) {
     if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "No autenticado." }, { status: 401 });
+      const res = NextResponse.json({ error: "No autenticado." }, { status: 401 });
+      res.cookies.set(SESSION_COOKIE, "", {
+        ...sessionCookieOptionsEdge(
+          isSecureRequest(
+            request.headers.get("x-forwarded-proto"),
+            request.nextUrl.protocol,
+          ),
+        ),
+        maxAge: 0,
+        expires: new Date(0),
+      });
+      return res;
     }
     const login = new URL("/login", request.url);
     login.searchParams.set("next", pathname);
-    return NextResponse.redirect(login);
+    const res = NextResponse.redirect(login);
+    res.cookies.set(SESSION_COOKIE, "", {
+      ...sessionCookieOptionsEdge(
+        isSecureRequest(
+          request.headers.get("x-forwarded-proto"),
+          request.nextUrl.protocol,
+        ),
+      ),
+      maxAge: 0,
+      expires: new Date(0),
+    });
+    return res;
   }
 
-  return NextResponse.next();
+  // Renueva la cookie en cada navegación para que F5 no pierda la sesión.
+  const secure = isSecureRequest(
+    request.headers.get("x-forwarded-proto"),
+    request.nextUrl.protocol,
+  );
+  const freshToken = await createSessionTokenEdge(payload.userId);
+  const res = NextResponse.next();
+  res.cookies.set(SESSION_COOKIE, freshToken, sessionCookieOptionsEdge(secure));
+  return res;
 }
 
 export const config = {

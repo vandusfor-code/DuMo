@@ -43,10 +43,12 @@ export function verifySessionToken(token: string): SessionPayload | null {
   }
 }
 
-export function sessionCookieOptions() {
+export function sessionCookieOptions(secure?: boolean) {
+  const useSecure =
+    secure ?? (process.env.VERCEL === "1" || process.env.NODE_ENV === "production");
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: useSecure,
     sameSite: "lax" as const,
     path: "/",
     maxAge: MAX_AGE_SEC,
