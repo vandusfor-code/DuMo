@@ -30,6 +30,7 @@ export interface CommercialConfigurationRepository {
 
 const PLANS_KEY = "commercial_plans";
 const SETTINGS_KEY = "commercial_settings";
+const LEGACY_BUDGET_KEY = "accounting_monthly_budget";
 
 class PostgresCommercialConfigurationRepository implements CommercialConfigurationRepository {
   private async loadPlans(): Promise<CommercialPlan[]> {
@@ -50,12 +51,23 @@ class PostgresCommercialConfigurationRepository implements CommercialConfigurati
   }
 
   private async loadSettings(): Promise<CommercialGlobalSettings> {
-    const stored = await getConfig<Parameters<typeof normalizeCommercialSettings>[0] | null>(
-      SETTINGS_KEY,
-      null,
-    );
-    if (stored !== null) return normalizeCommercialSettings(stored);
-    return { ...COMMERCIAL_SETTINGS_MOCK };
+    const [stored, legacyBudget] = await Promise.all([
+      getConfig<Parameters<typeof normalizeCommercialSettings>[0] | null>(SETTINGS_KEY, null),
+      getConfig<number>(LEGACY_BUDGET_KEY, 0),
+    ]);
+
+    if (stored !== null) {
+      const settings = normalizeCommercialSettings(stored);
+      if (!settings.monthlyBudget && legacyBudget > 0) {
+        return { ...settings, monthlyBudget: legacyBudget };
+      }
+      return settings;
+    }
+
+    return {
+      ...COMMERCIAL_SETTINGS_MOCK,
+      monthlyBudget: legacyBudget || COMMERCIAL_SETTINGS_MOCK.monthlyBudget,
+    };
   }
 
   private async savePlans(plans: CommercialPlan[]) {
@@ -105,7 +117,10 @@ class PostgresCommercialConfigurationRepository implements CommercialConfigurati
 
   async updateSettings(input: UpdateCommercialSettingsInput) {
     const next = normalizeCommercialSettings(input);
-    await setConfig(SETTINGS_KEY, next);
+    await Promise.all([
+      setConfig(SETTINGS_KEY, next),
+      setConfig(LEGACY_BUDGET_KEY, next.monthlyBudget),
+    ]);
     return { ...next };
   }
 

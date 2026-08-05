@@ -134,6 +134,7 @@ export function CommercialSettingsForm({
     monthlyGoal: number;
     economicGoal: number;
     baseCommission: number;
+    monthlyBudget: number;
   };
   onSave: (values: typeof settings) => void;
   isSaving: boolean;
@@ -156,13 +157,18 @@ export function CommercialSettingsForm({
       label: "Comisión base ($)",
       hint: "Por línea, si no encuentra el plan en la tabla.",
     },
+    {
+      key: "monthlyBudget" as const,
+      label: "Presupuesto mensual ($)",
+      hint: "Tope de gastos del mes. Alimenta disponible, gastos y presupuesto restante en dashboard y contabilidad.",
+    },
   ];
 
   return (
     <Card className="p-5">
       <h3 className="text-[15px] font-semibold text-ink">Configuraciones adicionales</h3>
       <p className="mt-1 text-[13px] text-muted">
-        Metas y comisión base. Los cálculos usan Valor DuMo de los planes comerciales.
+        Metas, comisión base y presupuesto. Los cálculos usan Valor DuMo de los planes comerciales.
       </p>
       <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {fields.map((f) => (

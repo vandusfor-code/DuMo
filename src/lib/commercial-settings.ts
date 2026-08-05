@@ -14,6 +14,7 @@ export function normalizeCommercialSettings(raw: StoredSettings): CommercialGlob
     monthlyGoal: Number(raw.monthlyGoal ?? 0) || 0,
     economicGoal: Number(raw.economicGoal ?? raw.profitGoal ?? 0) || 0,
     baseCommission: Number(raw.baseCommission ?? 0) || 0,
+    monthlyBudget: Number(raw.monthlyBudget ?? 0) || 0,
   };
 }
 

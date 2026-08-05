@@ -39,6 +39,8 @@ export interface CommercialGlobalSettings {
   economicGoal: number;
   /** Comisión por línea si el plan vendido no coincide con la tabla. */
   baseCommission: number;
+  /** Presupuesto mensual de gastos — base para disponible y presupuesto restante. */
+  monthlyBudget: number;
 }
 
 export interface CommercialConfigSnapshot {

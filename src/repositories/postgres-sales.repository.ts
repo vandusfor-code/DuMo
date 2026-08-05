@@ -28,7 +28,6 @@ import {
   perAdvisorSalesGoal,
   salesProgress,
 } from "@/lib/commercial-settings";
-import { getConfig } from "@/server/db/app-config";
 import { ADMIN_DASHBOARD_MOCK } from "@/data/mock/admin-dashboard.mock";
 import { DASHBOARD_MOCK } from "@/data/mock/dashboard.mock";
 import { ensureSchema, getSql, withDbRetry, withQueryTimeout } from "@/server/db/client";
@@ -704,8 +703,8 @@ export class PostgresSalesStore {
         .filter((s) => s.status === "finalizada")
         .reduce((sum, s) => sum + s.dumoValue * s.lines, 0);
 
+      const budget = config.settings.monthlyBudget || 0;
       let expenses = 0;
-      let budget = 0;
       const sql = getSql();
       if (sql) {
         const { start, end } = monthExpenseBounds(monthKey);
@@ -720,9 +719,8 @@ export class PostgresSalesStore {
             5000,
           );
           expenses = expenseRows.reduce((s, e) => s + (Number(e.amount) || 0), 0);
-          budget = await withQueryTimeout(getConfig<number>("accounting_monthly_budget", 0), 5000);
         } catch (err) {
-          console.error("[getAdminDashboard] expenses/budget", err);
+          console.error("[getAdminDashboard] expenses", err);
         }
       }
 

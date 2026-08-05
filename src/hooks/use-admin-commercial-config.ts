@@ -24,7 +24,11 @@ export function useUpdateCommercialSettings() {
         action: "updateSettings",
         settings,
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "commercial-config"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "commercial-config"] });
+      qc.invalidateQueries({ queryKey: ["admin", "dashboard"] });
+      qc.invalidateQueries({ queryKey: ["admin", "accounting"] });
+    },
   });
 }
 

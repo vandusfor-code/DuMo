@@ -5,6 +5,7 @@ export const COMMERCIAL_SETTINGS_MOCK: CommercialGlobalSettings = {
   monthlyGoal: 120,
   economicGoal: 8_000_000,
   baseCommission: 18_000,
+  monthlyBudget: 3_000_000,
 };
 
 const RAW_PLANS: CommercialPlan[] = [

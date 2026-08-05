@@ -144,7 +144,14 @@ class PostgresAccountingRepository implements AccountingRepository {
   async getOverview(filters: AccountingFilters) {
     const expenses = await this.listAllExpenses();
     const filtered = filterExpenses(filters, expenses);
-    const monthlyBudget = await getConfig(BUDGET_KEY, ACCOUNTING_MONTHLY_BUDGET);
+    let monthlyBudget = 0;
+    try {
+      const config = await getCommercialConfigurationRepository().getSnapshot();
+      monthlyBudget = config.settings.monthlyBudget;
+    } catch (err) {
+      console.error("[accounting] load budget", err);
+      monthlyBudget = await getConfig(BUDGET_KEY, ACCOUNTING_MONTHLY_BUDGET);
+    }
     const key = monthKey(filters);
     let stats: MonthCommercialStats = { salesCount: 0, dumoIncome: 0 };
     try {
@@ -200,7 +207,14 @@ class MockAccountingRepository implements AccountingRepository {
 
   async getOverview(filters: AccountingFilters) {
     const filtered = filterExpenses(filters, this.expenses);
-    const summary = await buildSummary(filtered, ACCOUNTING_MONTHLY_BUDGET);
+    let monthlyBudget = ACCOUNTING_MONTHLY_BUDGET;
+    try {
+      const config = await getCommercialConfigurationRepository().getSnapshot();
+      monthlyBudget = config.settings.monthlyBudget;
+    } catch {
+      /* mock fallback */
+    }
+    const summary = await buildSummary(filtered, monthlyBudget);
     return {
       summary,
       chart: buildChart(this.expenses),
@@ -225,5 +239,13 @@ export function getAccountingRepository(): AccountingRepository {
 }
 
 export async function setAccountingMonthlyBudget(amount: number): Promise<void> {
-  await setConfig(BUDGET_KEY, amount);
+  const normalized = Number(amount) || 0;
+  await setConfig(BUDGET_KEY, normalized);
+  try {
+    const repo = getCommercialConfigurationRepository();
+    const { settings } = await repo.getSnapshot();
+    await repo.updateSettings({ ...settings, monthlyBudget: normalized });
+  } catch (err) {
+    console.error("[accounting] sync commercial budget", err);
+  }
 }
