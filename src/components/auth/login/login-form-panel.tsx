@@ -94,10 +94,10 @@ export function LoginFormPanel() {
         password,
       });
       const next = searchParams.get("next");
+      // `next` solo se respeta si pertenece al área del rol del usuario; si no,
+      // manda el destino por rol (evita que un admin caiga en /dashboard).
       const dest =
-        next && (next.startsWith("/admin") || next.startsWith("/dashboard"))
-          ? next
-          : res.redirectTo;
+        next && next.startsWith(res.redirectTo) ? next : res.redirectTo;
       router.push(dest);
       router.refresh();
     } catch (err) {

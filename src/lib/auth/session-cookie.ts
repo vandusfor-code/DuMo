@@ -8,15 +8,18 @@ const MAX_AGE_SEC = 60 * 60 * 24 * 7; // 7 días
 export type SessionPayload = {
   userId: string;
   exp: number;
+  /** Rol del usuario: permite que el middleware separe admin/asesora. */
+  role?: string;
 };
 
 function secret(): string {
   return process.env.AUTH_SECRET ?? "dumo-dev-auth-secret-change-in-production";
 }
 
-export function createSessionToken(userId: string): string {
+export function createSessionToken(userId: string, role?: string): string {
   const payload: SessionPayload = {
     userId,
+    role,
     exp: Math.floor(Date.now() / 1000) + MAX_AGE_SEC,
   };
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");

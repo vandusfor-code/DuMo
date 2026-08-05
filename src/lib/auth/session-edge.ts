@@ -43,6 +43,8 @@ function timingSafeEqual(a: string, b: string): boolean {
 export type EdgeSessionPayload = {
   userId: string;
   exp: number;
+  /** Rol del usuario: permite que el middleware separe admin/asesora. */
+  role?: string;
 };
 
 export async function verifySessionTokenEdge(
@@ -64,9 +66,13 @@ export async function verifySessionTokenEdge(
   }
 }
 
-export async function createSessionTokenEdge(userId: string): Promise<string> {
+export async function createSessionTokenEdge(
+  userId: string,
+  role?: string,
+): Promise<string> {
   const payload: EdgeSessionPayload = {
     userId,
+    role,
     exp: Math.floor(Date.now() / 1000) + MAX_AGE_SEC,
   };
   const body = toBase64Url(new TextEncoder().encode(JSON.stringify(payload)));

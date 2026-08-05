@@ -28,7 +28,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const token = createSessionToken(result.user.id);
+    // El rol viaja en el token para que el middleware separe admin/asesora.
+    const token = createSessionToken(result.user.id, result.user.role);
     const secure = isSecureRequest(
       request.headers.get("x-forwarded-proto"),
       request.nextUrl.protocol,
