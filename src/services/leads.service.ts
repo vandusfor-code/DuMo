@@ -53,10 +53,20 @@ export const leadsService = {
   async sendMessage(input: SendMessageInput): Promise<{ id: string }> {
     const version = graphVersion();
     const repo = getConversationRepository();
-    const phoneId =
-      (await repo.getSendFromPhoneId(input.conversationId)) ??
-      process.env.WHATSAPP_PHONE_NUMBER_ID ??
-      "";
+    const envPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim() || "";
+    const convPhoneId = await repo.getSendFromPhoneId(input.conversationId);
+
+    // Responder SIEMPRE desde un número activo. Si la conversación entró por un
+    // número que ya se desconectó (p. ej. el 314 anterior), ese id ya no sirve:
+    // se usa el número configurado/registrado actual.
+    let phoneId = envPhoneId;
+    if (convPhoneId) {
+      const connected = await repo.listConnectedPhoneIds().catch(() => [] as string[]);
+      const isActive =
+        convPhoneId === envPhoneId ||
+        (connected.length > 0 && connected.includes(convPhoneId));
+      phoneId = isActive ? convPhoneId : envPhoneId || convPhoneId;
+    }
     const perNumberToken = phoneId ? await repo.getAccessTokenForPhoneId(phoneId) : null;
     const creds = resolveSendCredentials(phoneId, perNumberToken);
     if ("error" in creds) {

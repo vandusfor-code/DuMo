@@ -8,7 +8,7 @@ import type { DashboardData } from "@/types/dashboard";
 export function useDashboard() {
   return useQuery({
     queryKey: ["dashboard"],
-    queryFn: () => advisorApiGet<DashboardData>("/api/dashboard", EMPTY_ADVISOR_DASHBOARD),
+    queryFn: () => advisorApiGet<DashboardData>("/api/dashboard"),
     placeholderData: EMPTY_ADVISOR_DASHBOARD,
     ...ADVISOR_QUERY_OPTIONS,
   });

@@ -273,81 +273,89 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
     return next;
   }
 
-  private async pickAdvisorForAutoAssign() {
-    await ensureSchema();
+  /**
+   * Asigna conversaciones sin asesora repartiéndolas en round-robin.
+   *
+   * Una SOLA sentencia atómica: evita las condiciones de carrera entre
+   * instancias serverless (dos no pueden asignar el mismo lead) y elimina las
+   * ~5 consultas por conversación del enfoque anterior, que saturaban el pool.
+   *
+   * `onlyOnline=true` reparte entre las asesoras conectadas al CRM en los
+   * últimos 10 min; si no hay ninguna, se reintenta con todas las activas.
+   */
+  private async assignPendingRoundRobin(
+    conversationId: string | null,
+    onlyOnline: boolean,
+  ): Promise<number> {
     const sql = requireSql();
-    const online = await sql`
-      SELECT id, name, avatar_url
-      FROM users
-      WHERE role = 'asesora' AND active = true
-        AND last_seen_at IS NOT NULL
-        AND last_seen_at > now() - interval '10 minutes'
-      ORDER BY last_seen_at DESC
-    `;
-    const pool =
-      online.length > 0
-        ? online
-        : await sql`
-            SELECT id, name, avatar_url
-            FROM users
-            WHERE role = 'asesora' AND active = true
-            ORDER BY name ASC
-          `;
-    if (pool.length === 0) return null;
-    const settings = await this.getAutoAssignSettings();
-    const idx = settings.lastAdvisorIndex % pool.length;
-    const picked = pool[idx] as { id: string; name: string };
-    await setConfig(AUTO_ASSIGN_KEY, {
-      ...settings,
-      lastAdvisorIndex: (idx + 1) % pool.length,
-    });
-    return picked;
+    const rows = await withQueryTimeout(
+      sql<{ id: string }[]>`
+        WITH advisors AS (
+          SELECT id, name,
+                 (row_number() OVER (ORDER BY last_seen_at DESC NULLS LAST, name)) - 1 AS rn,
+                 (count(*) OVER ()) AS total
+          FROM users
+          WHERE role = 'asesora' AND active = true
+            AND (
+              ${onlyOnline} = false
+              OR (last_seen_at IS NOT NULL AND last_seen_at > now() - interval '10 minutes')
+            )
+        ),
+        pending AS (
+          SELECT id, (row_number() OVER (ORDER BY last_message_at)) - 1 AS rn
+          FROM lead_conversations
+          WHERE assigned_advisor_id IS NULL
+            AND (${conversationId}::text IS NULL OR id = ${conversationId})
+          LIMIT 200
+        )
+        UPDATE lead_conversations c
+        SET assigned_advisor_id = a.id,
+            assigned_advisor_name = a.name,
+            admin_status = 'asignado'
+        FROM pending p, advisors a
+        WHERE c.id = p.id
+          AND c.assigned_advisor_id IS NULL
+          AND a.rn = (p.rn % a.total)
+        RETURNING c.id
+      `,
+      6000,
+    );
+    return rows.length;
   }
 
+  /** Asigna una conversación concreta (la llama el webhook al entrar un mensaje). */
   async autoAssignIfNeeded(conversationId: string) {
     const settings = await this.getAutoAssignSettings();
     if (!settings.enabled) return;
-
     await ensureSchema();
-    const sql = requireSql();
-    const rows = await sql`
-      SELECT assigned_advisor_id FROM lead_conversations WHERE id = ${conversationId} LIMIT 1
-    `;
-    const existing = rows[0] as { assigned_advisor_id: string | null } | undefined;
-    if (existing?.assigned_advisor_id) return;
-
-    const advisor = await this.pickAdvisorForAutoAssign();
-    if (!advisor) return;
-
-    await sql`
-      UPDATE lead_conversations SET
-        assigned_advisor_id = ${advisor.id},
-        assigned_advisor_name = ${advisor.name},
-        admin_status = 'asignado'
-      WHERE id = ${conversationId}
-    `;
+    const assigned = await this.assignPendingRoundRobin(conversationId, true);
+    if (assigned === 0) {
+      // Nadie conectado: reparte entre todas las asesoras activas.
+      await this.assignPendingRoundRobin(conversationId, false);
+    }
   }
 
+  /**
+   * Barrido de pendientes. Se limita con un throttle porque antes se ejecutaba
+   * en CADA poll de la bandeja (cada 5 s por asesora) y saturaba la base.
+   */
   async autoAssignAllPending() {
+    if (Date.now() - lastSweepAt < SWEEP_INTERVAL_MS) return;
+    lastSweepAt = Date.now();
+
     const settings = await this.getAutoAssignSettings();
     if (!settings.enabled) return;
-
     await ensureSchema();
-    const sql = requireSql();
-    const pending = await withQueryTimeout(
-      sql<{ id: string }[]>`
-        SELECT id FROM lead_conversations
-        WHERE assigned_advisor_id IS NULL
-        ORDER BY last_message_at DESC
-        LIMIT 50
-      `,
-      5000,
-    );
-    for (const row of pending) {
-      await this.autoAssignIfNeeded(row.id);
+    const assigned = await this.assignPendingRoundRobin(null, true);
+    if (assigned === 0) {
+      await this.assignPendingRoundRobin(null, false);
     }
   }
 }
+
+/** Throttle del barrido de auto-asignación (por instancia serverless). */
+let lastSweepAt = 0;
+const SWEEP_INTERVAL_MS = 30_000;
 
 class MockAdminLeadsRepository implements AdminLeadsRepository {
   private conversations: AdminConversation[] = [];

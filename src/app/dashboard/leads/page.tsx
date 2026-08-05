@@ -40,6 +40,8 @@ export default function LeadsPage() {
               conversation={selected}
               messages={messages.data ?? []}
               isLoading={messages.isLoading}
+              isError={messages.isError}
+              onRetry={() => messages.refetch()}
             />
           </Card>
           <Card className="flex min-h-0 flex-col overflow-hidden rounded-none border-y-0 border-r-0 shadow-none">

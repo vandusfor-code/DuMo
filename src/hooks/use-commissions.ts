@@ -16,9 +16,7 @@ export function useCommissions(month: string) {
     queryFn: () =>
       advisorApiGet<Commission[]>(
         `/api/commissions?month=${encodeURIComponent(month)}`,
-        [],
       ),
-    placeholderData: [],
     ...ADVISOR_QUERY_OPTIONS,
   });
 }

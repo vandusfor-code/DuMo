@@ -37,6 +37,8 @@ export interface ConversationRepository {
   getSendFromPhoneId(conversationId: string): Promise<string | null>;
   /** Token de envío registrado para un phone_number_id conectado. */
   getAccessTokenForPhoneId(phoneNumberId: string): Promise<string | null>;
+  /** phone_number_id registrados como conectados a DuMo (números activos). */
+  listConnectedPhoneIds(): Promise<string[]>;
   registerNumber(number: ConnectedNumber): Promise<void>;
 }
 
@@ -60,6 +62,9 @@ class MockConversationRepository implements ConversationRepository {
   }
   getAccessTokenForPhoneId() {
     return Promise.resolve(null);
+  }
+  listConnectedPhoneIds() {
+    return Promise.resolve([] as string[]);
   }
   registerNumber() {
     return Promise.resolve();
@@ -206,6 +211,15 @@ class PostgresConversationRepository implements ConversationRepository {
     `) as unknown as { access_token: string | null }[];
     const token = rows[0]?.access_token?.trim();
     return token || null;
+  }
+
+  async listConnectedPhoneIds(): Promise<string[]> {
+    await ensureSchema();
+    const sql = getSql()!;
+    const rows = (await sql`
+      SELECT phone_number_id FROM connected_numbers
+    `) as unknown as { phone_number_id: string }[];
+    return rows.map((r) => r.phone_number_id);
   }
 
   async registerNumber(number: ConnectedNumber): Promise<void> {

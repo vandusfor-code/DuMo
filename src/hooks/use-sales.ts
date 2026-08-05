@@ -14,7 +14,7 @@ export const salesKeys = {
 export function useSales() {
   return useQuery({
     queryKey: salesKeys.list(),
-    queryFn: () => advisorApiGet<SaleSummary[]>("/api/sales", []),
+    queryFn: () => advisorApiGet<SaleSummary[]>("/api/sales"),
     placeholderData: [],
     ...ADVISOR_QUERY_OPTIONS,
   });
@@ -23,7 +23,7 @@ export function useSales() {
 export function useSale(id: string) {
   return useQuery({
     queryKey: salesKeys.detail(id),
-    queryFn: () => advisorApiGet<SaleDetail | null>(`/api/sales/${id}`, null),
+    queryFn: () => advisorApiGet<SaleDetail | null>(`/api/sales/${id}`),
     enabled: Boolean(id),
     ...ADVISOR_QUERY_OPTIONS,
   });

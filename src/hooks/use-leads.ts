@@ -15,12 +15,12 @@ export const leadKeys = {
 export function useConversations() {
   return useQuery({
     queryKey: leadKeys.conversations,
-    queryFn: () => advisorApiGet<Conversation[]>("/api/leads/conversations", []),
-    placeholderData: [],
-    refetchInterval: 5000,
+    queryFn: () => advisorApiGet<Conversation[]>("/api/leads/conversations"),
+    // Sincronización casi instantánea de la bandeja.
+    refetchInterval: 4000,
     refetchIntervalInBackground: true,
-    staleTime: 2000,
-    retry: false,
+    staleTime: 0,
+    retry: 2,
   });
 }
 
@@ -30,23 +30,22 @@ export function useConversationMessages(conversationId: string | null) {
     queryFn: () =>
       advisorApiGet<ChatMessage[]>(
         `/api/leads/conversations/${conversationId}/messages`,
-        [],
       ),
     enabled: Boolean(conversationId),
-    placeholderData: [],
-    refetchInterval: 5000,
+    // El chat abierto se refresca más seguido que la bandeja.
+    refetchInterval: 3000,
     refetchIntervalInBackground: true,
-    staleTime: 2000,
-    retry: false,
+    staleTime: 0,
+    retry: 2,
   });
 }
 
 export function usePlans() {
   return useQuery({
     queryKey: leadKeys.plans,
-    queryFn: () => advisorApiGet<Plan[]>("/api/leads/plans", []),
+    queryFn: () => advisorApiGet<Plan[]>("/api/leads/plans"),
     staleTime: 5 * 60_000,
-    retry: false,
+    retry: 1,
   });
 }
 

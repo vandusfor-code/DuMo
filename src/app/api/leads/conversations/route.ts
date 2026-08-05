@@ -11,23 +11,28 @@ export async function GET() {
     const user = await authService.getSessionUser();
     const advisorId = user?.role === "asesora" ? user.id : undefined;
 
+    // El barrido de auto-asignación NO debe bloquear la bandeja: va en segundo
+    // plano y además está limitado por throttle dentro del repositorio.
     if (advisorId) {
       const { adminLeadsService } = await import("@/services/admin-leads.service");
-      await Promise.race([
-        adminLeadsService.autoAssignAllPending(),
-        new Promise<void>((resolve) => setTimeout(resolve, 5000)),
-      ]);
+      void adminLeadsService.autoAssignAllPending().catch(() => {});
     }
 
     const conversations = await Promise.race([
       leadsService.getConversations(advisorId),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Conversations timeout")), 12_000),
+        setTimeout(() => reject(new Error("Conversations timeout")), 10_000),
       ),
     ]);
-    return NextResponse.json(conversations);
+    return NextResponse.json(conversations, {
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (error) {
+    // Nunca devolver [] ante un fallo: ocultaría que la bandeja se rompió.
     console.error("[GET /api/leads/conversations]", error);
-    return NextResponse.json([]);
+    return NextResponse.json(
+      { error: "No se pudieron cargar las conversaciones." },
+      { status: 503 },
+    );
   }
 }
