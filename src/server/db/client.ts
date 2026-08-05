@@ -34,11 +34,15 @@ export function getSql(): Sql | null {
 
   sqlSingleton = postgres(url, {
     ssl: isLocal ? false : "require",
-    max: 1,
-    idle_timeout: 10,
+    // Varias conexiones por instancia: la app hace consultas concurrentes
+    // (polling de conversaciones + mensajes + markRead + perfil). Con max:1 se
+    // encolaban todas en una sola conexión y bajo latencia de Neon se
+    // congestionaban hasta el timeout. Requiere la URI con pooler de Neon.
+    max: Number(process.env.DB_POOL_MAX ?? 8) || 8,
+    idle_timeout: 20,
     connect_timeout: 15,
     max_lifetime: 60 * 5,
-    // Supabase pooler y serverless: sin prepared statements.
+    // Pooler (Neon/Supabase) + serverless: sin prepared statements.
     prepare: false,
   });
   return sqlSingleton;
