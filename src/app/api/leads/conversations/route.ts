@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { adminLeadsService } from "@/services/admin-leads.service";
 import { authService } from "@/services/auth.service";
 import { leadsService } from "@/services/leads.service";
@@ -12,9 +12,16 @@ export async function GET() {
     const user = await authService.getSessionUser();
     const advisorId = user?.role === "asesora" ? user.id : undefined;
 
-    // Solo asigna si hay pendientes — evita el round-robin pesado en cada poll.
+    // La asignación corre DESPUÉS de responder: la bandeja nunca espera por
+    // ella, así un problema de asignación no puede romper la sincronización.
     if (advisorId) {
-      await adminLeadsService.ensurePendingAssigned();
+      after(async () => {
+        try {
+          await adminLeadsService.ensurePendingAssigned();
+        } catch (err) {
+          console.error("[ensurePendingAssigned]", err);
+        }
+      });
     }
 
     const conversations = await Promise.race([

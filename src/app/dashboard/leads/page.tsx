@@ -53,6 +53,9 @@ export default function LeadsPage() {
               messages={messages.data ?? []}
               isLoading={messages.isLoading}
               isError={messages.isError}
+              errorMessage={
+                messages.error instanceof Error ? messages.error.message : undefined
+              }
               onRetry={() => messages.refetch()}
             />
           </Card>

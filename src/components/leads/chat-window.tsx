@@ -13,6 +13,7 @@ export function ChatWindow({
   messages,
   isLoading,
   isError = false,
+  errorMessage,
   onRetry,
 }: {
   conversation: Conversation;
@@ -20,6 +21,8 @@ export function ChatWindow({
   isLoading: boolean;
   /** Falló la carga: se avisa en vez de mostrar un chat vacío engañoso. */
   isError?: boolean;
+  /** Mensaje real del fallo (incluye el código) para poder diagnosticar. */
+  errorMessage?: string;
   onRetry?: () => void;
 }) {
   const endRef = useRef<HTMLDivElement>(null);
@@ -51,7 +54,7 @@ export function ChatWindow({
           <div className="flex justify-center">
             <div className="inline-flex items-center gap-2 rounded-full border border-danger/20 bg-danger-soft px-3 py-1.5 text-[12px] font-medium text-danger-ink">
               <AlertTriangle className="size-3.5" />
-              No se pudieron cargar los mensajes.
+              {errorMessage ?? "No se pudieron cargar los mensajes."}
               {onRetry && (
                 <button
                   type="button"
