@@ -31,7 +31,11 @@ class PostgresCommercialConfigurationRepository implements CommercialConfigurati
   private async loadPlans(): Promise<CommercialPlan[]> {
     const stored = await getConfig<CommercialPlan[] | null>(PLANS_KEY, null);
     if (stored && stored.length > 0) return stored;
-    await setConfig(PLANS_KEY, COMMERCIAL_PLANS_MOCK);
+    try {
+      await setConfig(PLANS_KEY, COMMERCIAL_PLANS_MOCK);
+    } catch (err) {
+      console.error("[commercial-config] seed plans", err);
+    }
     return [...COMMERCIAL_PLANS_MOCK];
   }
 

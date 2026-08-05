@@ -108,6 +108,35 @@ export function ensureSchema(): Promise<void> {
           created_at timestamptz NOT NULL DEFAULT now()
         )
       `;
+      await sql`
+        ALTER TABLE lead_conversations
+        ADD COLUMN IF NOT EXISTS assigned_advisor_id text
+      `;
+      await sql`
+        ALTER TABLE lead_conversations
+        ADD COLUMN IF NOT EXISTS assigned_advisor_name text
+      `;
+      await sql`
+        ALTER TABLE lead_conversations
+        ADD COLUMN IF NOT EXISTS admin_status text NOT NULL DEFAULT 'nuevo'
+      `;
+      await sql`
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS last_seen_at timestamptz
+      `;
+      await sql`
+        CREATE TABLE IF NOT EXISTS lead_notes (
+          id text PRIMARY KEY,
+          conversation_id text NOT NULL,
+          text text NOT NULL,
+          author text NOT NULL DEFAULT '',
+          created_at timestamptz NOT NULL DEFAULT now()
+        )
+      `;
+      await sql`
+        CREATE INDEX IF NOT EXISTS idx_lead_notes_conv
+        ON lead_notes (conversation_id, created_at DESC)
+      `;
     })().catch((err) => {
       schemaPromise = null;
       throw err;

@@ -12,12 +12,17 @@ import {
   useAdminConversations,
   useAdminLeadDetail,
   useAdminMessages,
+  useAdminSendMessage,
   useAssignAdvisor,
+  useAutoAssignSettings,
+  useSetAutoAssign,
 } from "@/hooks/use-admin-leads";
 
 export default function AdminLeadsPage() {
   const { data: conversations, isLoading, isError, refetch } = useAdminConversations();
   const { data: advisors = [] } = useAdminAdvisors();
+  const { data: autoAssign } = useAutoAssignSettings();
+  const setAutoAssign = useSetAutoAssign();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const assign = useAssignAdvisor();
 
@@ -28,6 +33,7 @@ export default function AdminLeadsPage() {
 
   const detail = useAdminLeadDetail(selectedId);
   const messages = useAdminMessages(selectedId);
+  const sendMessage = useAdminSendMessage(selectedId);
 
   if (isError) {
     return (
@@ -46,10 +52,13 @@ export default function AdminLeadsPage() {
             advisors={advisors}
             isLoading={isLoading}
             selectedId={selectedId}
+            autoAssignEnabled={autoAssign?.enabled ?? false}
+            autoAssignLoading={setAutoAssign.isPending}
             onSelect={setSelectedId}
             onAssign={(conversationId, advisorId) =>
               assign.mutate({ conversationId, advisorId })
             }
+            onToggleAutoAssign={(enabled) => setAutoAssign.mutate(enabled)}
           />
         </Card>
 
@@ -60,6 +69,11 @@ export default function AdminLeadsPage() {
                 conversation={selected}
                 messages={messages.data ?? []}
                 isLoading={messages.isLoading}
+                isSending={sendMessage.isPending}
+                sendError={sendMessage.error instanceof Error ? sendMessage.error.message : null}
+                onSend={async (text) => {
+                  await sendMessage.mutateAsync({ to: selected.phone, text });
+                }}
               />
             </Card>
             <Card className="flex min-h-0 flex-col overflow-hidden rounded-none border-y-0 border-r-0 shadow-none">

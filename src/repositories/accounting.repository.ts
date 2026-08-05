@@ -50,30 +50,44 @@ function buildChart(expenses: Expense[]): AccountingChartPoint[] {
 }
 
 async function buildSummary(expenses: Expense[], monthlyBudget: number) {
-  const config = await getCommercialConfigurationRepository().getSnapshot();
-  const monthlyExpenses = expenses.reduce((s, e) => s + e.amount, 0);
-  const available = monthlyBudget - monthlyExpenses;
-  const currentIncome = 0;
-  const estimatedProfit = currentIncome - monthlyExpenses;
-  const monthlyGoal = config.settings.monthlyGoal;
-  const activePlans = config.plans.filter((p) => p.status === "active");
-  const avgSaleValue =
-    activePlans.length > 0
-      ? activePlans.reduce((s, p) => s + p.operatorPayment, 0) / activePlans.length
-      : 1;
-  const salesNeededForGoal =
-    avgSaleValue > 0
-      ? Math.ceil(Math.max(0, monthlyGoal - currentIncome) / avgSaleValue)
-      : 0;
+  let monthlyGoal = 0;
+  try {
+    const config = await getCommercialConfigurationRepository().getSnapshot();
+    monthlyGoal = config.settings.monthlyGoal;
+    const activePlans = config.plans.filter((p) => p.status === "active");
+    const avgSaleValue =
+      activePlans.length > 0
+        ? activePlans.reduce((s, p) => s + p.operatorPayment, 0) / activePlans.length
+        : 1;
+    const currentIncome = 0;
+    const monthlyExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+    const available = monthlyBudget - monthlyExpenses;
+    const estimatedProfit = currentIncome - monthlyExpenses;
+    const salesNeededForGoal =
+      avgSaleValue > 0
+        ? Math.ceil(Math.max(0, monthlyGoal - currentIncome) / avgSaleValue)
+        : 0;
 
-  return {
-    monthlyBudget,
-    monthlyExpenses,
-    available,
-    estimatedProfit,
-    monthlyGoal,
-    salesNeededForGoal,
-  };
+    return {
+      monthlyBudget,
+      monthlyExpenses,
+      available,
+      estimatedProfit,
+      monthlyGoal,
+      salesNeededForGoal,
+    };
+  } catch (err) {
+    console.error("[accounting] buildSummary", err);
+    const monthlyExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+    return {
+      monthlyBudget,
+      monthlyExpenses,
+      available: monthlyBudget - monthlyExpenses,
+      estimatedProfit: -monthlyExpenses,
+      monthlyGoal,
+      salesNeededForGoal: 0,
+    };
+  }
 }
 
 function requireSql() {

@@ -29,7 +29,7 @@ export interface ConnectedNumber {
 }
 
 export interface ConversationRepository {
-  getConversations(): Promise<Conversation[]>;
+  getConversations(advisorId?: string): Promise<Conversation[]>;
   getMessages(conversationId: string): Promise<ChatMessage[]>;
   saveMessage(msg: IncomingMessage): Promise<void>;
   markRead(conversationId: string): Promise<void>;
@@ -43,7 +43,7 @@ export interface ConversationRepository {
 /* ----------------------------- Mock ----------------------------- */
 
 class MockConversationRepository implements ConversationRepository {
-  getConversations() {
+  getConversations(_advisorId?: string) {
     return withLatency(CONVERSATIONS_MOCK);
   }
   getMessages(conversationId: string) {
@@ -95,12 +95,18 @@ function toStatus(value: string): ConversationStatus {
 }
 
 class PostgresConversationRepository implements ConversationRepository {
-  async getConversations(): Promise<Conversation[]> {
+  async getConversations(advisorId?: string): Promise<Conversation[]> {
     await ensureSchema();
     const sql = getSql()!;
-    const rows = (await sql`
-      SELECT * FROM lead_conversations ORDER BY last_message_at DESC
-    `) as unknown as ConvRow[];
+    const rows = advisorId
+      ? ((await sql`
+          SELECT * FROM lead_conversations
+          WHERE assigned_advisor_id = ${advisorId}
+          ORDER BY last_message_at DESC
+        `) as unknown as ConvRow[])
+      : ((await sql`
+          SELECT * FROM lead_conversations ORDER BY last_message_at DESC
+        `) as unknown as ConvRow[]);
     return rows.map((r) => ({
       id: r.id,
       customerName: r.customer_name || r.phone,

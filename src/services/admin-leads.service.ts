@@ -1,4 +1,5 @@
 import "server-only";
+import { getAdminLeadsRepository } from "@/repositories/admin-leads.repository";
 import { getLeadRepository } from "@/repositories/leads.repository";
 import type {
   AdminAdvisor,
@@ -14,39 +15,51 @@ import type { Lead, Plan, SaveLeadInput } from "@/types/lead";
 
 export const adminLeadsService = {
   listConversations(): Promise<AdminConversation[]> {
-    return getLeadRepository().listAdminConversations();
+    return getAdminLeadsRepository().listConversations();
+  },
+  listConversationsForAdvisor(advisorId: string): Promise<AdminConversation[]> {
+    return getAdminLeadsRepository().listConversationsForAdvisor(advisorId);
   },
   getDetail(conversationId: string): Promise<AdminLeadDetail> {
-    return getLeadRepository().getAdminDetail(conversationId);
+    return getAdminLeadsRepository().getDetail(conversationId);
   },
   listAdvisors(): Promise<AdminAdvisor[]> {
-    return getLeadRepository().listAdvisors();
+    return getAdminLeadsRepository().listAdvisors();
   },
   assignAdvisor(input: AssignAdvisorInput): Promise<AdminConversation> {
-    return getLeadRepository().assignAdvisor(input);
+    return getAdminLeadsRepository().assignAdvisor(input);
   },
   getMessages(conversationId: string): Promise<ChatMessage[]> {
-    return getLeadRepository().getMessages(conversationId);
+    return getAdminLeadsRepository().getMessages(conversationId);
   },
   listNotes(conversationId: string): Promise<LeadNote[]> {
-    return getLeadRepository().listNotes(conversationId);
+    return getAdminLeadsRepository().listNotes(conversationId);
   },
   addNote(input: UpsertLeadNoteInput): Promise<LeadNote> {
-    return getLeadRepository().addNote(input);
+    return getAdminLeadsRepository().addNote(input);
   },
   updateNote(id: string, text: string): Promise<LeadNote> {
-    return getLeadRepository().updateNote(id, text);
+    return getAdminLeadsRepository().updateNote(id, text);
   },
   deleteNote(id: string): Promise<void> {
-    return getLeadRepository().deleteNote(id);
+    return getAdminLeadsRepository().deleteNote(id);
   },
   getClientProfile(conversationId: string): Promise<ClientProfile> {
-    return getLeadRepository().getClientProfile(conversationId);
+    return getAdminLeadsRepository().getDetail(conversationId).then((d) => d.client);
   },
   getPlans(): Promise<Plan[]> {
     return getLeadRepository().getPlans();
   },
   saveLead(input: SaveLeadInput): Promise<Lead> {
     return getLeadRepository().saveLead(input);
+  },
+  getAutoAssignSettings() {
+    return getAdminLeadsRepository().getAutoAssignSettings();
+  },
+  setAutoAssignEnabled(enabled: boolean) {
+    return getAdminLeadsRepository().setAutoAssignEnabled(enabled);
+  },
+  autoAssignIfNeeded(conversationId: string) {
+    return getAdminLeadsRepository().autoAssignIfNeeded(conversationId);
   },
 };

@@ -1,27 +1,34 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { SquarePen } from "lucide-react";
+import { SquarePen, Zap } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConversationSearch } from "@/components/leads/conversation-search";
 import type { AdminAdvisor, AdminConversation, AdminLeadFilter } from "@/types/admin-lead";
 import { AdminConversationFilters } from "./admin-conversation-filters";
 import { AdminConversationItem } from "./admin-conversation-item";
+import { cn } from "@/lib/utils";
 
 export function AdminConversationList({
   conversations,
   advisors,
   isLoading,
   selectedId,
+  autoAssignEnabled,
+  autoAssignLoading,
   onSelect,
   onAssign,
+  onToggleAutoAssign,
 }: {
   conversations: AdminConversation[];
   advisors: AdminAdvisor[];
   isLoading: boolean;
   selectedId: string | null;
+  autoAssignEnabled: boolean;
+  autoAssignLoading?: boolean;
   onSelect: (id: string) => void;
   onAssign: (conversationId: string, advisorId: string) => void;
+  onToggleAutoAssign: (enabled: boolean) => void;
 }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<AdminLeadFilter>("all");
@@ -67,6 +74,44 @@ export function AdminConversationList({
             <SquarePen className="size-[18px]" />
           </button>
         </div>
+
+        <button
+          type="button"
+          disabled={autoAssignLoading}
+          onClick={() => onToggleAutoAssign(!autoAssignEnabled)}
+          className={cn(
+            "flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left transition-colors",
+            autoAssignEnabled
+              ? "border-brand/30 bg-brand-soft"
+              : "border-line bg-canvas hover:bg-card",
+          )}
+        >
+          <div className="flex items-center gap-2">
+            <Zap className={cn("size-4", autoAssignEnabled ? "text-brand" : "text-muted")} />
+            <div>
+              <p className="text-[13px] font-semibold text-ink">Asignación automática</p>
+              <p className="text-[11px] text-muted">
+                {autoAssignEnabled
+                  ? "Activa — nuevos chats van a asesoras conectadas"
+                  : "Inactiva — asignación manual"}
+              </p>
+            </div>
+          </div>
+          <span
+            className={cn(
+              "relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors",
+              autoAssignEnabled ? "bg-brand" : "bg-line",
+            )}
+          >
+            <span
+              className={cn(
+                "absolute top-0.5 size-5 rounded-full bg-white shadow transition-transform",
+                autoAssignEnabled ? "translate-x-5" : "translate-x-0.5",
+              )}
+            />
+          </span>
+        </button>
+
         <ConversationSearch value={search} onChange={setSearch} />
         <AdminConversationFilters value={filter} onChange={setFilter} counts={counts} />
       </div>

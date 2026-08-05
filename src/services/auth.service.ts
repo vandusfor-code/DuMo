@@ -39,7 +39,11 @@ export const authService = {
     if (!token) return null;
     const payload = verifySessionToken(token);
     if (!payload) return null;
-    return getAuthRepository().findById(payload.userId);
+    const user = await getAuthRepository().findById(payload.userId);
+    if (user) {
+      void getAuthRepository().touchLastSeen(user.id);
+    }
+    return user;
   },
 
   async getCurrentPublicUser() {

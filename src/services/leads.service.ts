@@ -18,8 +18,8 @@ export interface SendMessageInput {
 }
 
 export const leadsService = {
-  getConversations(): Promise<Conversation[]> {
-    return getConversationRepository().getConversations();
+  getConversations(advisorId?: string): Promise<Conversation[]> {
+    return getConversationRepository().getConversations(advisorId);
   },
   getMessages(conversationId: string): Promise<ChatMessage[]> {
     const repo = getConversationRepository();
@@ -34,8 +34,12 @@ export const leadsService = {
   },
 
   /** Persiste un mensaje entrante recibido por el webhook. */
-  receiveMessage(msg: IncomingMessage): Promise<void> {
-    return getConversationRepository().saveMessage(msg);
+  async receiveMessage(msg: IncomingMessage): Promise<void> {
+    await getConversationRepository().saveMessage(msg);
+    if (msg.direction === "in") {
+      const { adminLeadsService } = await import("@/services/admin-leads.service");
+      await adminLeadsService.autoAssignIfNeeded(msg.conversationId);
+    }
   },
 
   /** Registra un número conectado a DuMo (lo llama "Conectar con DuMo"). */

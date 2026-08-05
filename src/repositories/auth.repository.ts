@@ -25,6 +25,7 @@ export interface AuthRepository {
   changePassword(id: string, newPassword: string): Promise<void>;
   changePasswordWithCurrent(id: string, input: ChangePasswordInput): Promise<void>;
   updateProfile(id: string, input: UpdateProfileInput): Promise<AuthUser>;
+  touchLastSeen(id: string): Promise<void>;
 }
 
 function mapRow(r: {
@@ -257,6 +258,16 @@ class PostgresAuthRepository implements AuthRepository {
     const user = await this.findById(id);
     if (!user) throw new Error("Usuario no encontrado.");
     return user;
+  }
+
+  async touchLastSeen(id: string): Promise<void> {
+    try {
+      await ensureSchema();
+      const sql = requireSql();
+      await sql`UPDATE users SET last_seen_at = now() WHERE id = ${id}`;
+    } catch {
+      /* no bloquear la sesión si falla */
+    }
   }
 }
 

@@ -9,7 +9,11 @@ export async function GET(request: NextRequest) {
     const p = request.nextUrl.searchParams;
     const conversationId = p.get("conversationId");
     const advisors = p.get("advisors");
+    const settings = p.get("settings");
 
+    if (settings === "1") {
+      return NextResponse.json(await adminLeadsService.getAutoAssignSettings());
+    }
     if (advisors === "1") {
       return NextResponse.json(await adminLeadsService.listAdvisors());
     }
@@ -43,11 +47,16 @@ export async function POST(request: NextRequest) {
       const note = await adminLeadsService.addNote(body);
       return NextResponse.json(note);
     }
+    if (body.action === "setAutoAssign") {
+      const settings = await adminLeadsService.setAutoAssignEnabled(Boolean(body.enabled));
+      return NextResponse.json(settings);
+    }
     const lead = await adminLeadsService.saveLead(body);
     return NextResponse.json(lead);
   } catch (error) {
     console.error("[POST /api/admin/leads]", error);
-    return NextResponse.json({ error: "No se pudo guardar." }, { status: 500 });
+    const message = error instanceof Error ? error.message : "No se pudo guardar.";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }
 

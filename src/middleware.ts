@@ -24,6 +24,8 @@ export function middleware(request: NextRequest) {
     pathname.startsWith("/admin") ||
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/api/admin") ||
+    pathname.startsWith("/api/leads") ||
+    pathname.startsWith("/api/whatsapp/send") ||
     pathname.startsWith("/api/users/me");
 
   if (!needsAuth) return NextResponse.next();

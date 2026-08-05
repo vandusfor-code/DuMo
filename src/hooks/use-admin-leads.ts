@@ -16,6 +16,7 @@ export function useAdminConversations() {
   return useQuery({
     queryKey: ["admin", "leads", "conversations"],
     queryFn: () => apiGet<AdminConversation[]>("/api/admin/leads"),
+    refetchInterval: 2000,
   });
 }
 
@@ -39,6 +40,7 @@ export function useAdminMessages(conversationId: string | null) {
     queryKey: ["admin", "leads", "messages", conversationId],
     queryFn: () => apiGet<ChatMessage[]>(`/api/admin/leads?conversationId=${conversationId}&messages=1`),
     enabled: !!conversationId,
+    refetchInterval: 2000,
   });
 }
 
@@ -84,5 +86,42 @@ export function useDeleteLeadNote() {
   return useMutation({
     mutationFn: (id: string) => apiDelete(`/api/admin/leads?noteId=${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "leads"] }),
+  });
+}
+
+export function useAutoAssignSettings() {
+  return useQuery({
+    queryKey: ["admin", "leads", "auto-assign"],
+    queryFn: () => apiGet<{ enabled: boolean; lastAdvisorIndex: number }>("/api/admin/leads?settings=1"),
+  });
+}
+
+export function useSetAutoAssign() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) =>
+      apiPost<{ enabled: boolean; lastAdvisorIndex: number }>("/api/admin/leads", {
+        action: "setAutoAssign",
+        enabled,
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "leads", "auto-assign"] }),
+  });
+}
+
+export function useAdminSendMessage(conversationId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { to: string; text: string }) =>
+      apiPost<{ ok: boolean; id: string }>("/api/whatsapp/send", {
+        conversationId,
+        to: input.to,
+        text: input.text,
+      }),
+    onSuccess: () => {
+      if (conversationId) {
+        qc.invalidateQueries({ queryKey: ["admin", "leads", "messages", conversationId] });
+      }
+      qc.invalidateQueries({ queryKey: ["admin", "leads", "conversations"] });
+    },
   });
 }

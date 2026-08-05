@@ -15,8 +15,7 @@ export function useConversations() {
   return useQuery({
     queryKey: leadKeys.conversations,
     queryFn: () => apiGet<Conversation[]>("/api/leads/conversations"),
-    // Near-real-time inbox without websockets.
-    refetchInterval: 5000,
+    refetchInterval: 2000,
   });
 }
 
@@ -26,7 +25,7 @@ export function useConversationMessages(conversationId: string | null) {
     queryFn: () =>
       apiGet<ChatMessage[]>(`/api/leads/conversations/${conversationId}/messages`),
     enabled: Boolean(conversationId),
-    refetchInterval: 4000,
+    refetchInterval: 2000,
   });
 }
 

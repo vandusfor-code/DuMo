@@ -5,21 +5,27 @@ import { Mic, Paperclip, Send, Smile } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChatHeader } from "@/components/leads/chat-header";
 import { ChatBubble } from "@/components/leads/chat-bubble";
-import { Lock } from "lucide-react";
 import type { AdminConversation } from "@/types/admin-lead";
 import type { ChatMessage, Conversation } from "@/types/conversation";
 
-/** Chat admin — solo interfaz, sin integración WhatsApp. */
 export function AdminChatPanel({
   conversation,
   messages,
   isLoading,
+  onSend,
+  isSending,
+  sendError,
 }: {
   conversation: AdminConversation;
   messages: ChatMessage[];
   isLoading: boolean;
+  onSend: (text: string) => Promise<void>;
+  isSending?: boolean;
+  sendError?: string | null;
 }) {
   const [value, setValue] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
   const headerConv: Conversation = {
     id: conversation.id,
     customerName: conversation.customerName,
@@ -32,6 +38,18 @@ export function AdminChatPanel({
     online: conversation.online,
   };
 
+  const handleSend = async () => {
+    const text = value.trim();
+    if (!text || isSending) return;
+    setError(null);
+    try {
+      await onSend(text);
+      setValue("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo enviar el mensaje.");
+    }
+  };
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="shrink-0">
@@ -39,12 +57,6 @@ export function AdminChatPanel({
       </div>
 
       <div className="wa-chat-bg min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
-        <div className="flex justify-center">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-soft px-3 py-1 text-[11px] font-medium text-warning-ink">
-            <Lock className="size-3" />
-            Vista administrativa — envío deshabilitado
-          </span>
-        </div>
         <div className="flex justify-center">
           <span className="rounded-full bg-card px-3 py-1 text-[11px] font-medium text-muted shadow-sm">
             Hoy
@@ -62,6 +74,11 @@ export function AdminChatPanel({
       </div>
 
       <div className="shrink-0 border-t border-[#e9edef] bg-[#f0f2f5] px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
+        {(error || sendError) && (
+          <p className="mb-2 rounded-lg bg-danger-soft px-3 py-2 text-[12px] font-medium text-danger-ink">
+            {error ?? sendError}
+          </p>
+        )}
         <div className="flex items-center gap-2">
           <button type="button" aria-label="Emoji" className="grid size-9 place-items-center rounded-xl text-muted transition-colors hover:bg-brand-soft hover:text-brand">
             <Smile className="size-5" />
@@ -72,11 +89,19 @@ export function AdminChatPanel({
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && void handleSend()}
             placeholder="Escribe un mensaje..."
-            className="min-h-10 flex-1 rounded-2xl border-0 bg-white px-4 text-[14px] outline-none ring-0 placeholder:text-muted"
+            disabled={isSending}
+            className="min-h-10 flex-1 rounded-2xl border-0 bg-white px-4 text-[14px] outline-none ring-0 placeholder:text-muted disabled:opacity-60"
           />
           {value.trim() ? (
-            <button type="button" aria-label="Enviar" className="grid size-10 place-items-center rounded-full bg-brand text-white">
+            <button
+              type="button"
+              aria-label="Enviar"
+              disabled={isSending}
+              onClick={() => void handleSend()}
+              className="grid size-10 place-items-center rounded-full bg-brand text-white disabled:opacity-60"
+            >
               <Send className="size-[18px]" />
             </button>
           ) : (
