@@ -156,7 +156,7 @@ class PostgresAuthRepository implements AuthRepository {
     const sql = requireSql();
     await this.assertUnique(input.email, input.username);
 
-    const id = `usr-${Date.now()}`;
+    const id = `usr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     await sql`
       INSERT INTO users (id, username, email, password_hash, name, role, active, avatar_url)
       VALUES (

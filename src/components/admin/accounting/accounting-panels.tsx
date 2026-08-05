@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -175,12 +175,23 @@ export function AddExpenseDialog({
 }: {
   open: boolean;
   onClose: () => void;
-  onSave: (values: { date: string; category: ExpenseCategory; description: string; amount: number }) => void;
+  onSave: (values: { date: string; category: ExpenseCategory; description: string; amount: number }) => Promise<void>;
 }) {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [category, setCategory] = useState<ExpenseCategory>("otros");
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setDate(new Date().toISOString().slice(0, 10));
+    setCategory("otros");
+    setDescription("");
+    setAmount(0);
+    setError(null);
+  }, [open]);
 
   if (!open) return null;
 
@@ -197,10 +208,31 @@ export function AddExpenseDialog({
           </select>
           <input placeholder="Descripción" value={description} onChange={(e) => setDescription(e.target.value)} className="h-11 w-full rounded-xl border border-line px-4 text-[14px]" />
           <input type="number" placeholder="Valor" value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} className="h-11 w-full rounded-xl border border-line px-4 text-[14px]" />
+          {error && (
+            <p className="rounded-lg bg-danger-soft px-3 py-2 text-[13px] font-medium text-danger-ink">
+              {error}
+            </p>
+          )}
         </div>
         <div className="mt-6 flex justify-end gap-3">
-          <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-          <Button onClick={() => { onSave({ date, category, description, amount }); onClose(); }}>Guardar</Button>
+          <Button variant="secondary" onClick={onClose} disabled={saving}>Cancelar</Button>
+          <Button
+            disabled={!amount || saving}
+            onClick={async () => {
+              setSaving(true);
+              setError(null);
+              try {
+                await onSave({ date, category, description, amount });
+                onClose();
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "No se pudo guardar el gasto.");
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            {saving ? "Guardando…" : "Guardar"}
+          </Button>
         </div>
       </Card>
     </div>

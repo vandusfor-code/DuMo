@@ -35,11 +35,11 @@ export default function AdminUsuariosPage() {
       ) : (
         <AdminUsersTable
           users={data}
-          onCreate={(input) => createUser.mutate(input)}
-          onUpdate={(id, input) => updateUser.mutate({ id, data: input })}
+          onCreate={async (input) => { await createUser.mutateAsync(input); }}
+          onUpdate={async (id, input) => { await updateUser.mutateAsync({ id, data: input }); }}
           onToggle={(id, active) => toggleUser.mutate({ id, active })}
           onDelete={(id) => deleteUser.mutate(id)}
-          onChangePassword={(id, newPassword) => changePassword.mutate({ id, newPassword })}
+          onChangePassword={async (id, newPassword) => { await changePassword.mutateAsync({ id, newPassword }); }}
         />
       )}
     </div>

@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "crypto";
+import type { NextResponse } from "next/server";
 import { SESSION_COOKIE } from "./constants";
 
 export { SESSION_COOKIE };
@@ -50,4 +51,13 @@ export function sessionCookieOptions() {
     path: "/",
     maxAge: MAX_AGE_SEC,
   };
+}
+
+/** Borra la cookie de sesión en una respuesta (Route Handler o middleware). */
+export function clearSessionCookie(res: NextResponse) {
+  res.cookies.set(SESSION_COOKIE, "", {
+    ...sessionCookieOptions(),
+    maxAge: 0,
+    expires: new Date(0),
+  });
 }

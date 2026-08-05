@@ -90,6 +90,24 @@ export function ensureSchema(): Promise<void> {
           created_at timestamptz NOT NULL DEFAULT now()
         )
       `;
+      await sql`
+        CREATE TABLE IF NOT EXISTS app_config (
+          key text PRIMARY KEY,
+          value jsonb NOT NULL,
+          updated_at timestamptz NOT NULL DEFAULT now()
+        )
+      `;
+      await sql`
+        CREATE TABLE IF NOT EXISTS accounting_expenses (
+          id text PRIMARY KEY,
+          date date NOT NULL,
+          category text NOT NULL,
+          description text NOT NULL DEFAULT '',
+          amount numeric NOT NULL,
+          user_name text NOT NULL DEFAULT '',
+          created_at timestamptz NOT NULL DEFAULT now()
+        )
+      `;
     })().catch((err) => {
       schemaPromise = null;
       throw err;

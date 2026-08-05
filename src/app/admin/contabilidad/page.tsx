@@ -56,12 +56,12 @@ export default function AdminContabilidadPage() {
       <AddExpenseDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
-        onSave={(v) =>
-          createExpense.mutate({
+        onSave={async (v) => {
+          await createExpense.mutateAsync({
             ...v,
             user: "Administrador",
-          })
-        }
+          });
+        }}
       />
     </div>
   );

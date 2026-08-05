@@ -1,23 +1,23 @@
 import "server-only";
 import type {
+  AccountingChartPoint,
   AccountingFilters,
   AccountingResult,
   CreateExpenseInput,
   Expense,
 } from "@/types/accounting";
-import {
-  ACCOUNTING_CHART_MOCK,
-  ACCOUNTING_MONTHLY_BUDGET,
-  EXPENSES_MOCK,
-} from "@/data/mock/accounting.mock";
+import { ACCOUNTING_MONTHLY_BUDGET } from "@/data/mock/accounting.mock";
 import { getCommercialConfigurationRepository } from "@/repositories/commercial-configuration.repository";
-import { withLatency } from "@/lib/mock";
+import { getConfig, setConfig } from "@/server/db/app-config";
+import { ensureSchema, getSql, hasDatabase } from "@/server/db/client";
 
 export interface AccountingRepository {
   getOverview(filters: AccountingFilters): Promise<AccountingResult>;
   createExpense(input: CreateExpenseInput): Promise<Expense>;
   deleteExpense(id: string): Promise<void>;
 }
+
+const BUDGET_KEY = "accounting_monthly_budget";
 
 function monthKey(filters: AccountingFilters): string {
   return `${filters.year}-${filters.month.padStart(2, "0")}`;
@@ -28,18 +28,43 @@ function filterExpenses(filters: AccountingFilters, expenses: Expense[]): Expens
   return expenses.filter((e) => e.date.startsWith(key));
 }
 
-async function buildSummary(expenses: Expense[]) {
+function buildChart(expenses: Expense[]): AccountingChartPoint[] {
+  const now = new Date();
+  const points: AccountingChartPoint[] = [];
+
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const monthExpenses = expenses
+      .filter((e) => e.date.startsWith(key))
+      .reduce((s, e) => s + e.amount, 0);
+    points.push({
+      label: d.toLocaleDateString("es-CL", { month: "short" }),
+      income: 0,
+      expenses: monthExpenses,
+      profit: -monthExpenses,
+    });
+  }
+
+  return points;
+}
+
+async function buildSummary(expenses: Expense[], monthlyBudget: number) {
   const config = await getCommercialConfigurationRepository().getSnapshot();
   const monthlyExpenses = expenses.reduce((s, e) => s + e.amount, 0);
-  const monthlyBudget = ACCOUNTING_MONTHLY_BUDGET;
   const available = monthlyBudget - monthlyExpenses;
-  const chartPoint = ACCOUNTING_CHART_MOCK[ACCOUNTING_CHART_MOCK.length - 1];
-  const estimatedProfit = chartPoint.income - monthlyExpenses;
+  const currentIncome = 0;
+  const estimatedProfit = currentIncome - monthlyExpenses;
   const monthlyGoal = config.settings.monthlyGoal;
-  const avgSaleValue = config.plans
-    .filter((p) => p.status === "active")
-    .reduce((s, p) => s + p.operatorPayment, 0) / Math.max(1, config.plans.filter((p) => p.status === "active").length);
-  const salesNeededForGoal = Math.ceil(Math.max(0, monthlyGoal - chartPoint.income) / avgSaleValue);
+  const activePlans = config.plans.filter((p) => p.status === "active");
+  const avgSaleValue =
+    activePlans.length > 0
+      ? activePlans.reduce((s, p) => s + p.operatorPayment, 0) / activePlans.length
+      : 1;
+  const salesNeededForGoal =
+    avgSaleValue > 0
+      ? Math.ceil(Math.max(0, monthlyGoal - currentIncome) / avgSaleValue)
+      : 0;
 
   return {
     monthlyBudget,
@@ -51,31 +76,124 @@ async function buildSummary(expenses: Expense[]) {
   };
 }
 
+function requireSql() {
+  const sql = getSql();
+  if (!sql) {
+    throw new Error("DATABASE_URL no configurada. Contabilidad requiere Postgres.");
+  }
+  return sql;
+}
+
+function mapExpenseRow(r: {
+  id: string;
+  date: string | Date;
+  category: string;
+  description: string;
+  amount: string | number;
+  user_name: string;
+}): Expense {
+  const date =
+    r.date instanceof Date
+      ? r.date.toISOString().slice(0, 10)
+      : String(r.date).slice(0, 10);
+  return {
+    id: r.id,
+    date,
+    category: r.category as Expense["category"],
+    description: r.description,
+    amount: Number(r.amount),
+    user: r.user_name,
+  };
+}
+
+class PostgresAccountingRepository implements AccountingRepository {
+  private async listAllExpenses(): Promise<Expense[]> {
+    await ensureSchema();
+    const sql = requireSql();
+    const rows = await sql`
+      SELECT id, date, category, description, amount, user_name
+      FROM accounting_expenses
+      ORDER BY date DESC, created_at DESC
+    `;
+    return rows.map((r) => mapExpenseRow(r as Parameters<typeof mapExpenseRow>[0]));
+  }
+
+  async getOverview(filters: AccountingFilters) {
+    const expenses = await this.listAllExpenses();
+    const filtered = filterExpenses(filters, expenses);
+    const monthlyBudget = await getConfig(BUDGET_KEY, ACCOUNTING_MONTHLY_BUDGET);
+    const summary = await buildSummary(filtered, monthlyBudget);
+    const chart = buildChart(expenses);
+
+    return {
+      summary,
+      chart,
+      expenses: filtered.sort((a, b) => b.date.localeCompare(a.date)),
+    };
+  }
+
+  async createExpense(input: CreateExpenseInput) {
+    await ensureSchema();
+    const sql = requireSql();
+    const id = `exp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    await sql`
+      INSERT INTO accounting_expenses (id, date, category, description, amount, user_name)
+      VALUES (
+        ${id},
+        ${input.date},
+        ${input.category},
+        ${input.description},
+        ${input.amount},
+        ${input.user}
+      )
+    `;
+    return {
+      id,
+      date: input.date,
+      category: input.category,
+      description: input.description,
+      amount: input.amount,
+      user: input.user,
+    };
+  }
+
+  async deleteExpense(id: string) {
+    await ensureSchema();
+    const sql = requireSql();
+    await sql`DELETE FROM accounting_expenses WHERE id = ${id}`;
+  }
+}
+
+/** Fallback en memoria solo cuando no hay DATABASE_URL (desarrollo local). */
 class MockAccountingRepository implements AccountingRepository {
-  private expenses = [...EXPENSES_MOCK];
+  private expenses: Expense[] = [];
 
   async getOverview(filters: AccountingFilters) {
     const filtered = filterExpenses(filters, this.expenses);
-    const summary = await buildSummary(filtered);
-    return withLatency({
+    const summary = await buildSummary(filtered, ACCOUNTING_MONTHLY_BUDGET);
+    return {
       summary,
-      chart: ACCOUNTING_CHART_MOCK,
+      chart: buildChart(this.expenses),
       expenses: filtered.sort((a, b) => b.date.localeCompare(a.date)),
-    });
+    };
   }
 
   async createExpense(input: CreateExpenseInput) {
     const expense: Expense = { id: `exp-${Date.now()}`, ...input };
     this.expenses.unshift(expense);
-    return withLatency(expense);
+    return expense;
   }
 
-  deleteExpense(id: string) {
+  async deleteExpense(id: string) {
     this.expenses = this.expenses.filter((e) => e.id !== id);
-    return withLatency(undefined);
   }
 }
 
 export function getAccountingRepository(): AccountingRepository {
+  if (hasDatabase()) return new PostgresAccountingRepository();
   return new MockAccountingRepository();
+}
+
+export async function setAccountingMonthlyBudget(amount: number): Promise<void> {
+  await setConfig(BUDGET_KEY, amount);
 }
