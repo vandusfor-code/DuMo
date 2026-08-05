@@ -36,7 +36,7 @@ export class PostgresLeadRepository {
     const config = await getCommercialConfigurationRepository().getSnapshot();
     const plans = config.plans
       .filter((p) => p.status === "active")
-      .map((p) => ({ id: p.id, name: p.name }));
+      .map((p) => ({ id: p.id, name: p.name, womValue: p.womValue }));
     return plans.length > 0 ? plans : [{ id: "default", name: "Plan estándar" }];
   }
 

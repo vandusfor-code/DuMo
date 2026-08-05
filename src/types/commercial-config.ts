@@ -24,7 +24,10 @@ export interface CommercialPlan {
   name: string;
   operator: string;
   saleType: CommercialSaleType;
-  operatorPayment: number;
+  /** Precio al cliente final (WOM) — visible para asesoras. */
+  womValue: number;
+  /** Lo que WOM paga a DuMo — solo admin / contabilidad. */
+  dumoValue: number;
   advisorCommission: number;
   status: CommercialPlanStatus;
 }
@@ -46,7 +49,8 @@ export interface UpsertCommercialPlanInput {
   name: string;
   operator: string;
   saleType: CommercialSaleType;
-  operatorPayment: number;
+  womValue: number;
+  dumoValue: number;
   advisorCommission: number;
   status: CommercialPlanStatus;
 }

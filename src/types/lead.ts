@@ -33,10 +33,12 @@ export const LEAD_SALE_TYPE_LABELS: Record<LeadSaleType, string> = {
 /** Tipos de venta en los que el campo "Equipo" aplica (se muestra). */
 export const EQUIPMENT_LEAD_TYPES: LeadSaleType[] = ["portability", "renewal"];
 
-/** Plan comercial (viene del repositorio; mock por ahora). */
+/** Plan comercial visible para asesoras (sin Valor DuMo). */
 export interface Plan {
   id: string;
   name: string;
+  /** Precio WOM al cliente final. */
+  womValue?: number;
 }
 
 /** Una línea vendida dentro de la gestión. */

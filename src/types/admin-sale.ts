@@ -27,15 +27,18 @@ export const ADMIN_SALE_TYPE_LABELS: Record<AdminSaleType, string> = {
 };
 
 export interface AdminSale {
-  id: string; // "#VTA-0982"
-  date: string; // "03/08/2025"
-  time: string; // "10:24 am"
+  id: string;
+  date: string;
+  time: string;
   customerName: string;
   rut: string;
   advisor: string;
   type: AdminSaleType;
   plan: string;
-  operatorValue: number;
+  /** Precio WOM al cliente — referencia comercial. */
+  womValue: number;
+  /** Ingreso DuMo (lo que paga WOM) — base contable admin. */
+  dumoValue: number;
   status: AdminSaleStatus;
   lines: number;
 }

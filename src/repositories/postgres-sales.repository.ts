@@ -21,6 +21,7 @@ import type { AdvisorScope } from "@/lib/advisor-scope";
 import { matchesAdvisor } from "@/lib/advisor-scope";
 import { getAuthRepository } from "@/repositories/auth.repository";
 import { getCommercialConfigurationRepository } from "@/repositories/commercial-configuration.repository";
+import { buildPlanValueIndex } from "@/lib/commercial-plan";
 import { getConfig } from "@/server/db/app-config";
 import { ADMIN_DASHBOARD_MOCK } from "@/data/mock/admin-dashboard.mock";
 import { DASHBOARD_MOCK } from "@/data/mock/dashboard.mock";
@@ -50,6 +51,7 @@ type SaleRow = {
   sale_type: string;
   plan: string;
   operator_value: number | string;
+  dumo_value?: number | string;
   sale_date: string | Date;
   notes: string;
   created_at: string | Date;
@@ -88,12 +90,25 @@ function lineCount(row: SaleRow): number {
   return Number(row.line_count ?? 0) || 0;
 }
 
-function operatorValue(row: SaleRow): number {
-  return Number(row.operator_value ?? 0) || 0;
+function resolveSaleValues(
+  row: SaleRow,
+  planIndex: Map<string, { wom: number; dumo: number }>,
+): { womValue: number; dumoValue: number } {
+  const storedWom = Number(row.operator_value ?? 0) || 0;
+  const storedDumo = Number(row.dumo_value ?? 0) || 0;
+  const fromPlan = row.plan ? planIndex.get(row.plan.toLowerCase()) : undefined;
+  return {
+    womValue: storedWom || fromPlan?.wom || 0,
+    dumoValue: storedDumo || fromPlan?.dumo || 0,
+  };
 }
 
-function rowToAdminSale(row: SaleRow): AdminSale {
+function rowToAdminSale(
+  row: SaleRow,
+  planIndex: Map<string, { wom: number; dumo: number }>,
+): AdminSale {
   const iso = isoFromRow(row);
+  const { womValue, dumoValue } = resolveSaleValues(row, planIndex);
   return {
     id: row.id.startsWith("#") ? row.id : row.id,
     date: toAdminDate(iso),
@@ -103,10 +118,16 @@ function rowToAdminSale(row: SaleRow): AdminSale {
     advisor: row.advisor_name,
     type: toAdminSaleType(row.sale_type),
     plan: row.plan,
-    operatorValue: operatorValue(row),
+    womValue,
+    dumoValue,
     status: row.status as AdminSale["status"],
     lines: lineCount(row),
   };
+}
+
+async function loadPlanValueIndex() {
+  const config = await getCommercialConfigurationRepository().getSnapshot();
+  return buildPlanValueIndex(config.plans);
 }
 
 function summarizeAdmin(rows: AdminSale[]): AdminSalesSummary {
@@ -273,10 +294,11 @@ export class PostgresSalesStore {
   }
 
   async listAdminSales(filters: AdminSalesFilters): Promise<AdminSalesResult> {
+    const planIndex = await loadPlanValueIndex();
     const rows = await fetchSalesWithLineCounts();
     const q = filters.search.trim().toLowerCase();
     const filtered = rows
-      .map(rowToAdminSale)
+      .map((r) => rowToAdminSale(r, planIndex))
       .filter((r) => {
         if (filters.status !== "all" && r.status !== filters.status) return false;
         if (filters.advisor !== "all" && r.advisor !== filters.advisor) return false;
@@ -307,8 +329,9 @@ export class PostgresSalesStore {
   async listAdminCommissions(filters: AdminCommissionFilters): Promise<AdminCommissionResult> {
     const configRepo = getCommercialConfigurationRepository();
     const config = await configRepo.getSnapshot();
+    const planIndex = buildPlanValueIndex(config.plans);
     const advisors = await getAuthRepository().listByRole("asesora");
-    const sales = (await fetchSalesWithLineCounts()).map(rowToAdminSale);
+    const sales = (await fetchSalesWithLineCounts()).map((r) => rowToAdminSale(r, planIndex));
     const paidRows = await this.loadCommissionPayments(filters.month, filters.year);
 
     const rows = await Promise.all(
@@ -384,8 +407,9 @@ export class PostgresSalesStore {
     const advisor = list.rows[0];
     if (!advisor) throw new Error("Asesora no encontrada");
 
+    const planIndex = buildPlanValueIndex((await configRepo.getSnapshot()).plans);
     const sales = (await fetchSalesWithLineCounts())
-      .map(rowToAdminSale)
+      .map((r) => rowToAdminSale(r, planIndex))
       .filter(
         (s) =>
           s.advisor === advisor.name &&
@@ -402,7 +426,7 @@ export class PostgresSalesStore {
           date: s.date,
           plan: s.plan,
           lines: s.lines,
-          operatorValue: s.operatorValue,
+          womValue: s.womValue,
           commission,
         };
       }),
@@ -631,7 +655,8 @@ export class PostgresSalesStore {
         withQueryTimeout(configRepo.getSnapshot(), 8000),
         fetchSalesWithLineCounts(),
       ]);
-      const adminSales = rows.map(rowToAdminSale);
+      const planIndex = buildPlanValueIndex(config.plans);
+      const adminSales = rows.map((r) => rowToAdminSale(r, planIndex));
 
       const todayIso = businessDateISO();
       const todayAdmin = toAdminDate(todayIso);
@@ -653,7 +678,7 @@ export class PostgresSalesStore {
 
       const income = monthSales
         .filter((s) => s.status === "finalizada")
-        .reduce((sum, s) => sum + s.operatorValue * s.lines, 0);
+        .reduce((sum, s) => sum + s.dumoValue * s.lines, 0);
 
       let expenses = 0;
       let budget = 0;

@@ -65,7 +65,8 @@ export function CommercialPlansTable({
             <TableHead>Nombre plan</TableHead>
             <TableHead>Operador</TableHead>
             <TableHead>Tipo venta</TableHead>
-            <TableHead>Valor operador</TableHead>
+            <TableHead>Valor Wom</TableHead>
+            <TableHead>Valor DuMo</TableHead>
             <TableHead>Comisión asesora</TableHead>
             <TableHead>Estado</TableHead>
             <TableHead className="w-12" />
@@ -77,7 +78,8 @@ export function CommercialPlansTable({
               <TableCell className="font-semibold text-ink">{p.name}</TableCell>
               <TableCell>{p.operator}</TableCell>
               <TableCell>{COMMERCIAL_SALE_TYPE_LABELS[p.saleType]}</TableCell>
-              <TableCell>{money.format(p.operatorPayment)}</TableCell>
+              <TableCell>{money.format(p.womValue)}</TableCell>
+              <TableCell>{money.format(p.dumoValue)}</TableCell>
               <TableCell>{money.format(p.advisorCommission)}</TableCell>
               <TableCell>
                 <StatusBadge status={p.status} />
@@ -190,7 +192,8 @@ export function CommercialPlanDialog({
   const [name, setName] = useState(initial?.name ?? "");
   const [operator, setOperator] = useState(initial?.operator ?? "");
   const [saleType, setSaleType] = useState(initial?.saleType ?? "portabilidad");
-  const [operatorPayment, setOperatorPayment] = useState(initial?.operatorPayment ?? 0);
+  const [womValue, setWomValue] = useState(initial?.womValue ?? 0);
+  const [dumoValue, setDumoValue] = useState(initial?.dumoValue ?? 0);
   const [advisorCommission, setAdvisorCommission] = useState(initial?.advisorCommission ?? 0);
   const [status, setStatus] = useState<CommercialPlanStatus>(initial?.status ?? "active");
 
@@ -210,8 +213,18 @@ export function CommercialPlanDialog({
               <option key={k} value={k}>{v}</option>
             ))}
           </select>
-          <input type="number" placeholder="Valor operador" value={operatorPayment} onChange={(e) => setOperatorPayment(Number(e.target.value))} className="h-11 w-full rounded-xl border border-line px-4 text-[14px]" />
-          <input type="number" placeholder="Comisión asesora" value={advisorCommission} onChange={(e) => setAdvisorCommission(Number(e.target.value))} className="h-11 w-full rounded-xl border border-line px-4 text-[14px]" />
+          <label className="block">
+            <span className="text-[13px] text-muted">Valor Wom (precio al cliente)</span>
+            <input type="number" value={womValue} onChange={(e) => setWomValue(Number(e.target.value))} className="mt-1.5 h-11 w-full rounded-xl border border-line px-4 text-[14px]" />
+          </label>
+          <label className="block">
+            <span className="text-[13px] text-muted">Valor DuMo (pago WOM → DuMo, solo admin)</span>
+            <input type="number" value={dumoValue} onChange={(e) => setDumoValue(Number(e.target.value))} className="mt-1.5 h-11 w-full rounded-xl border border-line px-4 text-[14px]" />
+          </label>
+          <label className="block">
+            <span className="text-[13px] text-muted">Comisión asesora</span>
+            <input type="number" value={advisorCommission} onChange={(e) => setAdvisorCommission(Number(e.target.value))} className="mt-1.5 h-11 w-full rounded-xl border border-line px-4 text-[14px]" />
+          </label>
           <select value={status} onChange={(e) => setStatus(e.target.value as CommercialPlanStatus)} className="h-11 w-full rounded-xl border border-line px-4 text-[14px]">
             <option value="active">Activo</option>
             <option value="inactive">Inactivo</option>
@@ -219,7 +232,7 @@ export function CommercialPlanDialog({
         </div>
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-          <Button onClick={() => { onSave({ name, operator, saleType, operatorPayment, advisorCommission, status }); onClose(); }}>
+          <Button onClick={() => { onSave({ name, operator, saleType, womValue, dumoValue, advisorCommission, status }); onClose(); }}>
             Guardar
           </Button>
         </div>

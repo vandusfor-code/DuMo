@@ -112,7 +112,7 @@ class MockCommissionRepository implements CommissionRepository {
           date: s.date,
           plan: s.plan,
           lines: s.lines,
-          operatorValue: s.operatorValue,
+          womValue: s.womValue,
           commission,
         };
       }),

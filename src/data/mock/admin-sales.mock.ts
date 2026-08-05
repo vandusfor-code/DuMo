@@ -2,16 +2,16 @@ import type { AdminSale, AdminSaleStatus, AdminSaleType } from "@/types/admin-sa
 
 /** Las 10 filas exactas del mockup (página 1). */
 const EXACT: AdminSale[] = [
-  { id: "#VTA-0982", date: "03/08/2025", time: "10:24 am", customerName: "Juan Pérez Gómez", rut: "1.234.567.890", advisor: "María López", type: "portabilidad", plan: "Porta 80GB", operatorValue: 82000, status: "registrada", lines: 1 },
-  { id: "#VTA-0981", date: "03/08/2025", time: "09:58 am", customerName: "Ana María Torres", rut: "1.098.765.432", advisor: "Laura Torres", type: "renovacion", plan: "Renovación 50GB", operatorValue: 55000, status: "en_reparto", lines: 1 },
-  { id: "#VTA-0980", date: "03/08/2025", time: "09:41 am", customerName: "Carlos Ramírez", rut: "1.112.223.334", advisor: "Andrea Ruiz", type: "portabilidad", plan: "Porta 50GB", operatorValue: 72000, status: "finalizada", lines: 2 },
-  { id: "#VTA-0979", date: "03/08/2025", time: "09:15 am", customerName: "Luis Fernando Díaz", rut: "1.556.667.778", advisor: "Carolina Díaz", type: "linea_nueva", plan: "Plan Control 45GB", operatorValue: 68000, status: "finalizada", lines: 1 },
-  { id: "#VTA-0978", date: "03/08/2025", time: "08:32 am", customerName: "Sofía Martínez", rut: "1.334.445.556", advisor: "Paula Gómez", type: "migracion", plan: "Fibra 300MB", operatorValue: 140000, status: "rechazada", lines: 1 },
-  { id: "#VTA-0977", date: "03/08/2025", time: "07:50 pm", customerName: "Diego Herrera", rut: "1.998.887.776", advisor: "María López", type: "portabilidad", plan: "Porta 100GB", operatorValue: 95000, status: "cancelada", lines: 1 },
-  { id: "#VTA-0976", date: "02/08/2025", time: "06:20 pm", customerName: "Valentina Gómez", rut: "1.444.555.666", advisor: "Laura Torres", type: "renovacion", plan: "Renovación 80GB", operatorValue: 70000, status: "en_reparto", lines: 1 },
-  { id: "#VTA-0975", date: "02/08/2025", time: "05:48 pm", customerName: "Jorge Martínez", rut: "1.777.888.999", advisor: "Andrea Ruiz", type: "linea_nueva", plan: "Plan Control 35GB", operatorValue: 58000, status: "registrada", lines: 1 },
-  { id: "#VTA-0974", date: "02/08/2025", time: "05:10 pm", customerName: "Camila Ríos", rut: "1.222.333.444", advisor: "Carolina Díaz", type: "portabilidad", plan: "Porta 80GB", operatorValue: 82000, status: "finalizada", lines: 1 },
-  { id: "#VTA-0973", date: "02/08/2025", time: "04:22 pm", customerName: "Andrés López", rut: "1.666.777.888", advisor: "Paula Gómez", type: "migracion", plan: "Fibra 500MB", operatorValue: 180000, status: "en_reparto", lines: 2 },
+  { id: "#VTA-0982", date: "03/08/2025", time: "10:24 am", customerName: "Juan Pérez Gómez", rut: "1.234.567.890", advisor: "María López", type: "portabilidad", plan: "Porta 80GB", womValue: 82000, dumoValue: 82000, status: "registrada", lines: 1 },
+  { id: "#VTA-0981", date: "03/08/2025", time: "09:58 am", customerName: "Ana María Torres", rut: "1.098.765.432", advisor: "Laura Torres", type: "renovacion", plan: "Renovación 50GB", womValue: 55000, dumoValue: 55000, status: "en_reparto", lines: 1 },
+  { id: "#VTA-0980", date: "03/08/2025", time: "09:41 am", customerName: "Carlos Ramírez", rut: "1.112.223.334", advisor: "Andrea Ruiz", type: "portabilidad", plan: "Porta 50GB", womValue: 72000, dumoValue: 72000, status: "finalizada", lines: 2 },
+  { id: "#VTA-0979", date: "03/08/2025", time: "09:15 am", customerName: "Luis Fernando Díaz", rut: "1.556.667.778", advisor: "Carolina Díaz", type: "linea_nueva", plan: "Plan Control 45GB", womValue: 68000, dumoValue: 68000, status: "finalizada", lines: 1 },
+  { id: "#VTA-0978", date: "03/08/2025", time: "08:32 am", customerName: "Sofía Martínez", rut: "1.334.445.556", advisor: "Paula Gómez", type: "migracion", plan: "Fibra 300MB", womValue: 140000, dumoValue: 140000, status: "rechazada", lines: 1 },
+  { id: "#VTA-0977", date: "03/08/2025", time: "07:50 pm", customerName: "Diego Herrera", rut: "1.998.887.776", advisor: "María López", type: "portabilidad", plan: "Porta 100GB", womValue: 95000, dumoValue: 95000, status: "cancelada", lines: 1 },
+  { id: "#VTA-0976", date: "02/08/2025", time: "06:20 pm", customerName: "Valentina Gómez", rut: "1.444.555.666", advisor: "Laura Torres", type: "renovacion", plan: "Renovación 80GB", womValue: 70000, dumoValue: 70000, status: "en_reparto", lines: 1 },
+  { id: "#VTA-0975", date: "02/08/2025", time: "05:48 pm", customerName: "Jorge Martínez", rut: "1.777.888.999", advisor: "Andrea Ruiz", type: "linea_nueva", plan: "Plan Control 35GB", womValue: 58000, dumoValue: 58000, status: "registrada", lines: 1 },
+  { id: "#VTA-0974", date: "02/08/2025", time: "05:10 pm", customerName: "Camila Ríos", rut: "1.222.333.444", advisor: "Carolina Díaz", type: "portabilidad", plan: "Porta 80GB", womValue: 82000, dumoValue: 82000, status: "finalizada", lines: 1 },
+  { id: "#VTA-0973", date: "02/08/2025", time: "04:22 pm", customerName: "Andrés López", rut: "1.666.777.888", advisor: "Paula Gómez", type: "migracion", plan: "Fibra 500MB", womValue: 180000, dumoValue: 180000, status: "en_reparto", lines: 2 },
 ];
 
 const ADVISORS = ["María López", "Laura Torres", "Andrea Ruiz", "Carolina Díaz", "Paula Gómez", "Sofía Hernández"];
@@ -63,7 +63,8 @@ function buildAll(): AdminSale[] {
       advisor: ADVISORS[i % ADVISORS.length],
       type,
       plan: pick.plan,
-      operatorValue: pick.value,
+      womValue: pick.value,
+      dumoValue: Math.round(pick.value * 0.7),
       status: statuses[i],
       lines: i % 5 === 0 ? 2 : 1,
     });

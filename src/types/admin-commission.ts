@@ -41,7 +41,7 @@ export interface AdminCommissionSaleDetail {
   date: string;
   plan: string;
   lines: number;
-  operatorValue: number;
+  womValue: number;
   commission: number;
 }
 

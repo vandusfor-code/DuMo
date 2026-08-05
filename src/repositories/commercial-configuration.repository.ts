@@ -11,6 +11,11 @@ import {
   COMMERCIAL_SETTINGS_MOCK,
   findPlanCommission,
 } from "@/data/mock/commercial-config.mock";
+import {
+  normalizeCommercialPlans,
+  resolveDumoValueForPlan,
+  resolveWomValueForPlan,
+} from "@/lib/commercial-plan";
 import { getConfig, setConfig } from "@/server/db/app-config";
 import { hasDatabase } from "@/server/db/client";
 
@@ -22,6 +27,8 @@ export interface CommercialConfigurationRepository {
   deletePlan(id: string): Promise<void>;
   updateSettings(input: UpdateCommercialSettingsInput): Promise<CommercialGlobalSettings>;
   resolveCommissionForPlan(planName: string): Promise<number>;
+  resolveWomValueForPlan(planName: string): Promise<number>;
+  resolveDumoValueForPlan(planName: string): Promise<number>;
 }
 
 const PLANS_KEY = "commercial_plans";
@@ -29,9 +36,13 @@ const SETTINGS_KEY = "commercial_settings";
 
 class PostgresCommercialConfigurationRepository implements CommercialConfigurationRepository {
   private async loadPlans(): Promise<CommercialPlan[]> {
-    const stored = await getConfig<CommercialPlan[] | null>(PLANS_KEY, null);
+    const stored = await getConfig<(CommercialPlan & { operatorPayment?: number })[] | null>(
+      PLANS_KEY,
+      null,
+    );
     if (stored !== null) {
-      return stored.length > 0 ? stored : [...COMMERCIAL_PLANS_MOCK];
+      const normalized = normalizeCommercialPlans(stored);
+      return normalized.length > 0 ? normalized : [...COMMERCIAL_PLANS_MOCK];
     }
     try {
       await setConfig(PLANS_KEY, COMMERCIAL_PLANS_MOCK);
@@ -99,6 +110,16 @@ class PostgresCommercialConfigurationRepository implements CommercialConfigurati
     const plans = await this.loadPlans();
     return findPlanCommission(planName, plans);
   }
+
+  async resolveWomValueForPlan(planName: string) {
+    const plans = await this.loadPlans();
+    return resolveWomValueForPlan(planName, plans);
+  }
+
+  async resolveDumoValueForPlan(planName: string) {
+    const plans = await this.loadPlans();
+    return resolveDumoValueForPlan(planName, plans);
+  }
 }
 
 class MockCommercialConfigurationRepository implements CommercialConfigurationRepository {
@@ -146,6 +167,14 @@ class MockCommercialConfigurationRepository implements CommercialConfigurationRe
 
   resolveCommissionForPlan(planName: string) {
     return Promise.resolve(findPlanCommission(planName, this.plans));
+  }
+
+  resolveWomValueForPlan(planName: string) {
+    return Promise.resolve(resolveWomValueForPlan(planName, this.plans));
+  }
+
+  resolveDumoValueForPlan(planName: string) {
+    return Promise.resolve(resolveDumoValueForPlan(planName, this.plans));
   }
 }
 

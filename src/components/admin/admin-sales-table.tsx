@@ -133,8 +133,12 @@ function buildColumns() {
       header: "Plan / Producto",
       cell: (i) => <span className="text-muted">{i.getValue()}</span>,
     }),
-    columnHelper.accessor("operatorValue", {
-      header: "Valor operador",
+    columnHelper.accessor("womValue", {
+      header: "Valor Wom",
+      cell: (i) => <span className="text-muted">{money.format(i.getValue())}</span>,
+    }),
+    columnHelper.accessor("dumoValue", {
+      header: "Valor DuMo",
       cell: (i) => <span className="font-medium text-ink">{money.format(i.getValue())}</span>,
     }),
     columnHelper.accessor("status", {

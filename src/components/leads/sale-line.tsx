@@ -105,7 +105,9 @@ export function SaleLine({
                   <SelectContent>
                     {plans.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
-                        {p.name}
+                        {p.womValue
+                          ? `${p.name} — ${new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(p.womValue)}`
+                          : p.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

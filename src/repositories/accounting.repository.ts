@@ -57,7 +57,7 @@ async function buildSummary(expenses: Expense[], monthlyBudget: number) {
     const activePlans = config.plans.filter((p) => p.status === "active");
     const avgSaleValue =
       activePlans.length > 0
-        ? activePlans.reduce((s, p) => s + p.operatorPayment, 0) / activePlans.length
+        ? activePlans.reduce((s, p) => s + p.dumoValue, 0) / activePlans.length
         : 1;
     const currentIncome = 0;
     const monthlyExpenses = expenses.reduce((s, e) => s + e.amount, 0);

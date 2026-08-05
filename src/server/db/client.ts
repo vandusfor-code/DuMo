@@ -87,7 +87,7 @@ export async function withQueryTimeout<T>(promise: Promise<T>, ms = 8000): Promi
  * Versión del esquema. Súbela al agregar/alterar tablas para que la migración
  * vuelva a correr una vez. Si no cambia, los cold-starts saltan todo el DDL.
  */
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 /** Clave del advisory lock que serializa la migración entre instancias. */
 const MIGRATION_LOCK_KEY = 828171;
 
@@ -205,6 +205,7 @@ async function runMigrations(sql: Sql) {
         sale_type text NOT NULL DEFAULT 'portabilidad',
         plan text NOT NULL DEFAULT '',
         operator_value numeric NOT NULL DEFAULT 0,
+        dumo_value numeric NOT NULL DEFAULT 0,
         sale_date date NOT NULL DEFAULT CURRENT_DATE,
         notes text NOT NULL DEFAULT '',
         created_at timestamptz NOT NULL DEFAULT now()
@@ -237,6 +238,8 @@ async function runMigrations(sql: Sql) {
         UNIQUE (advisor_id, period_month, period_year)
       )
     `;
+    await tx`ALTER TABLE sales ADD COLUMN IF NOT EXISTS dumo_value numeric NOT NULL DEFAULT 0`;
+    await tx`UPDATE sales SET dumo_value = operator_value WHERE dumo_value = 0 AND operator_value <> 0`;
     await tx`
       CREATE TABLE IF NOT EXISTS lead_gestiones (
         id text PRIMARY KEY,
