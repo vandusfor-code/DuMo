@@ -9,7 +9,6 @@ import {
   type ConversationFilter,
 } from "./conversation-filters";
 import { ConversationItem } from "./conversation-item";
-import { CoexistenceButton } from "./coexistence-button";
 import type { Conversation } from "@/types/conversation";
 
 export function ConversationList({
@@ -66,7 +65,6 @@ export function ConversationList({
         </div>
         <ConversationSearch value={search} onChange={setSearch} />
         <ConversationFilters value={filter} onChange={setFilter} counts={counts} />
-        <CoexistenceButton />
       </div>
 
       <div className="flex-1 space-y-1 overflow-y-auto p-2">

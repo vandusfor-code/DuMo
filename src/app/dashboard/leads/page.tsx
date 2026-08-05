@@ -34,9 +34,9 @@ export default function LeadsPage() {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:h-screen lg:grid-cols-[24fr_41fr_35fr] lg:py-4">
+    <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[24fr_41fr_35fr]">
       {/* Column 1 — conversations */}
-      <Card className="flex min-h-0 flex-col overflow-hidden">
+      <Card className="flex min-h-0 flex-col overflow-hidden rounded-none border-y-0 border-l-0 shadow-none">
         <ConversationList
           conversations={conversations ?? []}
           isLoading={isLoading}
@@ -48,19 +48,19 @@ export default function LeadsPage() {
       {/* Columns 2 & 3 */}
       {selected ? (
         <>
-          <Card className="flex min-h-0 flex-col overflow-hidden">
+          <Card className="flex min-h-0 flex-col overflow-hidden rounded-none border-y-0 shadow-none">
             <ChatWindow
               conversation={selected}
               messages={messages.data ?? []}
               isLoading={messages.isLoading}
             />
           </Card>
-          <Card className="flex min-h-0 flex-col overflow-hidden">
+          <Card className="flex min-h-0 flex-col overflow-hidden rounded-none border-y-0 border-r-0 shadow-none">
             <LeadFormPanel key={selected.id} conversation={selected} />
           </Card>
         </>
       ) : (
-        <Card className="flex min-h-0 flex-col overflow-hidden lg:col-span-2">
+        <Card className="flex min-h-0 flex-col overflow-hidden rounded-none border-y-0 border-r-0 shadow-none lg:col-span-2">
           <EmptyConversation />
         </Card>
       )}
