@@ -44,6 +44,16 @@ export async function GET() {
     `;
     const users = await sql`SELECT count(*)::int AS n FROM users`;
     const convCount = await sql`SELECT count(*)::int AS n FROM lead_conversations`;
+    const msgCount = await sql`SELECT count(*)::int AS n FROM lead_messages`;
+    // ¿Coinciden los conversation_id de los mensajes con los ids de las conversaciones?
+    const orphanMsgs = await sql`
+      SELECT count(*)::int AS n FROM lead_messages m
+      WHERE NOT EXISTS (SELECT 1 FROM lead_conversations c WHERE c.id = m.conversation_id)
+    `;
+    const convWithMsgs = await sql`
+      SELECT count(*)::int AS n FROM lead_conversations c
+      WHERE EXISTS (SELECT 1 FROM lead_messages m WHERE m.conversation_id = c.id)
+    `;
 
     return NextResponse.json({
       configured: true,
@@ -53,6 +63,9 @@ export async function GET() {
       tables: tables.map((t) => t.table_name),
       users: users[0]?.n ?? 0,
       conversations: convCount[0]?.n ?? 0,
+      messages: msgCount[0]?.n ?? 0,
+      conversationsWithMessages: convWithMsgs[0]?.n ?? 0,
+      orphanMessages: orphanMsgs[0]?.n ?? 0,
     });
   } catch (error) {
     return NextResponse.json(
