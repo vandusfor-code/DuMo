@@ -1,14 +1,9 @@
 "use client";
 
 import { Bell, Calendar, ChevronDown } from "lucide-react";
-import { PhotoAvatar } from "@/components/ui/avatar";
-
-const ADMIN = {
-  name: "Administrador",
-  role: "Admin",
-  avatarUrl:
-    "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=facearea&facepad=3&w=160&h=160&q=80",
-};
+import { PhotoAvatar, InitialsAvatar } from "@/components/ui/avatar";
+import { getInitials } from "@/lib/format";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 function todayLabel(): string {
   const now = new Date();
@@ -25,6 +20,10 @@ export function AdminPageHeader({
   title: string;
   subtitle?: string;
 }) {
+  const { data: user } = useCurrentUser();
+  const name = user?.name ?? "Administrador";
+  const role = user?.role ?? "Admin";
+
   return (
     <div className="flex flex-col gap-4 py-6 lg:flex-row lg:items-center lg:justify-between">
       <div>
@@ -56,10 +55,14 @@ export function AdminPageHeader({
         </button>
 
         <div className="flex items-center gap-2.5 border-l border-line pl-3">
-          <PhotoAvatar src={ADMIN.avatarUrl} alt={ADMIN.name} />
+          {user?.avatarUrl ? (
+            <PhotoAvatar src={user.avatarUrl} alt={name} />
+          ) : (
+            <InitialsAvatar initials={getInitials(name)} />
+          )}
           <div className="hidden leading-tight sm:block">
-            <p className="text-[14px] font-semibold text-ink">{ADMIN.name}</p>
-            <p className="text-[12px] text-muted">{ADMIN.role}</p>
+            <p className="text-[14px] font-semibold text-ink">{name}</p>
+            <p className="text-[12px] text-muted">{role}</p>
           </div>
           <ChevronDown className="size-4 text-muted" />
         </div>

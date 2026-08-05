@@ -43,3 +43,33 @@ export async function apiPost<T>(url: string, body: unknown): Promise<T> {
   if (!res.ok) await parseError(res);
   return res.json() as Promise<T>;
 }
+
+export async function apiPut<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) await parseError(res);
+  return res.json() as Promise<T>;
+}
+
+export async function apiPatch<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) await parseError(res);
+  return res.json() as Promise<T>;
+}
+
+export async function apiDelete<T>(url: string): Promise<T> {
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) await parseError(res);
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
+}

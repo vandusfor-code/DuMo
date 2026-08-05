@@ -7,6 +7,9 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const user = await usersService.getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: "No autenticado." }, { status: 401 });
+    }
     return NextResponse.json(user);
   } catch (error) {
     console.error("[GET /api/users/me]", error);

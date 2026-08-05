@@ -77,6 +77,19 @@ export function ensureSchema(): Promise<void> {
         ALTER TABLE connected_numbers
         ADD COLUMN IF NOT EXISTS access_token text
       `;
+      await sql`
+        CREATE TABLE IF NOT EXISTS users (
+          id text PRIMARY KEY,
+          username text UNIQUE NOT NULL,
+          email text UNIQUE NOT NULL,
+          password_hash text NOT NULL,
+          name text NOT NULL,
+          role text NOT NULL,
+          active boolean NOT NULL DEFAULT true,
+          avatar_url text NOT NULL DEFAULT '',
+          created_at timestamptz NOT NULL DEFAULT now()
+        )
+      `;
     })().catch((err) => {
       schemaPromise = null;
       throw err;

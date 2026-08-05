@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, type FormEvent, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { LoginLogo } from "./login-logo";
+import { ApiError, apiPost } from "@/lib/api-client";
 
 const container = {
   hidden: { opacity: 0 },
@@ -76,13 +77,38 @@ function LoginField({
 
 export function LoginFormPanel() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const searchParams = useSearchParams();
+  const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    router.push("/dashboard");
+    setError(null);
+    setLoading(true);
+    try {
+      const res = await apiPost<{ redirectTo: string }>("/api/auth/login", {
+        login,
+        password,
+      });
+      const next = searchParams.get("next");
+      const dest =
+        next && (next.startsWith("/admin") || next.startsWith("/dashboard"))
+          ? next
+          : res.redirectTo;
+      router.push(dest);
+      router.refresh();
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "No se pudo iniciar sesión. Intenta nuevamente.",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -107,15 +133,24 @@ export function LoginFormPanel() {
         </motion.div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {error && (
+            <motion.div
+              variants={item}
+              className="rounded-[18px] border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700"
+            >
+              {error}
+            </motion.div>
+          )}
+
           <motion.div variants={item}>
             <LoginField
-              id="email"
-              label="Correo electrónico"
-              type="email"
-              placeholder="nombre@empresa.com"
+              id="login"
+              label="Correo o usuario"
+              type="text"
+              placeholder="correo@empresa.com o usuario"
               icon={<Mail className="size-5" strokeWidth={2} />}
-              value={email}
-              onChange={setEmail}
+              value={login}
+              onChange={setLogin}
             />
           </motion.div>
 
@@ -157,11 +192,12 @@ export function LoginFormPanel() {
           <motion.div variants={item}>
             <motion.button
               type="submit"
-              whileHover={{ scale: 1.02 }}
+              disabled={loading}
+              whileHover={{ scale: loading ? 1 : 1.02 }}
               transition={{ duration: 0.25 }}
-              className="flex h-[60px] w-full items-center justify-center gap-2 rounded-[18px] bg-gradient-to-b from-[#7C3AED] to-[#6D28FF] text-[16px] font-semibold text-white shadow-[0_18px_40px_rgba(109,40,255,0.25)] transition-colors duration-[250ms] hover:from-[#6D28FF] hover:to-[#5B21E6]"
+              className="flex h-[60px] w-full items-center justify-center gap-2 rounded-[18px] bg-gradient-to-b from-[#7C3AED] to-[#6D28FF] text-[16px] font-semibold text-white shadow-[0_18px_40px_rgba(109,40,255,0.25)] transition-colors duration-[250ms] hover:from-[#6D28FF] hover:to-[#5B21E6] disabled:opacity-60"
             >
-              Iniciar sesión
+              {loading ? "Ingresando..." : "Iniciar sesión"}
               <ArrowRight className="size-5" strokeWidth={2} />
             </motion.button>
           </motion.div>

@@ -1,0 +1,307 @@
+"use client";
+
+import { useState } from "react";
+import { useForm, FormProvider } from "react-hook-form";
+import {
+  AlertCircle,
+  CheckCircle2,
+  ClipboardList,
+  Clock,
+  MessageSquare,
+  Pencil,
+  Plus,
+  Trash2,
+  User,
+} from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { LeadTypeSelect } from "@/components/leads/lead-type-select";
+import { SaleDetails } from "@/components/leads/sale-details";
+import { ObservationField } from "@/components/leads/observation-field";
+import { ActionButtons } from "@/components/leads/action-buttons";
+import { ClientCard } from "@/components/leads/client-card";
+import {
+  useAddLeadNote,
+  useDeleteLeadNote,
+  useSaveAdminLead,
+  useUpdateLeadNote,
+} from "@/hooks/use-admin-leads";
+import type { AdminConversation, ClientProfile, LeadNote, LeadTimelineEvent } from "@/types/admin-lead";
+import { EMPTY_LEAD_LINE, type LeadFormValues } from "@/types/lead-form";
+import type { LeadSaleType, SaveLeadInput } from "@/types/lead";
+import { useWatch } from "react-hook-form";
+
+function defaultsFor(c: AdminConversation): LeadFormValues {
+  return {
+    customerName: c.customerName,
+    rut: c.rut,
+    phone: c.phone,
+    type: "venta",
+    observations: "",
+    internalNotes: "",
+    lines: [{ ...EMPTY_LEAD_LINE }],
+  };
+}
+
+export function AdminLeadFormPanel({
+  conversation,
+  client,
+  notes,
+  timeline,
+}: {
+  conversation: AdminConversation;
+  client: ClientProfile;
+  notes: LeadNote[];
+  timeline: LeadTimelineEvent[];
+}) {
+  const saveLead = useSaveAdminLead();
+  const methods = useForm<LeadFormValues>({ defaultValues: defaultsFor(conversation) });
+  const type = useWatch({ control: methods.control, name: "type" });
+
+  const onSubmit = methods.handleSubmit(async (values) => {
+    const notesParts = [
+      values.observations,
+      values.internalNotes ? `Notas internas: ${values.internalNotes}` : "",
+    ].filter(Boolean);
+
+    const input: SaveLeadInput = {
+      conversationId: conversation.id,
+      phone: values.phone,
+      customerName: values.customerName,
+      rut: values.rut,
+      type: values.type,
+      notes: notesParts.join("\n\n"),
+      lines:
+        values.type === "venta"
+          ? values.lines
+              .filter((l) => l.phone || l.saleType || l.planId)
+              .map((l) => ({
+                phone: l.phone,
+                saleType: l.saleType as LeadSaleType,
+                planId: l.planId,
+                equipment: l.equipment,
+              }))
+          : [],
+    };
+    await saveLead.mutateAsync(input);
+  });
+
+  return (
+    <FormProvider {...methods}>
+      <form onSubmit={onSubmit} className="flex h-full flex-col">
+        <div className="flex h-full flex-col">
+          <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
+            <p className="text-[15px] font-semibold text-ink">Gestión del cliente</p>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-[13px] font-medium text-brand transition-colors hover:bg-brand-soft"
+            >
+              <Plus className="size-4" />
+              Nueva conversación
+            </button>
+          </div>
+
+          <Tabs defaultValue="gestion" className="flex min-h-0 flex-1 flex-col">
+            <div className="border-b border-line px-4 pt-3">
+              <TabsList className="w-full justify-start bg-transparent p-0">
+                <PanelTab value="gestion" icon={<ClipboardList className="size-4" />} label="Gestión" />
+                <PanelTab value="cliente" icon={<User className="size-4" />} label="Cliente" />
+                <PanelTab value="notas" icon={<MessageSquare className="size-4" />} label="Notas" />
+                <PanelTab value="historial" icon={<Clock className="size-4" />} label="Historial" />
+              </TabsList>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+              <TabsContent value="gestion" className="space-y-5 outline-none">
+                <ClientCard />
+                <LeadTypeSelect />
+                {type === "venta" && <SaleDetails />}
+                <ObservationField
+                  name="observations"
+                  label="Observaciones"
+                  hint="(opcional)"
+                  placeholder="Escribe aquí cualquier observación relevante sobre la gestión..."
+                />
+                {saveLead.isError && (
+                  <div className="flex items-center gap-2.5 rounded-xl border border-danger/20 bg-danger-soft px-4 py-3 text-[13px] text-danger-ink">
+                    <AlertCircle className="size-[18px]" />
+                    No se pudo guardar la gestión. Intenta nuevamente.
+                  </div>
+                )}
+                {saveLead.isSuccess && (
+                  <div className="flex items-center gap-2.5 rounded-xl border border-success/20 bg-success-soft px-4 py-3 text-[13px] text-success-ink">
+                    <CheckCircle2 className="size-[18px]" />
+                    Gestión guardada correctamente.
+                  </div>
+                )}
+                <ActionButtons
+                  isSaving={saveLead.isPending}
+                  onCancel={() => methods.reset(defaultsFor(conversation))}
+                />
+              </TabsContent>
+
+              <TabsContent value="cliente" className="outline-none">
+                <ClientHistoryCard client={client} />
+              </TabsContent>
+
+              <TabsContent value="notas" className="outline-none">
+                <NotesTab conversationId={conversation.id} notes={notes} />
+              </TabsContent>
+
+              <TabsContent value="historial" className="outline-none">
+                <TimelineTab events={timeline} />
+              </TabsContent>
+            </div>
+          </Tabs>
+        </div>
+      </form>
+    </FormProvider>
+  );
+}
+
+function PanelTab({ value, icon, label }: { value: string; icon: React.ReactNode; label: string }) {
+  return (
+    <TabsTrigger
+      value={value}
+      className="flex-1 gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2 pb-2.5 text-[13px] data-[state=active]:border-brand data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+    >
+      {icon}
+      <span className="hidden sm:inline">{label}</span>
+    </TabsTrigger>
+  );
+}
+
+function ClientHistoryCard({ client }: { client: ClientProfile }) {
+  const rows = [
+    { label: "Ventas realizadas", value: String(client.salesCount) },
+    { label: "Líneas activas", value: String(client.linesCount) },
+    { label: "Primer contacto", value: client.firstContact },
+    { label: "Última compra", value: client.lastPurchase ?? "—" },
+    { label: "Estado actual", value: client.currentStatus },
+  ];
+  return (
+    <div className="space-y-3">
+      {rows.map((r) => (
+        <div key={r.label} className="flex items-center justify-between rounded-xl border border-line px-4 py-3">
+          <span className="text-[13px] text-muted">{r.label}</span>
+          <span className="text-[14px] font-semibold text-ink">{r.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function NotesTab({ conversationId, notes }: { conversationId: string; notes: LeadNote[] }) {
+  const [text, setText] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  const addNote = useAddLeadNote();
+  const updateNote = useUpdateLeadNote();
+  const deleteNote = useDeleteLeadNote();
+
+  const submit = async () => {
+    if (!text.trim()) return;
+    await addNote.mutateAsync({ conversationId, text: text.trim(), author: "Administrador" });
+    setText("");
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Agregar nota interna..."
+          className="min-h-[80px] w-full rounded-xl border border-line bg-card px-4 py-3 text-[14px] outline-none focus:border-brand/40"
+        />
+        <Button type="button" size="sm" onClick={submit} disabled={addNote.isPending || !text.trim()}>
+          Agregar nota
+        </Button>
+      </div>
+      <ul className="space-y-3">
+        {notes.map((n) => (
+          <li key={n.id} className="rounded-xl border border-line p-4">
+            {editingId === n.id ? (
+              <div className="space-y-2">
+                <textarea
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  className="min-h-[60px] w-full rounded-lg border border-line px-3 py-2 text-[14px]"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={async () => {
+                      await updateNote.mutateAsync({ id: n.id, text: editText });
+                      setEditingId(null);
+                    }}
+                  >
+                    Guardar
+                  </Button>
+                  <Button type="button" size="sm" variant="secondary" onClick={() => setEditingId(null)}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="text-[14px] text-ink">{n.text}</p>
+                <div className="mt-2 flex items-center justify-between">
+                  <p className="text-[12px] text-muted">
+                    {n.author} · {new Date(n.createdAt).toLocaleString("es-CL")}
+                  </p>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      aria-label="Editar"
+                      onClick={() => {
+                        setEditingId(n.id);
+                        setEditText(n.text);
+                      }}
+                      className="grid size-8 place-items-center rounded-lg text-muted hover:bg-canvas hover:text-brand"
+                    >
+                      <Pencil className="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Eliminar"
+                      onClick={() => deleteNote.mutate(n.id)}
+                      className="grid size-8 place-items-center rounded-lg text-muted hover:bg-danger-soft hover:text-danger-ink"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function TimelineTab({ events }: { events: LeadTimelineEvent[] }) {
+  return (
+    <ol className="space-y-5">
+      {events.map((e, i) => (
+        <li key={e.id} className="relative flex gap-3.5">
+          {i < events.length - 1 && (
+            <span className="absolute left-[13px] top-7 h-full w-px bg-line" />
+          )}
+          <span className="grid size-7 shrink-0 place-items-center rounded-full bg-brand-soft text-brand">
+            <Clock className="size-3.5" />
+          </span>
+          <div className="leading-tight">
+            <p className="text-[14px] font-medium text-ink">{e.title}</p>
+            <p className="text-[13px] text-muted">{e.detail}</p>
+            <p className="mt-0.5 text-[12px] text-muted">
+              {e.at} {e.user ? `· ${e.user}` : ""}
+            </p>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}

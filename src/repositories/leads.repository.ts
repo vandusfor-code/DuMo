@@ -1,6 +1,24 @@
 import "server-only";
 import type { Lead, Plan, SaveLeadInput } from "@/types/lead";
+import type {
+  AdminAdvisor,
+  AdminConversation,
+  AdminLeadDetail,
+  AssignAdvisorInput,
+  ClientProfile,
+  LeadNote,
+  UpsertLeadNoteInput,
+} from "@/types/admin-lead";
+import type { ChatMessage } from "@/types/conversation";
 import { PLANS_MOCK } from "@/data/mock/leads.mock";
+import {
+  ADMIN_ADVISORS_MOCK,
+  ADMIN_CONVERSATIONS_MOCK,
+  LEAD_NOTES_MOCK,
+  buildTimeline,
+  getDefaultClientProfile,
+  getMockMessages,
+} from "@/data/mock/admin-leads.mock";
 import { withLatency } from "@/lib/mock";
 import { businessDateISO } from "@/lib/date";
 import { getSheetsClient, type GoogleSheetsClient } from "@/server/google/sheets-client";
@@ -8,6 +26,17 @@ import { getSheetsClient, type GoogleSheetsClient } from "@/server/google/sheets
 export interface LeadRepository {
   getPlans(): Promise<Plan[]>;
   saveLead(input: SaveLeadInput): Promise<Lead>;
+  /** Admin CRM */
+  listAdminConversations(): Promise<AdminConversation[]>;
+  getAdminDetail(conversationId: string): Promise<AdminLeadDetail>;
+  listAdvisors(): Promise<AdminAdvisor[]>;
+  assignAdvisor(input: AssignAdvisorInput): Promise<AdminConversation>;
+  listNotes(conversationId: string): Promise<LeadNote[]>;
+  addNote(input: UpsertLeadNoteInput): Promise<LeadNote>;
+  updateNote(id: string, text: string): Promise<LeadNote>;
+  deleteNote(id: string): Promise<void>;
+  getClientProfile(conversationId: string): Promise<ClientProfile>;
+  getMessages(conversationId: string): Promise<ChatMessage[]>;
 }
 
 const ADVISOR = "María López";
@@ -30,11 +59,83 @@ function buildLead(id: string, input: SaveLeadInput): Lead {
 /* ----------------------------- Mock ----------------------------- */
 
 class MockLeadRepository implements LeadRepository {
+  private conversations = [...ADMIN_CONVERSATIONS_MOCK];
+  private notes = [...LEAD_NOTES_MOCK];
+
   getPlans() {
     return withLatency(PLANS_MOCK);
   }
   saveLead(input: SaveLeadInput) {
     return withLatency(buildLead(`LEAD-${Date.now()}`, input));
+  }
+
+  listAdminConversations() {
+    return withLatency([...this.conversations]);
+  }
+
+  listAdvisors() {
+    return withLatency([...ADMIN_ADVISORS_MOCK]);
+  }
+
+  getMessages(conversationId: string) {
+    return withLatency(getMockMessages(conversationId));
+  }
+
+  async getAdminDetail(conversationId: string): Promise<AdminLeadDetail> {
+    const conversation = this.conversations.find((c) => c.id === conversationId);
+    if (!conversation) throw new Error("Conversación no encontrada");
+    return withLatency({
+      conversation,
+      messages: getMockMessages(conversationId),
+      notes: this.notes.filter((n) => n.conversationId === conversationId),
+      timeline: buildTimeline(conversationId),
+      client: getDefaultClientProfile(conversationId),
+    });
+  }
+
+  assignAdvisor(input: AssignAdvisorInput) {
+    const idx = this.conversations.findIndex((c) => c.id === input.conversationId);
+    if (idx === -1) throw new Error("Conversación no encontrada");
+    const advisor = ADMIN_ADVISORS_MOCK.find((a) => a.id === input.advisorId);
+    if (!advisor) throw new Error("Asesora no encontrada");
+    this.conversations[idx] = {
+      ...this.conversations[idx],
+      assignedAdvisor: advisor,
+      status: this.conversations[idx].status === "nuevo" ? "asignado" : this.conversations[idx].status,
+    };
+    return withLatency(this.conversations[idx]);
+  }
+
+  listNotes(conversationId: string) {
+    return withLatency(this.notes.filter((n) => n.conversationId === conversationId));
+  }
+
+  addNote(input: UpsertLeadNoteInput) {
+    const note: LeadNote = {
+      id: `n-${Date.now()}`,
+      conversationId: input.conversationId,
+      text: input.text,
+      createdAt: new Date().toISOString(),
+      author: input.author,
+    };
+    this.notes.unshift(note);
+    return withLatency(note);
+  }
+
+  updateNote(id: string, text: string) {
+    const idx = this.notes.findIndex((n) => n.id === id);
+    if (idx === -1) throw new Error("Nota no encontrada");
+    this.notes[idx] = { ...this.notes[idx], text };
+    return withLatency(this.notes[idx]);
+  }
+
+  deleteNote(id: string) {
+    this.notes = this.notes.filter((n) => n.id !== id);
+    return withLatency(undefined);
+  }
+
+  getClientProfile(conversationId: string) {
+    return withLatency(getDefaultClientProfile(conversationId));
   }
 }
 
@@ -83,6 +184,54 @@ class SheetsLeadRepository implements LeadRepository {
 
     await this.client.log("info", "Gestión guardada", { leadId: id, type: input.type });
     return lead;
+  }
+
+  listAdminConversations() {
+    return withLatency(ADMIN_CONVERSATIONS_MOCK);
+  }
+
+  listAdvisors() {
+    return withLatency(ADMIN_ADVISORS_MOCK);
+  }
+
+  getMessages(conversationId: string) {
+    return withLatency(getMockMessages(conversationId));
+  }
+
+  getAdminDetail(conversationId: string) {
+    const conversation = ADMIN_CONVERSATIONS_MOCK.find((c) => c.id === conversationId);
+    if (!conversation) throw new Error("Conversación no encontrada");
+    return withLatency({
+      conversation,
+      messages: getMockMessages(conversationId),
+      notes: LEAD_NOTES_MOCK.filter((n) => n.conversationId === conversationId),
+      timeline: buildTimeline(conversationId),
+      client: getDefaultClientProfile(conversationId),
+    });
+  }
+
+  assignAdvisor(_input: AssignAdvisorInput): Promise<AdminConversation> {
+    return Promise.reject(new Error("Asignación admin no implementada en Sheets aún"));
+  }
+
+  listNotes(conversationId: string) {
+    return withLatency(LEAD_NOTES_MOCK.filter((n) => n.conversationId === conversationId));
+  }
+
+  addNote(_input: UpsertLeadNoteInput): Promise<LeadNote> {
+    return Promise.reject(new Error("Notas admin no implementadas en Sheets aún"));
+  }
+
+  updateNote(_id: string, _text: string): Promise<LeadNote> {
+    return Promise.reject(new Error("Notas admin no implementadas en Sheets aún"));
+  }
+
+  deleteNote(_id: string): Promise<void> {
+    return Promise.reject(new Error("Notas admin no implementadas en Sheets aún"));
+  }
+
+  getClientProfile(conversationId: string) {
+    return withLatency(getDefaultClientProfile(conversationId));
   }
 }
 

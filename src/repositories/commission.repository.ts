@@ -1,0 +1,147 @@
+import "server-only";
+import type {
+  AdminCommissionDetail,
+  AdminCommissionFilters,
+  AdminCommissionResult,
+  AdminCommissionStatus,
+} from "@/types/admin-commission";
+import { ADMIN_SALES_MOCK } from "@/data/mock/admin-sales.mock";
+import { ADMIN_ADVISORS_MOCK } from "@/data/mock/admin-leads.mock";
+import { getCommercialConfigurationRepository } from "@/repositories/commercial-configuration.repository";
+import { withLatency } from "@/lib/mock";
+
+export interface CommissionRepository {
+  list(filters: AdminCommissionFilters): Promise<AdminCommissionResult>;
+  getDetail(advisorId: string, filters: AdminCommissionFilters): Promise<AdminCommissionDetail>;
+  markPaid(advisorId: string, filters: AdminCommissionFilters): Promise<void>;
+}
+
+function inPeriod(dateStr: string, filters: AdminCommissionFilters): boolean {
+  const [, m, y] = dateStr.split("/");
+  const month = filters.month.padStart(2, "0");
+  const year = filters.year;
+  return m === month && y === year;
+}
+
+class MockCommissionRepository implements CommissionRepository {
+  private paidAdvisors = new Set<string>();
+
+  async list(filters: AdminCommissionFilters): Promise<AdminCommissionResult> {
+    const configRepo = getCommercialConfigurationRepository();
+    const config = await configRepo.getSnapshot();
+
+    const rows = await Promise.all(
+      ADMIN_ADVISORS_MOCK.map(async (advisor) => {
+        const advisorSales = ADMIN_SALES_MOCK.filter(
+          (s) => s.advisor === advisor.name && inPeriod(s.date, filters),
+        );
+        const finalized = advisorSales.filter((s) => s.status === "finalizada");
+        let calculatedCommission = 0;
+        for (const sale of finalized) {
+          const perLine = await configRepo.resolveCommissionForPlan(sale.plan);
+          calculatedCommission += perLine * sale.lines;
+        }
+        if (finalized.length > 0) {
+          calculatedCommission += config.settings.campaignCommission * finalized.length;
+        }
+
+        const status: AdminCommissionStatus = this.paidAdvisors.has(advisor.id)
+          ? "paid"
+          : "pending";
+
+        return {
+          id: advisor.id,
+          name: advisor.name,
+          avatarUrl: advisor.avatarUrl,
+          registeredSales: advisorSales.length,
+          finalizedSales: finalized.length,
+          calculatedCommission,
+          status,
+          paymentDate: status === "paid" ? `${filters.year}-${filters.month.padStart(2, "0")}-05` : null,
+        };
+      }),
+    );
+
+    let filtered = rows;
+    if (filters.advisor !== "all") {
+      filtered = filtered.filter((r) => r.id === filters.advisor);
+    }
+    if (filters.status !== "all") {
+      filtered = filtered.filter((r) => r.status === filters.status);
+    }
+
+    const pendingTotal = filtered
+      .filter((r) => r.status === "pending")
+      .reduce((s, r) => s + r.calculatedCommission, 0);
+    const paidTotal = filtered
+      .filter((r) => r.status === "paid")
+      .reduce((s, r) => s + r.calculatedCommission, 0);
+    const finalizedSales = filtered.reduce((s, r) => s + r.finalizedSales, 0);
+
+    return withLatency({
+      summary: {
+        pendingTotal,
+        paidTotal,
+        finalizedSales,
+        totalToPay: pendingTotal,
+      },
+      rows: filtered,
+    });
+  }
+
+  async getDetail(advisorId: string, filters: AdminCommissionFilters): Promise<AdminCommissionDetail> {
+    const configRepo = getCommercialConfigurationRepository();
+    const list = await this.list({ ...filters, advisor: advisorId, status: "all" });
+    const advisor = list.rows[0];
+    if (!advisor) throw new Error("Asesora no encontrada");
+
+    const sales = ADMIN_SALES_MOCK.filter(
+      (s) =>
+        s.advisor === advisor.name &&
+        s.status === "finalizada" &&
+        inPeriod(s.date, filters),
+    );
+
+    const saleDetails = await Promise.all(
+      sales.map(async (s) => {
+        const commission = (await configRepo.resolveCommissionForPlan(s.plan)) * s.lines;
+        return {
+          saleId: s.id,
+          customerName: s.customerName,
+          date: s.date,
+          plan: s.plan,
+          lines: s.lines,
+          operatorValue: s.operatorValue,
+          commission,
+        };
+      }),
+    );
+
+    return withLatency({
+      advisor,
+      sales: saleDetails,
+      totalCommission: advisor.calculatedCommission,
+      calculatedAt: `${filters.year}-${filters.month.padStart(2, "0")}-04T18:00:00`,
+      paymentHistory:
+        advisor.status === "paid"
+          ? [
+              {
+                id: "pay-1",
+                amount: advisor.calculatedCommission,
+                date: advisor.paymentDate ?? "",
+                note: "Pago quincenal",
+              },
+            ]
+          : [],
+    });
+  }
+
+  markPaid(advisorId: string) {
+    this.paidAdvisors.add(advisorId);
+    return withLatency(undefined);
+  }
+}
+
+export function getCommissionRepository(): CommissionRepository {
+  return new MockCommissionRepository();
+}
