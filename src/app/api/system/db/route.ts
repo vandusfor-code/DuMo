@@ -4,6 +4,57 @@ import { ensureSchema, getDatabaseUrl, getSql, hasDatabase, pingDatabase } from 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * Analiza la forma de la URI de conexión SIN exponer la contraseña.
+ * Detecta los dos errores típicos con Supabase:
+ *  - usar el pooler con usuario "postgres" en vez de "postgres.<project-ref>"
+ *  - contraseña con caracteres especiales sin URL-encodear
+ */
+function inspectUrl(raw: string | null) {
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    const host = u.hostname;
+    const port = u.port || "5432";
+    const user = decodeURIComponent(u.username || "");
+    const password = u.password || "";
+    const isPoolerHost = host.includes("pooler.supabase.com");
+    const isSupabaseDirect = host.startsWith("db.") && host.endsWith("supabase.co");
+    const userHasProjectRef = user.includes(".");
+    const problems: string[] = [];
+
+    if (isPoolerHost && !userHasProjectRef) {
+      problems.push(
+        `El host es el pooler pero el usuario es "${user}". Con el pooler debe ser "postgres.<project-ref>" (ej. postgres.abcdefghijklm).`,
+      );
+    }
+    if (isSupabaseDirect) {
+      problems.push(
+        "Estás usando la conexión directa (db.<ref>.supabase.co). En Vercel usa el Transaction pooler (aws-...pooler.supabase.com:6543).",
+      );
+    }
+    if (!password) {
+      problems.push("La URI no incluye contraseña.");
+    } else if (/[@#?&/:%\s]/.test(decodeURIComponent(password)) && password === decodeURIComponent(password)) {
+      problems.push(
+        "La contraseña contiene caracteres especiales sin URL-encodear (@ # ? & / : espacio). Codifícalos: @ → %40, # → %23, ? → %3F, & → %26, / → %2F.",
+      );
+    }
+
+    return {
+      host,
+      port,
+      user,
+      database: u.pathname.replace("/", "") || "(vacío)",
+      passwordLength: password.length,
+      kind: isPoolerHost ? "pooler" : isSupabaseDirect ? "direct" : "otro",
+      problems,
+    };
+  } catch {
+    return { problems: ["La URI no tiene formato válido (postgresql://usuario:clave@host:puerto/base)."] };
+  }
+}
+
 export async function GET() {
   const url = getDatabaseUrl();
   if (!hasDatabase()) {
@@ -23,8 +74,9 @@ export async function GET() {
         connected: false,
         provider: url?.includes("supabase") ? "supabase" : "postgres",
         error: ping.message,
+        connection: inspectUrl(url),
         hint:
-          "Si usas Supabase, la URI debe ser del Transaction pooler (6543), no la conexión directa (5432).",
+          "Si usas Supabase, la URI debe ser del Transaction pooler (6543) y el usuario 'postgres.<project-ref>'. Revisa el campo 'connection.problems'.",
       },
       { status: 500 },
     );
