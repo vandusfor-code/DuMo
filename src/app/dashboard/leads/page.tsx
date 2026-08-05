@@ -10,7 +10,7 @@ import { useConversations, useConversationMessages } from "@/hooks/use-leads";
 import type { Conversation } from "@/types/conversation";
 
 export default function LeadsPage() {
-  const { data: conversations, isLoading } = useConversations();
+  const { data: conversations, isLoading, isError, isFetching, refetch } = useConversations();
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const selected = useMemo<Conversation | null>(
@@ -19,14 +19,26 @@ export default function LeadsPage() {
   );
 
   const messages = useConversationMessages(selectedId);
+  const list = conversations ?? [];
 
   return (
     <div className="grid h-full grid-cols-1 lg:grid-cols-[24fr_41fr_35fr]">
       {/* Column 1 — conversations */}
       <Card className="flex min-h-0 flex-col overflow-hidden rounded-none border-y-0 border-l-0 shadow-none">
+        {isError && list.length > 0 ? (
+          <div className="border-b border-warning-soft bg-warning-soft px-4 py-2 text-[12px] text-warning-ink">
+            No se pudo sincronizar. Mostrando la última versión.{" "}
+            <button type="button" onClick={() => refetch()} className="font-semibold underline">
+              Reintentar
+            </button>
+          </div>
+        ) : null}
         <ConversationList
-          conversations={conversations ?? []}
-          isLoading={isLoading}
+          conversations={list}
+          isLoading={isLoading && list.length === 0}
+          isError={isError && list.length === 0}
+          isSyncing={isFetching && list.length > 0}
+          onRetry={() => refetch()}
           selectedId={selectedId}
           onSelect={setSelectedId}
         />

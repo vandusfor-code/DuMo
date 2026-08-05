@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiPost } from "@/lib/api-client";
-import { ADVISOR_QUERY_OPTIONS, advisorApiGet } from "@/lib/advisor-query";
+import { advisorApiGet } from "@/lib/advisor-query";
 import type { ChatMessage, Conversation } from "@/types/conversation";
 import type { Lead, Plan, SaveLeadInput } from "@/types/lead";
 
@@ -12,15 +12,20 @@ export const leadKeys = {
   plans: ["leads", "plans"] as const,
 };
 
+/** Bandeja de conversaciones — misma función para Leads y notificaciones. */
+export function fetchAdvisorConversations() {
+  return advisorApiGet<Conversation[]>("/api/leads/conversations");
+}
+
 export function useConversations() {
   return useQuery({
     queryKey: leadKeys.conversations,
-    queryFn: () => advisorApiGet<Conversation[]>("/api/leads/conversations"),
-    // Sincronización casi instantánea de la bandeja.
+    queryFn: fetchAdvisorConversations,
     refetchInterval: 4000,
     refetchIntervalInBackground: true,
     staleTime: 0,
     retry: 2,
+    placeholderData: (prev) => prev,
   });
 }
 
@@ -32,11 +37,11 @@ export function useConversationMessages(conversationId: string | null) {
         `/api/leads/conversations/${conversationId}/messages`,
       ),
     enabled: Boolean(conversationId),
-    // El chat abierto se refresca más seguido que la bandeja.
     refetchInterval: 3000,
     refetchIntervalInBackground: true,
     staleTime: 0,
     retry: 2,
+    placeholderData: (prev) => prev,
   });
 }
 

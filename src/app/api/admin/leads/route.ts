@@ -1,4 +1,4 @@
-import { NextResponse, after, type NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { withAdminFallback } from "@/lib/admin-api-fallbacks";
 import { requireAdminSession } from "@/lib/require-admin";
 import { adminLeadsService } from "@/services/admin-leads.service";
@@ -63,25 +63,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(data);
     }
 
-    // El barrido de auto-asignación va después de responder (no retrasa la
-    // lista y Next mantiene viva la función hasta terminarlo).
-    after(async () => {
-      try {
-        await adminLeadsService.autoAssignAllPending();
-      } catch (err) {
-        console.error("[autoAssign sweep admin]", err);
-      }
-    });
+    // Asignar pendientes antes de listar (misma razón que en la ruta de asesora).
+    await adminLeadsService.autoAssignAllPending({ skipThrottle: true });
 
-    const data = await withAdminFallback(
-      () => adminLeadsService.listConversations(),
-      [],
-      "GET /api/admin/leads",
-    );
-    return NextResponse.json(data);
+    const data = await Promise.race([
+      adminLeadsService.listConversations(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("GET /api/admin/leads timeout")), 10_000),
+      ),
+    ]);
+    return NextResponse.json(data, {
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (error) {
     console.error("[GET /api/admin/leads]", error);
-    return NextResponse.json([]);
+    return NextResponse.json(
+      { error: "No se pudieron cargar las conversaciones." },
+      { status: 503 },
+    );
   }
 }
 

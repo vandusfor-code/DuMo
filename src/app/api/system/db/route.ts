@@ -96,6 +96,22 @@ export async function GET() {
     `;
     const users = await sql`SELECT count(*)::int AS n FROM users`;
     const convCount = await sql`SELECT count(*)::int AS n FROM lead_conversations`;
+    const unassigned = await sql`
+      SELECT count(*)::int AS n FROM lead_conversations WHERE assigned_advisor_id IS NULL
+    `;
+    const activeAdvisors = await sql`
+      SELECT count(*)::int AS n FROM users WHERE role = 'asesora' AND active = true
+    `;
+    const autoAssignRaw = await sql`
+      SELECT value FROM app_config WHERE key = 'leads_auto_assign' LIMIT 1
+    `;
+    let autoAssignEnabled: boolean | null = null;
+    try {
+      const raw = autoAssignRaw[0]?.value as { enabled?: boolean } | null;
+      autoAssignEnabled = raw?.enabled ?? true;
+    } catch {
+      autoAssignEnabled = null;
+    }
     const msgCount = await sql`SELECT count(*)::int AS n FROM lead_messages`;
     // ¿Coinciden los conversation_id de los mensajes con los ids de las conversaciones?
     const orphanMsgs = await sql`
@@ -145,6 +161,9 @@ export async function GET() {
       tables: tables.map((t) => t.table_name),
       users: users[0]?.n ?? 0,
       conversations: convCount[0]?.n ?? 0,
+      unassignedConversations: unassigned[0]?.n ?? 0,
+      activeAdvisors: activeAdvisors[0]?.n ?? 0,
+      autoAssignEnabled,
       messages: msgCount[0]?.n ?? 0,
       conversationsWithMessages: convWithMsgs[0]?.n ?? 0,
       orphanMessages: orphanMsgs[0]?.n ?? 0,

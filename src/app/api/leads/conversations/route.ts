@@ -1,4 +1,5 @@
-import { NextResponse, after } from "next/server";
+import { NextResponse } from "next/server";
+import { adminLeadsService } from "@/services/admin-leads.service";
 import { authService } from "@/services/auth.service";
 import { leadsService } from "@/services/leads.service";
 
@@ -11,18 +12,10 @@ export async function GET() {
     const user = await authService.getSessionUser();
     const advisorId = user?.role === "asesora" ? user.id : undefined;
 
-    // El barrido de auto-asignación corre DESPUÉS de responder, con `after()`:
-    // no retrasa la bandeja y Next mantiene viva la función hasta terminarlo
-    // (lanzarlo con `void` podía cortarse y dañar la conexión del pool).
+    // Asignar pendientes ANTES de listar: si solo corre en `after()`, la bandeja
+    // responde vacía y la asesora ve "sin conversaciones" hasta el siguiente poll.
     if (advisorId) {
-      after(async () => {
-        try {
-          const { adminLeadsService } = await import("@/services/admin-leads.service");
-          await adminLeadsService.autoAssignAllPending();
-        } catch (err) {
-          console.error("[autoAssign sweep]", err);
-        }
-      });
+      await adminLeadsService.autoAssignAllPending({ skipThrottle: true });
     }
 
     const conversations = await Promise.race([
@@ -35,7 +28,6 @@ export async function GET() {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
-    // Nunca devolver [] ante un fallo: ocultaría que la bandeja se rompió.
     console.error("[GET /api/leads/conversations]", error);
     return NextResponse.json(
       { error: "No se pudieron cargar las conversaciones." },

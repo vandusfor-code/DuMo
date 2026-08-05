@@ -44,7 +44,7 @@ export interface AdminLeadsRepository {
   getAutoAssignSettings(): Promise<AutoAssignSettings>;
   setAutoAssignEnabled(enabled: boolean): Promise<AutoAssignSettings>;
   autoAssignIfNeeded(conversationId: string): Promise<void>;
-  autoAssignAllPending(): Promise<void>;
+  autoAssignAllPending(options?: { skipThrottle?: boolean }): Promise<void>;
 }
 
 type ConvRow = {
@@ -378,8 +378,8 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
    * Barrido de pendientes. Se limita con un throttle porque antes se ejecutaba
    * en CADA poll de la bandeja (cada 5 s por asesora) y saturaba la base.
    */
-  async autoAssignAllPending() {
-    if (Date.now() - lastSweepAt < SWEEP_INTERVAL_MS) return;
+  async autoAssignAllPending(options?: { skipThrottle?: boolean }) {
+    if (!options?.skipThrottle && Date.now() - lastSweepAt < SWEEP_INTERVAL_MS) return;
     lastSweepAt = Date.now();
 
     const settings = await this.getAutoAssignSettings();

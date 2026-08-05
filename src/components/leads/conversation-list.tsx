@@ -14,11 +14,17 @@ import type { Conversation } from "@/types/conversation";
 export function ConversationList({
   conversations,
   isLoading,
+  isError,
+  isSyncing,
+  onRetry,
   selectedId,
   onSelect,
 }: {
   conversations: Conversation[];
   isLoading: boolean;
+  isError?: boolean;
+  isSyncing?: boolean;
+  onRetry?: () => void;
   selectedId: string | null;
   onSelect: (id: string) => void;
 }) {
@@ -54,7 +60,12 @@ export function ConversationList({
     <div className="flex h-full flex-col">
       <div className="space-y-3 border-b border-line p-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-[16px] font-semibold text-ink">Conversaciones</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-[16px] font-semibold text-ink">Conversaciones</h2>
+            {isSyncing ? (
+              <span className="text-[11px] font-medium text-muted">Sincronizando…</span>
+            ) : null}
+          </div>
           <button
             type="button"
             aria-label="Nueva conversación"
@@ -78,6 +89,22 @@ export function ConversationList({
               </div>
             </div>
           ))
+        ) : isError ? (
+          <div className="px-4 py-10 text-center">
+            <p className="text-[13px] font-medium text-ink">No se pudo cargar la bandeja</p>
+            <p className="mt-1 text-[12px] text-muted">
+              Revisa tu conexión. Los chats siguen en el servidor.
+            </p>
+            {onRetry ? (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="mt-4 text-[13px] font-semibold text-brand hover:text-brand-hover"
+              >
+                Reintentar
+              </button>
+            ) : null}
+          </div>
         ) : filtered.length === 0 ? (
           <p className="px-4 py-10 text-center text-[13px] text-muted">
             No hay conversaciones que coincidan.

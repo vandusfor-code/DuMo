@@ -62,8 +62,8 @@ export const adminLeadsService = {
   autoAssignIfNeeded(conversationId: string) {
     return getAdminLeadsRepository().autoAssignIfNeeded(conversationId);
   },
-  autoAssignAllPending() {
-    return getAdminLeadsRepository().autoAssignAllPending();
+  autoAssignAllPending(options?: { skipThrottle?: boolean }) {
+    return getAdminLeadsRepository().autoAssignAllPending(options);
   },
   deleteConversation(conversationId: string) {
     return getAdminLeadsRepository().deleteConversation(conversationId);

@@ -3,21 +3,21 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "@/lib/api-client";
-import { leadKeys } from "@/hooks/use-leads";
+import { fetchAdvisorConversations, leadKeys } from "@/hooks/use-leads";
 import type { AdminConversation } from "@/types/admin-lead";
-import type { Conversation } from "@/types/conversation";
 
 export const MESSAGE_POLL_MS = 4000;
 
 export function useAdvisorConversationsPoll(enabled = true) {
   return useQuery({
     queryKey: leadKeys.conversations,
-    queryFn: () => apiGet<Conversation[]>("/api/leads/conversations"),
+    queryFn: fetchAdvisorConversations,
     refetchInterval: MESSAGE_POLL_MS,
     refetchIntervalInBackground: true,
     staleTime: 1500,
-    retry: 1,
+    retry: 2,
     enabled,
+    placeholderData: (prev) => prev,
   });
 }
 
@@ -28,8 +28,9 @@ export function useAdminConversationsPoll(enabled = true) {
     refetchInterval: MESSAGE_POLL_MS,
     refetchIntervalInBackground: true,
     staleTime: 1500,
-    retry: 1,
+    retry: 2,
     enabled,
+    placeholderData: (prev) => prev,
   });
 }
 
