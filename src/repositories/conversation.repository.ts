@@ -216,8 +216,11 @@ class PostgresConversationRepository implements ConversationRepository {
   async listConnectedPhoneIds(): Promise<string[]> {
     await ensureSchema();
     const sql = getSql()!;
+    // Solo los números con token utilizable cuentan como activos: un número ya
+    // desconectado (sin token) no debe usarse para responder.
     const rows = (await sql`
       SELECT phone_number_id FROM connected_numbers
+      WHERE access_token IS NOT NULL AND btrim(access_token) <> ''
     `) as unknown as { phone_number_id: string }[];
     return rows.map((r) => r.phone_number_id);
   }
