@@ -131,12 +131,35 @@ export async function DELETE(request: NextRequest) {
     if (!(await requireAdminSession())) {
       return NextResponse.json({ error: "No autorizado." }, { status: 403 });
     }
-    const id = request.nextUrl.searchParams.get("noteId");
+    const p = request.nextUrl.searchParams;
+
+    // Borrar TODAS las conversaciones. Requiere confirmación explícita para
+    // que no pueda dispararse por accidente.
+    if (p.get("allConversations") === "1") {
+      if (p.get("confirm") !== "BORRAR-TODO") {
+        return NextResponse.json(
+          { error: "Falta confirmación explícita (confirm=BORRAR-TODO)." },
+          { status: 400 },
+        );
+      }
+      const deleted = await adminLeadsService.deleteAllConversations();
+      console.warn(`[admin] borradas TODAS las conversaciones (${deleted})`);
+      return NextResponse.json({ ok: true, deleted });
+    }
+
+    // Borrar una conversación con su historial.
+    const conversationId = p.get("conversationId");
+    if (conversationId) {
+      await adminLeadsService.deleteConversation(conversationId);
+      return NextResponse.json({ ok: true, conversationId });
+    }
+
+    const id = p.get("noteId");
     if (!id) return NextResponse.json({ error: "ID requerido." }, { status: 400 });
     await adminLeadsService.deleteNote(id);
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[DELETE /api/admin/leads]", error);
-    return NextResponse.json({ error: "No se pudo eliminar la nota." }, { status: 400 });
+    return NextResponse.json({ error: "No se pudo eliminar." }, { status: 400 });
   }
 }

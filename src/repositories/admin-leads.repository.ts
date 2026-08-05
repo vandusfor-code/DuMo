@@ -37,6 +37,10 @@ export interface AdminLeadsRepository {
   addNote(input: UpsertLeadNoteInput): Promise<LeadNote>;
   updateNote(id: string, text: string): Promise<LeadNote>;
   deleteNote(id: string): Promise<void>;
+  /** Borra una conversación con todo su historial (mensajes y notas). */
+  deleteConversation(conversationId: string): Promise<void>;
+  /** Borra TODAS las conversaciones y su historial. Irreversible. */
+  deleteAllConversations(): Promise<number>;
   getAutoAssignSettings(): Promise<AutoAssignSettings>;
   setAutoAssignEnabled(enabled: boolean): Promise<AutoAssignSettings>;
   autoAssignIfNeeded(conversationId: string): Promise<void>;
@@ -255,6 +259,38 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
     await sql`DELETE FROM lead_notes WHERE id = ${id}`;
   }
 
+  /**
+   * Borra una conversación y todo su historial en una transacción: si algo
+   * falla, no queda a medias (mensajes huérfanos o al revés).
+   * No toca ventas ni gestiones comerciales.
+   */
+  async deleteConversation(conversationId: string) {
+    await ensureSchema();
+    const sql = requireSql();
+    await sql.begin(async (tx) => {
+      await tx`DELETE FROM lead_messages WHERE conversation_id = ${conversationId}`;
+      await tx`DELETE FROM lead_notes WHERE conversation_id = ${conversationId}`;
+      await tx`DELETE FROM lead_conversations WHERE id = ${conversationId}`;
+    });
+  }
+
+  /** Borra TODAS las conversaciones y su historial. Devuelve cuántas borró. */
+  async deleteAllConversations(): Promise<number> {
+    await ensureSchema();
+    const sql = requireSql();
+    let deleted = 0;
+    await sql.begin(async (tx) => {
+      const rows = (await tx`
+        SELECT count(*)::int AS n FROM lead_conversations
+      `) as unknown as { n: number }[];
+      deleted = rows[0]?.n ?? 0;
+      await tx`DELETE FROM lead_messages`;
+      await tx`DELETE FROM lead_notes`;
+      await tx`DELETE FROM lead_conversations`;
+    });
+    return deleted;
+  }
+
   async getAutoAssignSettings() {
     const stored = await getConfig<AutoAssignSettings | null>(AUTO_ASSIGN_KEY, null);
     if (stored === null) {
@@ -438,6 +474,19 @@ class MockAdminLeadsRepository implements AdminLeadsRepository {
   deleteNote(id: string) {
     this.notes = this.notes.filter((n) => n.id !== id);
     return withLatency(undefined);
+  }
+
+  deleteConversation(conversationId: string) {
+    this.conversations = this.conversations.filter((c) => c.id !== conversationId);
+    this.notes = this.notes.filter((n) => n.conversationId !== conversationId);
+    return withLatency(undefined);
+  }
+
+  deleteAllConversations() {
+    const n = this.conversations.length;
+    this.conversations = [];
+    this.notes = [];
+    return withLatency(n);
   }
 
   getAutoAssignSettings() {

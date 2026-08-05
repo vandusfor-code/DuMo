@@ -92,6 +92,30 @@ export function useDeleteLeadNote() {
   });
 }
 
+/** Borra una conversación con todo su historial. */
+export function useDeleteConversation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (conversationId: string) =>
+      apiDelete<{ ok: boolean }>(
+        `/api/admin/leads?conversationId=${encodeURIComponent(conversationId)}`,
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "leads"] }),
+  });
+}
+
+/** Borra TODAS las conversaciones. Irreversible. */
+export function useDeleteAllConversations() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiDelete<{ ok: boolean; deleted: number }>(
+        "/api/admin/leads?allConversations=1&confirm=BORRAR-TODO",
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "leads"] }),
+  });
+}
+
 export function useAutoAssignSettings() {
   return useQuery({
     queryKey: ["admin", "leads", "auto-assign"],

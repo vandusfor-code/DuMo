@@ -9,6 +9,9 @@ import { ErrorState } from "@/components/shared/error-state";
 import { AdminConversationList } from "@/components/admin/leads/admin-conversation-list";
 import { AdminChatPanel } from "@/components/admin/leads/admin-chat-panel";
 import { AdminLeadFormPanel } from "@/components/admin/leads/admin-lead-form-panel";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { Button } from "@/components/ui/button";
+import { Trash2 } from "lucide-react";
 import {
   useAdminAdvisors,
   useAdminConversations,
@@ -17,6 +20,8 @@ import {
   useAdminSendMessage,
   useAssignAdvisor,
   useAutoAssignSettings,
+  useDeleteAllConversations,
+  useDeleteConversation,
   useSetAutoAssign,
 } from "@/hooks/use-admin-leads";
 
@@ -37,6 +42,12 @@ export default function AdminLeadsPage() {
   const detail = useAdminLeadDetail(selectedId);
   const messages = useAdminMessages(selectedId);
   const sendMessage = useAdminSendMessage(selectedId);
+
+  // Borrado de chats (solo admin). Ambas acciones piden confirmación.
+  const deleteOne = useDeleteConversation();
+  const deleteAll = useDeleteAllConversations();
+  const [confirmDeleteOne, setConfirmDeleteOne] = useState<string | null>(null);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
 
   if (shouldShowFatalQueryError(convQuery)) {
     return (
@@ -63,11 +74,32 @@ export default function AdminLeadsPage() {
             }
             onToggleAutoAssign={(enabled) => setAutoAssign.mutate(enabled)}
           />
+          {(conversations?.length ?? 0) > 0 && (
+            <div className="shrink-0 border-t border-line p-3">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteAll(true)}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-danger/25 px-3 py-2 text-[13px] font-semibold text-danger-ink transition-colors hover:bg-danger-soft"
+              >
+                <Trash2 className="size-4" />
+                Borrar todos los chats
+              </button>
+            </div>
+          )}
         </Card>
 
         {selected ? (
           <>
-            <Card className="flex min-h-0 flex-col overflow-hidden rounded-none border-y-0 shadow-none">
+            <Card className="relative flex min-h-0 flex-col overflow-hidden rounded-none border-y-0 shadow-none">
+              <button
+                type="button"
+                aria-label="Eliminar chat"
+                title="Eliminar este chat y su historial"
+                onClick={() => setConfirmDeleteOne(selected.id)}
+                className="absolute right-3 top-3 z-10 grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-danger-soft hover:text-danger-ink"
+              >
+                <Trash2 className="size-[18px]" />
+              </button>
               <AdminChatPanel
                 conversation={selected}
                 messages={messages.data ?? []}
@@ -103,6 +135,36 @@ export default function AdminLeadsPage() {
           </Card>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmDeleteOne !== null}
+        title="Eliminar este chat"
+        description="Se borrará la conversación con todos sus mensajes y notas. Esta acción no se puede deshacer. Las ventas registradas no se ven afectadas."
+        confirmLabel="Eliminar chat"
+        isLoading={deleteOne.isPending}
+        onCancel={() => setConfirmDeleteOne(null)}
+        onConfirm={async () => {
+          if (!confirmDeleteOne) return;
+          await deleteOne.mutateAsync(confirmDeleteOne);
+          if (selectedId === confirmDeleteOne) setSelectedId(null);
+          setConfirmDeleteOne(null);
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmDeleteAll}
+        title="Borrar TODOS los chats"
+        description="Se eliminarán todas las conversaciones con su historial completo de mensajes y notas. Esta acción no se puede deshacer. Las ventas registradas no se ven afectadas."
+        confirmLabel="Borrar todo"
+        confirmPhrase="BORRAR TODO"
+        isLoading={deleteAll.isPending}
+        onCancel={() => setConfirmDeleteAll(false)}
+        onConfirm={async () => {
+          await deleteAll.mutateAsync();
+          setSelectedId(null);
+          setConfirmDeleteAll(false);
+        }}
+      />
     </div>
   );
 }

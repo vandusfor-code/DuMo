@@ -65,4 +65,10 @@ export const adminLeadsService = {
   autoAssignAllPending() {
     return getAdminLeadsRepository().autoAssignAllPending();
   },
+  deleteConversation(conversationId: string) {
+    return getAdminLeadsRepository().deleteConversation(conversationId);
+  },
+  deleteAllConversations() {
+    return getAdminLeadsRepository().deleteAllConversations();
+  },
 };
