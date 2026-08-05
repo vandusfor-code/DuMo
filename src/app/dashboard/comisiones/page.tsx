@@ -96,7 +96,7 @@ export default function ComisionesPage() {
         actions={<CommissionMonthFilter month={month} onMonthChange={setMonth} />}
       />
 
-      {isError ? (
+      {isError && !data ? (
         <ErrorState
           title="No se pudieron cargar las comisiones"
           message="Intenta nuevamente en unos segundos."

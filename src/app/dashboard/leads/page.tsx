@@ -21,7 +21,9 @@ export default function LeadsPage() {
 
   const messages = useConversationMessages(selectedId);
 
-  if (isError) {
+  // Solo error total si nunca cargó. Si ya hay datos, un fallo transitorio de
+  // un refetch en segundo plano NO debe borrar la pantalla.
+  if (isError && !conversations) {
     return (
       <div className="pt-4">
         <ErrorState

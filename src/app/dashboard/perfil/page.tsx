@@ -18,7 +18,7 @@ export default function DashboardPerfilPage() {
         subtitle="Gestiona tu información personal y contraseña."
       />
 
-      {isError ? (
+      {isError && !data ? (
         <ErrorState title="No se pudo cargar tu perfil" onRetry={() => refetch()} />
       ) : isLoading || !data ? (
         <Skeleton className="h-80 rounded-card" />

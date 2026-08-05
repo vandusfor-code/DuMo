@@ -15,7 +15,7 @@ export default function AdminPerfilPage() {
     <div>
       <AdminPageHeader title="Perfil" subtitle="Tu información personal y seguridad de la cuenta" />
 
-      {isError ? (
+      {isError && !data ? (
         <ErrorState title="No se pudo cargar tu perfil" onRetry={() => refetch()} />
       ) : isLoading || !data ? (
         <Skeleton className="h-80 rounded-card" />

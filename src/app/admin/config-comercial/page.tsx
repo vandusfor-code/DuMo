@@ -37,7 +37,7 @@ export default function AdminConfigComercialPage() {
         subtitle="Planes, comisiones y metas que alimentan todos los cálculos del sistema"
       />
 
-      {isError ? (
+      {isError && !data ? (
         <ErrorState title="No se pudo cargar la configuración" onRetry={() => refetch()} />
       ) : isLoading || !data ? (
         <div className="space-y-5">

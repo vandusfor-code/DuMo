@@ -79,153 +79,182 @@ export async function withQueryTimeout<T>(promise: Promise<T>, ms = 8000): Promi
   }
 }
 
+/**
+ * Versión del esquema. Súbela al agregar/alterar tablas para que la migración
+ * vuelva a correr una vez. Si no cambia, los cold-starts saltan todo el DDL.
+ */
+const SCHEMA_VERSION = 1;
+/** Clave del advisory lock que serializa la migración entre instancias. */
+const MIGRATION_LOCK_KEY = 828171;
+
+/**
+ * Ejecuta las migraciones DDL UNA sola vez, serializadas entre todas las
+ * instancias serverless con un advisory lock transaccional. Tras la primera
+ * migración, cada cold-start solo lee la versión y sale (sin DDL), lo que
+ * elimina las carreras de CREATE/ALTER que causaban fallos intermitentes.
+ */
 async function runMigrations(sql: Sql) {
-  await sql`
-    CREATE TABLE IF NOT EXISTS lead_conversations (
-      id text PRIMARY KEY,
-      phone text NOT NULL,
-      customer_name text NOT NULL DEFAULT '',
-      last_message text NOT NULL DEFAULT '',
-      last_message_at timestamptz NOT NULL DEFAULT now(),
-      unread integer NOT NULL DEFAULT 0,
-      status text NOT NULL DEFAULT 'new',
-      online boolean NOT NULL DEFAULT false
-    )
-  `;
-  await sql`
-    CREATE TABLE IF NOT EXISTS lead_messages (
-      id text PRIMARY KEY,
-      conversation_id text NOT NULL,
-      direction text NOT NULL,
-      body text NOT NULL DEFAULT '',
-      created_at timestamptz NOT NULL DEFAULT now(),
-      read boolean NOT NULL DEFAULT false
-    )
-  `;
-  await sql`
-    CREATE INDEX IF NOT EXISTS idx_lead_messages_conv
-    ON lead_messages (conversation_id, created_at)
-  `;
-  await sql`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS dumo_phone_id text`;
-  await sql`
-    CREATE TABLE IF NOT EXISTS connected_numbers (
-      phone_number_id text PRIMARY KEY,
-      display_phone text NOT NULL DEFAULT '',
-      waba_id text NOT NULL DEFAULT '',
-      label text NOT NULL DEFAULT '',
-      connected_at timestamptz NOT NULL DEFAULT now()
-    )
-  `;
-  await sql`ALTER TABLE connected_numbers ADD COLUMN IF NOT EXISTS access_token text`;
-  await sql`
-    CREATE TABLE IF NOT EXISTS users (
-      id text PRIMARY KEY,
-      username text UNIQUE NOT NULL,
-      email text UNIQUE NOT NULL,
-      password_hash text NOT NULL,
-      name text NOT NULL,
-      role text NOT NULL,
-      active boolean NOT NULL DEFAULT true,
-      avatar_url text NOT NULL DEFAULT '',
-      created_at timestamptz NOT NULL DEFAULT now()
-    )
-  `;
-  await sql`
-    CREATE TABLE IF NOT EXISTS app_config (
-      key text PRIMARY KEY,
-      value jsonb NOT NULL,
-      updated_at timestamptz NOT NULL DEFAULT now()
-    )
-  `;
-  await sql`
-    CREATE TABLE IF NOT EXISTS accounting_expenses (
-      id text PRIMARY KEY,
-      date date NOT NULL,
-      category text NOT NULL,
-      description text NOT NULL DEFAULT '',
-      amount numeric NOT NULL,
-      user_name text NOT NULL DEFAULT '',
-      created_at timestamptz NOT NULL DEFAULT now()
-    )
-  `;
-  await sql`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS assigned_advisor_id text`;
-  await sql`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS assigned_advisor_name text`;
-  await sql`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS admin_status text DEFAULT 'nuevo'`;
-  await sql`UPDATE lead_conversations SET admin_status = 'nuevo' WHERE admin_status IS NULL`;
-  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at timestamptz`;
-  await sql`
-    CREATE TABLE IF NOT EXISTS lead_notes (
-      id text PRIMARY KEY,
-      conversation_id text NOT NULL,
-      text text NOT NULL,
-      author text NOT NULL DEFAULT '',
-      created_at timestamptz NOT NULL DEFAULT now()
-    )
-  `;
-  await sql`
-    CREATE INDEX IF NOT EXISTS idx_lead_notes_conv
-    ON lead_notes (conversation_id, created_at DESC)
-  `;
-  await sql`
-    CREATE TABLE IF NOT EXISTS sales (
-      id text PRIMARY KEY,
-      customer_name text NOT NULL,
-      rut text NOT NULL DEFAULT '',
-      phone text NOT NULL DEFAULT '',
-      email text NOT NULL DEFAULT '',
-      advisor_id text,
-      advisor_name text NOT NULL DEFAULT '',
-      status text NOT NULL DEFAULT 'registrada',
-      sale_type text NOT NULL DEFAULT 'portabilidad',
-      plan text NOT NULL DEFAULT '',
-      operator_value numeric NOT NULL DEFAULT 0,
-      sale_date date NOT NULL DEFAULT CURRENT_DATE,
-      notes text NOT NULL DEFAULT '',
-      created_at timestamptz NOT NULL DEFAULT now()
-    )
-  `;
-  await sql`
-    CREATE TABLE IF NOT EXISTS sale_lines (
-      id text PRIMARY KEY,
-      sale_id text NOT NULL,
-      phone_number text NOT NULL DEFAULT '',
-      sale_type text NOT NULL DEFAULT 'portability',
-      device_name text NOT NULL DEFAULT '',
-      plan_id text NOT NULL DEFAULT '',
-      status text NOT NULL DEFAULT 'pending'
-    )
-  `;
-  await sql`
-    CREATE INDEX IF NOT EXISTS idx_sale_lines_sale ON sale_lines (sale_id)
-  `;
-  await sql`
-    CREATE TABLE IF NOT EXISTS commission_payments (
-      id text PRIMARY KEY,
-      advisor_id text NOT NULL,
-      period_month int NOT NULL,
-      period_year int NOT NULL,
-      amount numeric NOT NULL DEFAULT 0,
-      status text NOT NULL DEFAULT 'pending',
-      paid_at timestamptz,
-      note text NOT NULL DEFAULT '',
-      UNIQUE (advisor_id, period_month, period_year)
-    )
-  `;
-  await sql`
-    CREATE TABLE IF NOT EXISTS lead_gestiones (
-      id text PRIMARY KEY,
-      conversation_id text NOT NULL,
-      phone text NOT NULL,
-      customer_name text NOT NULL DEFAULT '',
-      rut text NOT NULL DEFAULT '',
-      gestion_type text NOT NULL,
-      notes text NOT NULL DEFAULT '',
-      advisor_id text,
-      advisor_name text NOT NULL DEFAULT '',
-      lines jsonb NOT NULL DEFAULT '[]',
-      created_at timestamptz NOT NULL DEFAULT now()
-    )
-  `;
+  await sql.begin(async (tx) => {
+    // Serializa: solo una instancia corre el DDL a la vez; las demás esperan.
+    await tx`SELECT pg_advisory_xact_lock(${MIGRATION_LOCK_KEY})`;
+
+    await tx`
+      CREATE TABLE IF NOT EXISTS app_config (
+        key text PRIMARY KEY,
+        value jsonb NOT NULL,
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `;
+    const versionRows = await tx`SELECT value FROM app_config WHERE key = 'schema_version'`;
+    const current = versionRows[0]?.value != null ? Number(versionRows[0].value) : 0;
+    if (current >= SCHEMA_VERSION) return; // ya migrado: nada de DDL
+
+    await tx`
+      CREATE TABLE IF NOT EXISTS lead_conversations (
+        id text PRIMARY KEY,
+        phone text NOT NULL,
+        customer_name text NOT NULL DEFAULT '',
+        last_message text NOT NULL DEFAULT '',
+        last_message_at timestamptz NOT NULL DEFAULT now(),
+        unread integer NOT NULL DEFAULT 0,
+        status text NOT NULL DEFAULT 'new',
+        online boolean NOT NULL DEFAULT false
+      )
+    `;
+    await tx`
+      CREATE TABLE IF NOT EXISTS lead_messages (
+        id text PRIMARY KEY,
+        conversation_id text NOT NULL,
+        direction text NOT NULL,
+        body text NOT NULL DEFAULT '',
+        created_at timestamptz NOT NULL DEFAULT now(),
+        read boolean NOT NULL DEFAULT false
+      )
+    `;
+    await tx`
+      CREATE INDEX IF NOT EXISTS idx_lead_messages_conv
+      ON lead_messages (conversation_id, created_at)
+    `;
+    await tx`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS dumo_phone_id text`;
+    await tx`
+      CREATE TABLE IF NOT EXISTS connected_numbers (
+        phone_number_id text PRIMARY KEY,
+        display_phone text NOT NULL DEFAULT '',
+        waba_id text NOT NULL DEFAULT '',
+        label text NOT NULL DEFAULT '',
+        connected_at timestamptz NOT NULL DEFAULT now()
+      )
+    `;
+    await tx`ALTER TABLE connected_numbers ADD COLUMN IF NOT EXISTS access_token text`;
+    await tx`
+      CREATE TABLE IF NOT EXISTS users (
+        id text PRIMARY KEY,
+        username text UNIQUE NOT NULL,
+        email text UNIQUE NOT NULL,
+        password_hash text NOT NULL,
+        name text NOT NULL,
+        role text NOT NULL,
+        active boolean NOT NULL DEFAULT true,
+        avatar_url text NOT NULL DEFAULT '',
+        created_at timestamptz NOT NULL DEFAULT now()
+      )
+    `;
+    await tx`
+      CREATE TABLE IF NOT EXISTS accounting_expenses (
+        id text PRIMARY KEY,
+        date date NOT NULL,
+        category text NOT NULL,
+        description text NOT NULL DEFAULT '',
+        amount numeric NOT NULL,
+        user_name text NOT NULL DEFAULT '',
+        created_at timestamptz NOT NULL DEFAULT now()
+      )
+    `;
+    await tx`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS assigned_advisor_id text`;
+    await tx`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS assigned_advisor_name text`;
+    await tx`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS admin_status text DEFAULT 'nuevo'`;
+    await tx`UPDATE lead_conversations SET admin_status = 'nuevo' WHERE admin_status IS NULL`;
+    await tx`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at timestamptz`;
+    await tx`
+      CREATE TABLE IF NOT EXISTS lead_notes (
+        id text PRIMARY KEY,
+        conversation_id text NOT NULL,
+        text text NOT NULL,
+        author text NOT NULL DEFAULT '',
+        created_at timestamptz NOT NULL DEFAULT now()
+      )
+    `;
+    await tx`
+      CREATE INDEX IF NOT EXISTS idx_lead_notes_conv
+      ON lead_notes (conversation_id, created_at DESC)
+    `;
+    await tx`
+      CREATE TABLE IF NOT EXISTS sales (
+        id text PRIMARY KEY,
+        customer_name text NOT NULL,
+        rut text NOT NULL DEFAULT '',
+        phone text NOT NULL DEFAULT '',
+        email text NOT NULL DEFAULT '',
+        advisor_id text,
+        advisor_name text NOT NULL DEFAULT '',
+        status text NOT NULL DEFAULT 'registrada',
+        sale_type text NOT NULL DEFAULT 'portabilidad',
+        plan text NOT NULL DEFAULT '',
+        operator_value numeric NOT NULL DEFAULT 0,
+        sale_date date NOT NULL DEFAULT CURRENT_DATE,
+        notes text NOT NULL DEFAULT '',
+        created_at timestamptz NOT NULL DEFAULT now()
+      )
+    `;
+    await tx`
+      CREATE TABLE IF NOT EXISTS sale_lines (
+        id text PRIMARY KEY,
+        sale_id text NOT NULL,
+        phone_number text NOT NULL DEFAULT '',
+        sale_type text NOT NULL DEFAULT 'portability',
+        device_name text NOT NULL DEFAULT '',
+        plan_id text NOT NULL DEFAULT '',
+        status text NOT NULL DEFAULT 'pending'
+      )
+    `;
+    await tx`
+      CREATE INDEX IF NOT EXISTS idx_sale_lines_sale ON sale_lines (sale_id)
+    `;
+    await tx`
+      CREATE TABLE IF NOT EXISTS commission_payments (
+        id text PRIMARY KEY,
+        advisor_id text NOT NULL,
+        period_month int NOT NULL,
+        period_year int NOT NULL,
+        amount numeric NOT NULL DEFAULT 0,
+        status text NOT NULL DEFAULT 'pending',
+        paid_at timestamptz,
+        note text NOT NULL DEFAULT '',
+        UNIQUE (advisor_id, period_month, period_year)
+      )
+    `;
+    await tx`
+      CREATE TABLE IF NOT EXISTS lead_gestiones (
+        id text PRIMARY KEY,
+        conversation_id text NOT NULL,
+        phone text NOT NULL,
+        customer_name text NOT NULL DEFAULT '',
+        rut text NOT NULL DEFAULT '',
+        gestion_type text NOT NULL,
+        notes text NOT NULL DEFAULT '',
+        advisor_id text,
+        advisor_name text NOT NULL DEFAULT '',
+        lines jsonb NOT NULL DEFAULT '[]',
+        created_at timestamptz NOT NULL DEFAULT now()
+      )
+    `;
+
+    await tx`
+      INSERT INTO app_config (key, value)
+      VALUES ('schema_version', ${String(SCHEMA_VERSION)}::jsonb)
+      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()
+    `;
+  });
 }
 
 export function ensureSchema(): Promise<void> {

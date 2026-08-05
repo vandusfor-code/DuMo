@@ -39,7 +39,7 @@ export default function DashboardPage() {
         }
       />
 
-      {isError ? (
+      {isError && !data ? (
         <ErrorState
           title="No se pudo cargar el dashboard"
           message="Intenta nuevamente en unos segundos."

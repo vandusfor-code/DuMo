@@ -42,7 +42,7 @@ export default function AdminComisionesPage() {
           onChange={setFilters}
         />
 
-        {isError ? (
+        {isError && !data ? (
           <ErrorState title="No se pudieron cargar las comisiones" onRetry={() => refetch()} />
         ) : isLoading || !data ? (
           <div className="space-y-5">

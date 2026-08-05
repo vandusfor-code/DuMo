@@ -53,7 +53,7 @@ export default function MisVentasPage() {
         actions={<SalesFilters range={range} onRangeChange={setRange} />}
       />
 
-      {isError ? (
+      {isError && !data ? (
         <ErrorState
           title="No se pudieron cargar las ventas"
           message="Revisa la conexión con Google Sheets e intenta nuevamente."

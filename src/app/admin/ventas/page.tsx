@@ -41,7 +41,7 @@ export default function AdminVentasPage() {
       <div className="space-y-5">
         <AdminSalesFilters onApply={apply} onClear={clear} />
 
-        {isError ? (
+        {isError && !data ? (
           <ErrorState title="No se pudieron cargar las ventas" onRetry={() => refetch()} />
         ) : isLoading || !data ? (
           <div className="space-y-5">

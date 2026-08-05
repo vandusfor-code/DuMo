@@ -26,7 +26,7 @@ export default function AdminConfiguracionPage() {
         subtitle="Configuración general del sistema — empresa e integraciones"
       />
 
-      {isError ? (
+      {isError && !data ? (
         <ErrorState title="No se pudo cargar la configuración" onRetry={() => refetch()} />
       ) : isLoading || !data ? (
         <div className="space-y-5">
