@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { EmptyConversation } from "@/components/leads/empty-conversation";
+import { shouldShowFatalQueryError } from "@/components/shared/query-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { AdminConversationList } from "@/components/admin/leads/admin-conversation-list";
 import { AdminChatPanel } from "@/components/admin/leads/admin-chat-panel";
@@ -19,7 +20,8 @@ import {
 } from "@/hooks/use-admin-leads";
 
 export default function AdminLeadsPage() {
-  const { data: conversations, isLoading, isError, refetch } = useAdminConversations();
+  const convQuery = useAdminConversations();
+  const { data: conversations, isLoading, refetch } = convQuery;
   const { data: advisors = [] } = useAdminAdvisors();
   const { data: autoAssign } = useAutoAssignSettings();
   const setAutoAssign = useSetAutoAssign();
@@ -35,7 +37,7 @@ export default function AdminLeadsPage() {
   const messages = useAdminMessages(selectedId);
   const sendMessage = useAdminSendMessage(selectedId);
 
-  if (isError) {
+  if (shouldShowFatalQueryError(convQuery)) {
     return (
       <div className="pt-4">
         <ErrorState title="No se pudieron cargar las conversaciones" onRetry={() => refetch()} />

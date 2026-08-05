@@ -3,11 +3,14 @@
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdvisorsKpis, AdvisorsTable } from "@/components/admin/asesoras/advisors-panels";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryStaleBanner, shouldShowFatalQueryError } from "@/components/shared/query-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { useAdminAdvisors } from "@/hooks/use-admin-users";
 
 export default function AdminAsesorasPage() {
-  const { data, isLoading, isError, refetch } = useAdminAdvisors();
+  const query = useAdminAdvisors();
+  const { data, isLoading, isError, refetch } = query;
+  const fatal = shouldShowFatalQueryError(query);
 
   return (
     <div>
@@ -16,9 +19,12 @@ export default function AdminAsesorasPage() {
         subtitle="Desempeño comercial y estado de las asesoras activas"
       />
 
-      {isError ? (
+      {fatal ? (
         <ErrorState title="No se pudieron cargar las asesoras" onRetry={() => refetch()} />
-      ) : isLoading || !data ? (
+      ) : (
+        <>
+          <QueryStaleBanner visible={isError && !!data} onRetry={() => refetch()} />
+          {isLoading && !data ? (
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -27,11 +33,13 @@ export default function AdminAsesorasPage() {
           </div>
           <Skeleton className="h-96 rounded-card" />
         </div>
-      ) : (
+          ) : data ? (
         <div className="space-y-5">
           <AdvisorsKpis summary={data.summary} />
           <AdvisorsTable rows={data.rows} />
         </div>
+          ) : null}
+        </>
       )}
     </div>
   );

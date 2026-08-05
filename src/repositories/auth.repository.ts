@@ -10,7 +10,7 @@ import type {
 import { AUTH_ROLE_LABELS } from "@/types/auth";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { SEED_ADMIN, seedAdminPasswordHash } from "@/lib/auth/seed-admin";
-import { ensureSchema, getSql } from "@/server/db/client";
+import { ensureSchema, getSql, withDbRetry } from "@/server/db/client";
 
 export interface AuthRepository {
   ensureSeedAdmin(): Promise<void>;
@@ -55,6 +55,8 @@ function requireSql() {
   }
   return sql;
 }
+
+const touchCache = new Map<string, number>();
 
 class PostgresAuthRepository implements AuthRepository {
   async ensureSeedAdmin(): Promise<void> {
@@ -123,11 +125,11 @@ class PostgresAuthRepository implements AuthRepository {
   async listUsers(): Promise<AuthUser[]> {
     await this.ensureSeedAdmin();
     const sql = requireSql();
-    const rows = await sql`
+    const rows = await withDbRetry(() => sql`
       SELECT id, username, email, name, role, active, avatar_url
       FROM users
       ORDER BY name ASC
-    `;
+    `);
     return rows.map((r) => mapRow(r as Parameters<typeof mapRow>[0]));
   }
 
@@ -261,10 +263,14 @@ class PostgresAuthRepository implements AuthRepository {
   }
 
   async touchLastSeen(id: string): Promise<void> {
+    const now = Date.now();
+    const last = touchCache.get(id) ?? 0;
+    if (now - last < 60_000) return;
+    touchCache.set(id, now);
     try {
       await ensureSchema();
       const sql = requireSql();
-      await sql`UPDATE users SET last_seen_at = now() WHERE id = ${id}`;
+      await withDbRetry(() => sql`UPDATE users SET last_seen_at = now() WHERE id = ${id}`);
     } catch {
       /* no bloquear la sesión si falla */
     }

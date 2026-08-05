@@ -9,6 +9,7 @@ import {
   ExpensesTable,
 } from "@/components/admin/accounting/accounting-panels";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryStaleBanner, shouldShowFatalQueryError } from "@/components/shared/query-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { useAccounting, useCreateExpense, useDeleteExpense } from "@/hooks/use-admin-accounting";
 
@@ -18,7 +19,9 @@ export default function AdminContabilidadPage() {
     month: String(now.getMonth() + 1),
     year: String(now.getFullYear()),
   };
-  const { data, isLoading, isError, refetch } = useAccounting(filters);
+  const query = useAccounting(filters);
+  const { data, isLoading, isError, refetch } = query;
+  const fatal = shouldShowFatalQueryError(query);
   const createExpense = useCreateExpense();
   const deleteExpense = useDeleteExpense();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -30,9 +33,12 @@ export default function AdminContabilidadPage() {
         subtitle="Control financiero del negocio — presupuesto, gastos y utilidad"
       />
 
-      {isError ? (
+      {fatal ? (
         <ErrorState title="No se pudo cargar contabilidad" onRetry={() => refetch()} />
-      ) : isLoading || !data ? (
+      ) : (
+        <>
+          <QueryStaleBanner visible={isError && !!data} onRetry={() => refetch()} />
+          {isLoading && !data ? (
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -41,7 +47,7 @@ export default function AdminContabilidadPage() {
           </div>
           <Skeleton className="h-72 rounded-card" />
         </div>
-      ) : (
+          ) : data ? (
         <div className="space-y-5">
           <AccountingKpis summary={data.summary} />
           <AccountingCharts chart={data.chart} />
@@ -51,6 +57,8 @@ export default function AdminContabilidadPage() {
             onDelete={(id) => deleteExpense.mutate(id)}
           />
         </div>
+          ) : null}
+        </>
       )}
 
       <AddExpenseDialog

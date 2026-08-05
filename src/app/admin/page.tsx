@@ -23,11 +23,14 @@ import { AlertsCard } from "@/components/admin/alerts-card";
 import { RecentActivityCard } from "@/components/admin/recent-activity-card";
 import { MonthlyGoalCard } from "@/components/admin/monthly-goal-card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryStaleBanner, shouldShowFatalQueryError } from "@/components/shared/query-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { useAdminDashboard } from "@/hooks/use-admin-dashboard";
 
 export default function AdminDashboardPage() {
-  const { data, isLoading, isError, refetch } = useAdminDashboard();
+  const query = useAdminDashboard();
+  const { data, isLoading, isError, refetch } = query;
+  const fatal = shouldShowFatalQueryError(query);
 
   return (
     <div>
@@ -36,15 +39,18 @@ export default function AdminDashboardPage() {
         subtitle="Resumen general del negocio"
       />
 
-      {isError ? (
+      {fatal ? (
         <ErrorState
           title="No se pudo cargar el dashboard"
           message="Intenta nuevamente."
           onRetry={() => refetch()}
         />
-      ) : isLoading || !data ? (
-        <DashboardSkeleton />
       ) : (
+        <>
+          <QueryStaleBanner visible={isError && !!data} onRetry={() => refetch()} />
+          {isLoading && !data ? (
+        <DashboardSkeleton />
+          ) : data ? (
         <motion.div
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
@@ -91,6 +97,8 @@ export default function AdminDashboardPage() {
             <RecentActivityCard activity={data.activity} />
           </div>
         </motion.div>
+          ) : null}
+        </>
       )}
     </div>
   );
