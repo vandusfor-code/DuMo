@@ -19,7 +19,7 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen bg-canvas">
       <Sidebar />
-      <main className={fullBleed ? "lg:pl-[260px]" : "py-8 lg:pl-[260px] pr-6 sm:pr-8 lg:pr-10"}>
+      <main className={fullBleed ? "h-dvh overflow-hidden lg:pl-[260px]" : "py-8 lg:pl-[260px] pr-6 sm:pr-8 lg:pr-10"}>
         {children}
       </main>
     </div>

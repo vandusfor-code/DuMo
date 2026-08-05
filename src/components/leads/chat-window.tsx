@@ -17,10 +17,12 @@ export function ChatWindow({
   isLoading: boolean;
 }) {
   return (
-    <div className="flex h-full flex-col">
-      <ChatHeader conversation={conversation} />
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0">
+        <ChatHeader conversation={conversation} />
+      </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto bg-[#faf9fc] px-5 py-4">
+      <div className="wa-chat-bg min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
         <div className="flex justify-center">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-soft px-3 py-1 text-[11px] font-medium text-warning-ink">
             <Lock className="size-3" />
