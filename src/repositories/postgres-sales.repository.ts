@@ -791,7 +791,7 @@ export class PostgresSalesStore {
         activity,
         monthlyGoal: {
           goal: monthlyGoal,
-          current: income,
+          current: monthSales.length,
           progress,
           remaining: Math.max(0, monthlyGoal - monthSales.length),
           salesNeeded: Math.max(0, monthlyGoal - monthSales.length),

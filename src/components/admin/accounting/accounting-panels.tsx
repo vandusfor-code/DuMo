@@ -55,7 +55,7 @@ export function AccountingKpis({ summary }: { summary: AccountingSummary }) {
     { icon: <DollarSign />, tint: "bg-danger-soft text-danger-ink", label: "Gastos del mes", value: money.format(summary.monthlyExpenses) },
     { icon: <PiggyBank />, tint: "bg-success-soft text-success-ink", label: "Disponible", value: money.format(summary.available) },
     { icon: <TrendingUp />, tint: "bg-[#e8f0fe] text-[#2563eb]", label: "Utilidad estimada", value: money.format(summary.estimatedProfit) },
-    { icon: <Target />, tint: "bg-warning-soft text-warning-ink", label: "Meta mensual", value: money.format(summary.monthlyGoal) },
+    { icon: <Target />, tint: "bg-warning-soft text-warning-ink", label: "Meta ventas (objetivo)", value: `${summary.monthlyGoal} ventas` },
     { icon: <Target />, tint: "bg-[#f1f1f6] text-[#6b7280]", label: "Ventas necesarias", value: String(summary.salesNeededForGoal) },
   ];
 

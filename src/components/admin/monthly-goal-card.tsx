@@ -1,6 +1,5 @@
 import { Pencil, Target } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { formatCurrency } from "@/lib/format";
 import type { MonthlyGoal } from "@/types/admin-dashboard";
 
 export function MonthlyGoalCard({ goal }: { goal: MonthlyGoal }) {
@@ -8,16 +7,16 @@ export function MonthlyGoalCard({ goal }: { goal: MonthlyGoal }) {
   return (
     <Card className="p-6">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
-        {/* Bloque izquierdo: meta + barra */}
         <div className="flex items-start gap-4 lg:w-80">
           <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-brand-soft text-brand">
             <Target className="size-7" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[13px] text-muted">Meta mensual de utilidad</p>
+            <p className="text-[13px] text-muted">Meta mensual de ventas</p>
             <div className="mt-0.5 flex items-center gap-2">
               <p className="text-[24px] font-bold leading-none text-ink">
-                {formatCurrency(goal.goal)}
+                {goal.goal}{" "}
+                <span className="text-[15px] font-semibold text-muted">ventas</span>
               </p>
               <button
                 type="button"
@@ -36,12 +35,11 @@ export function MonthlyGoalCard({ goal }: { goal: MonthlyGoal }) {
           </div>
         </div>
 
-        {/* Bloque derecho: 4 métricas */}
         <div className="grid flex-1 grid-cols-2 gap-6 sm:grid-cols-4">
-          <Stat label="Utilidad actual" value={formatCurrency(goal.current)} tone="success" />
+          <Stat label="Ventas del mes" value={`${goal.current}`} tone="success" />
           <Stat label="Avance" value={`${goal.progress}%`} tone="brand" />
-          <Stat label="Faltante para la meta" value={formatCurrency(goal.remaining)} tone="danger" />
-          <Stat label="Ventas finalizadas necesarias" value={`${goal.salesNeeded}`} hint="aprox." tone="ink" />
+          <Stat label="Faltan para la meta" value={`${goal.remaining}`} hint="ventas" tone="danger" />
+          <Stat label="Objetivo" value={`${goal.salesNeeded}`} hint="por cerrar" tone="ink" />
         </div>
       </div>
     </Card>

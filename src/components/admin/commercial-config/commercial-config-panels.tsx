@@ -143,11 +143,11 @@ export function CommercialSettingsForm({
   const [values, setValues] = useState(settings);
 
   const fields = [
-    { key: "monthlyGoal" as const, label: "Meta mensual" },
-    { key: "profitGoal" as const, label: "Meta utilidad" },
-    { key: "baseCommission" as const, label: "Comisión base" },
-    { key: "specialBonus" as const, label: "Bonificación especial" },
-    { key: "campaignCommission" as const, label: "Comisión por campaña" },
+    { key: "monthlyGoal" as const, label: "Meta mensual (cantidad de ventas)", hint: "Ej: 120 = cerrar 120 ventas en el mes" },
+    { key: "profitGoal" as const, label: "Meta utilidad ($)", hint: "Utilidad en pesos que quieres generar al mes" },
+    { key: "baseCommission" as const, label: "Comisión base ($)", hint: "Por línea, si no encuentra el plan" },
+    { key: "specialBonus" as const, label: "Bonificación especial ($)", hint: "Reservado — próximamente" },
+    { key: "campaignCommission" as const, label: "Comisión por campaña ($)", hint: "Extra por cada venta finalizada" },
   ];
 
   return (
@@ -160,6 +160,9 @@ export function CommercialSettingsForm({
         {fields.map((f) => (
           <label key={f.key} className="block">
             <span className="text-[13px] text-muted">{f.label}</span>
+            {f.hint ? (
+              <span className="mt-0.5 block text-[11px] text-muted/80">{f.hint}</span>
+            ) : null}
             <input
               type="number"
               value={values[f.key]}
