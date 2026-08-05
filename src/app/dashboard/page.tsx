@@ -25,7 +25,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8 pt-1">
       <PageHeader
-        title={<span>👋 ¡Bienvenida, {firstName}!</span>}
+        title={`¡Bienvenida, ${firstName}!`}
         subtitle="Aquí tienes un resumen de tu actividad comercial."
         actions={
           <Button
@@ -81,10 +81,15 @@ export default function DashboardPage() {
               <RecentSalesTable sales={dashboard.recentSales} />
             </div>
             <div className="space-y-6">
-              <QuickSummaryCard summary={dashboard.quickSummary} />
+              <QuickSummaryCard
+                summary={dashboard.quickSummary}
+                monthlyGoal={dashboard.monthlySales.goal}
+              />
               <MonthlyProgressCard
                 progress={dashboard.monthlyProgress}
                 economicProgress={dashboard.economicTarget?.progress}
+                current={dashboard.monthlySales.count}
+                goal={dashboard.monthlySales.goal}
               />
             </div>
           </div>

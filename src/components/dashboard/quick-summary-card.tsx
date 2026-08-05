@@ -7,17 +7,32 @@ import {
 import { Card } from "@/components/ui/card";
 import type { DashboardData } from "@/types/dashboard";
 
-type Row = { icon: LucideIcon; label: string; value: number };
+type Row = {
+  icon: LucideIcon;
+  label: string;
+  value: number;
+};
 
 /** "Resumen rápido" — four minimalist metric rows. */
 export function QuickSummaryCard({
   summary,
+  monthlyGoal,
 }: {
   summary: DashboardData["quickSummary"];
+  monthlyGoal: number;
 }) {
+  const monthlyLabel =
+    monthlyGoal > 0
+      ? `${summary.monthlySales} / ${monthlyGoal}`
+      : String(summary.monthlySales);
+
   const rows: Row[] = [
     { icon: TrendingUp, label: "Ventas del día", value: summary.dailySales },
-    { icon: TrendingUp, label: "Ventas del mes", value: summary.monthlySales },
+    {
+      icon: TrendingUp,
+      label: "Ventas del mes",
+      value: summary.monthlySales,
+    },
     { icon: UserPlus, label: "Clientes nuevos", value: summary.newClients },
     {
       icon: ClipboardList,
@@ -29,9 +44,15 @@ export function QuickSummaryCard({
   return (
     <Card className="p-7">
       <h3 className="text-[17px] font-semibold text-ink">Resumen rápido</h3>
+      {monthlyGoal > 0 ? (
+        <p className="mt-1 text-[12px] text-muted">
+          Meta personal del mes: {monthlyGoal} ventas
+        </p>
+      ) : null}
       <ul className="mt-5 space-y-1">
         {rows.map((row, i) => {
           const Icon = row.icon;
+          const isMonthly = row.label === "Ventas del mes";
           return (
             <li
               key={i}
@@ -41,7 +62,9 @@ export function QuickSummaryCard({
                 <Icon className="size-[19px]" />
               </span>
               <span className="flex-1 text-[14px] text-muted">{row.label}</span>
-              <span className="text-[18px] font-bold text-ink">{row.value}</span>
+              <span className="text-[18px] font-bold text-ink">
+                {isMonthly ? monthlyLabel : row.value}
+              </span>
             </li>
           );
         })}

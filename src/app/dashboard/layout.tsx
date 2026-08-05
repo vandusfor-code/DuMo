@@ -4,11 +4,7 @@ import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { AdvisorMessageNotifications } from "@/components/messaging/message-notification-listener";
 
-/**
- * Shared shell for every authenticated screen: fixed 260px sidebar + content
- * flush to the sidebar edge (no left gutter). Leads is full-bleed; other
- * screens keep vertical padding and right inset only.
- */
+/** Shell del área asesora: sidebar fijo + contenido con separación lateral. */
 export default function DashboardLayout({
   children,
 }: {
@@ -21,8 +17,10 @@ export default function DashboardLayout({
     <div className="min-h-screen bg-canvas">
       <AdvisorMessageNotifications />
       <Sidebar />
-      <main className={fullBleed ? "h-dvh overflow-hidden lg:pl-[260px]" : "py-8 lg:pl-[260px] pr-6 sm:pr-8 lg:pr-10"}>
-        {children}
+      <main className={fullBleed ? "h-dvh overflow-hidden lg:pl-[260px]" : "lg:pl-[260px]"}>
+        <div className={fullBleed ? "h-full" : "w-full px-6 py-8 sm:px-8 lg:px-10"}>
+          {children}
+        </div>
       </main>
     </div>
   );

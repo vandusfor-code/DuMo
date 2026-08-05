@@ -30,7 +30,6 @@ import {
   salesProgress,
 } from "@/lib/commercial-settings";
 import { ADMIN_DASHBOARD_MOCK } from "@/data/mock/admin-dashboard.mock";
-import { DASHBOARD_MOCK } from "@/data/mock/dashboard.mock";
 import { ensureSchema, getSql, withDbRetry, withQueryTimeout } from "@/server/db/client";
 import {
   adminDateInPeriod,
@@ -85,6 +84,50 @@ const DAILY_BUCKETS = [
 ];
 
 const MONTH_BUCKETS = [1, 7, 14, 21, 28, 31];
+
+function advisorDailyGoal(personalSalesGoal: number): number {
+  if (personalSalesGoal <= 0) return 0;
+  return Math.max(1, Math.round(personalSalesGoal / 20));
+}
+
+function buildAdvisorDashboardShell(
+  personalSalesGoal: number,
+  personalEconomicGoal: number,
+  now = new Date(),
+): DashboardData {
+  const dailyGoal = advisorDailyGoal(personalSalesGoal);
+  const dateFmt = new Intl.DateTimeFormat("es-CL", { day: "numeric", month: "long" });
+  const monthName = new Intl.DateTimeFormat("es-CL", { month: "long" }).format(now);
+  const monthLabel = `${monthName.charAt(0).toUpperCase()}${monthName.slice(1)} ${now.getFullYear()}`;
+
+  return {
+    dailySales: {
+      count: 0,
+      goal: dailyGoal,
+      dateLabel: `Hoy, ${dateFmt.format(now)}`,
+      series: DAILY_BUCKETS.map((b) => ({ label: b.label, value: 0 })),
+    },
+    monthlySales: {
+      count: 0,
+      goal: personalSalesGoal,
+      monthLabel,
+      series: MONTH_BUCKETS.map((d) => ({ label: String(d), value: 0 })),
+    },
+    economicTarget:
+      personalEconomicGoal > 0
+        ? { current: 0, goal: personalEconomicGoal, progress: 0 }
+        : undefined,
+    commission: { estimated: 0, generated: 0, paid: 0 },
+    recentSales: [],
+    quickSummary: {
+      dailySales: 0,
+      monthlySales: 0,
+      newClients: 0,
+      pending: 0,
+    },
+    monthlyProgress: 0,
+  };
+}
 
 function isoFromRow(row: SaleRow): string {
   const d = row.sale_date;
@@ -577,20 +620,29 @@ export class PostgresSalesStore {
   }
 
   async getAdvisorDashboard(scope: AdvisorScope | null = null): Promise<DashboardData> {
+    const configRepo = getCommercialConfigurationRepository();
+    let config;
+    let advisors;
     try {
-      const configRepo = getCommercialConfigurationRepository();
-      const [config, advisors] = await Promise.all([
+      [config, advisors] = await Promise.all([
         withQueryTimeout(configRepo.getSnapshot(), 8000),
         withQueryTimeout(getAuthRepository().listByRole("asesora"), 8000),
       ]);
-      const planIndex = buildPlanValueIndex(config.plans);
-      const activeAdvisorCount = advisors.filter((a) => a.active).length || 1;
-      const personalSalesGoal = perAdvisorSalesGoal(config.settings.monthlyGoal, activeAdvisorCount);
-      const personalEconomicGoal = perAdvisorEconomicGoal(
-        config.settings.economicGoal,
-        activeAdvisorCount,
-      );
+    } catch (err) {
+      console.error("[getAdvisorDashboard] config", err);
+      return buildAdvisorDashboardShell(0, 0);
+    }
 
+    const activeAdvisorCount = advisors.filter((a) => a.active).length || 1;
+    const personalSalesGoal = perAdvisorSalesGoal(config.settings.monthlyGoal, activeAdvisorCount);
+    const personalEconomicGoal = perAdvisorEconomicGoal(
+      config.settings.economicGoal,
+      activeAdvisorCount,
+    );
+    const dailyGoal = advisorDailyGoal(personalSalesGoal);
+
+    try {
+      const planIndex = buildPlanValueIndex(config.plans);
       const allRows = await fetchSalesWithLineCounts();
       const rows = allRows.filter((row) => matchesAdvisor(row, scope));
 
@@ -600,8 +652,6 @@ export class PostgresSalesStore {
 
       const monthSales = rows.filter((r) => isoFromRow(r).startsWith(monthKey));
       const daySales = rows.filter((r) => isoFromRow(r) === todayIso);
-
-      const dailyGoal = Math.max(1, Math.round(personalSalesGoal / 20));
 
       const dailySeries = DAILY_BUCKETS.map((b) => ({
         label: b.label,
@@ -702,8 +752,8 @@ export class PostgresSalesStore {
         monthlyProgress,
       };
     } catch (err) {
-      console.error("[getAdvisorDashboard]", err);
-      return { ...DASHBOARD_MOCK };
+      console.error("[getAdvisorDashboard] sales", err);
+      return buildAdvisorDashboardShell(personalSalesGoal, personalEconomicGoal);
     }
   }
 

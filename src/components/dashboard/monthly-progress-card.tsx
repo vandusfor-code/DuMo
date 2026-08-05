@@ -4,15 +4,24 @@ import { Trophy } from "lucide-react";
 export function MonthlyProgressCard({
   progress,
   economicProgress,
+  current,
+  goal,
 }: {
   progress: number;
   economicProgress?: number;
+  current?: number;
+  goal?: number;
 }) {
   const clamped = Math.max(0, Math.min(100, progress));
   const economicClamped =
     economicProgress !== undefined
       ? Math.max(0, Math.min(100, economicProgress))
       : undefined;
+
+  const progressText =
+    goal !== undefined && goal > 0
+      ? `Llevas ${current ?? 0} de ${goal} ventas (${clamped}% de tu meta).`
+      : `Llevas un ${clamped}% de tu meta de ventas.`;
 
   return (
     <div className="rounded-card bg-gradient-to-br from-[#f3effe] to-[#ece5fd] p-6">
@@ -23,7 +32,7 @@ export function MonthlyProgressCard({
         <div>
           <p className="text-[15px] font-semibold text-ink">¡Vas muy bien!</p>
           <p className="text-[13px] text-muted">
-            Llevas un {clamped}% de tu meta de ventas.
+            {progressText}
             {economicClamped !== undefined
               ? ` Ingreso DuMo al ${economicClamped}%.`
               : null}

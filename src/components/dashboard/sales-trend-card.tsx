@@ -35,7 +35,9 @@ export function SalesTrendCard({
         <p className="text-[40px] font-bold leading-none tracking-tight text-brand">
           {count}
         </p>
-        <p className="mt-2 text-[13px] text-muted">Objetivo: {goal} ventas</p>
+        <p className="mt-2 text-[13px] text-muted">
+          {goal > 0 ? `Objetivo: ${goal} ventas` : "Meta no configurada"}
+        </p>
       </div>
 
       <div className="mt-3">
