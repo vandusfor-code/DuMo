@@ -62,7 +62,7 @@ export async function GET() {
       configured: false,
       mode: "mock",
       hint:
-        "Configura DATABASE_URL con la URI de Postgres. En Supabase: Settings → Database → Connection string → Transaction pooler (puerto 6543). Las variables SUPABASE_ANON_KEY no sirven para SQL.",
+        "Configura DATABASE_URL1 con la URI de Postgres. En Supabase: Settings → Database → Connection string → Transaction pooler (puerto 6543). Las variables SUPABASE_ANON_KEY no sirven para SQL.",
     });
   }
 

@@ -33,7 +33,7 @@ export const SETTINGS_DEFAULT: SettingsSnapshot = {
     version: process.env.npm_package_version ?? "1.0.0",
     googleSheetsStatus: envStatus(!!process.env.GOOGLE_SHEET_ID),
     whatsappStatus: envStatus(!!process.env.WHATSAPP_TOKEN),
-    apisStatus: envStatus(!!process.env.DATABASE_URL),
+    apisStatus: envStatus(!!(process.env.DATABASE_URL1 || process.env.DATABASE_URL)),
     lastBackup: null,
   },
   logs: [],

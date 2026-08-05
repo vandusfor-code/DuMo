@@ -7,13 +7,13 @@ let schemaReady = false;
 
 /**
  * DuMo usa Postgres directo (compatible con Supabase, Neon, Vercel Postgres).
- * Supabase: usa la URI del **Transaction pooler** (puerto 6543) en DATABASE_URL.
+ * En Vercel/Supabase la URI va en **DATABASE_URL1** (Transaction pooler, puerto 6543).
  * Las variables NEXT_PUBLIC_SUPABASE_* / ANON_KEY no son la conexión SQL.
  */
 export function getDatabaseUrl(): string | null {
   const candidates = [
-    process.env.DATABASE_URL,
     process.env.DATABASE_URL1,
+    process.env.DATABASE_URL,
     process.env.SUPABASE_DATABASE_URL,
     process.env.POSTGRES_URL,
     process.env.POSTGRES_PRISMA_URL,
@@ -290,7 +290,7 @@ export async function pingDatabase(): Promise<{ ok: boolean; message: string }> 
     return {
       ok: false,
       message:
-        "DATABASE_URL no configurada. En Supabase: Project Settings → Database → Transaction pooler → copia la URI y ponla en DATABASE_URL.",
+        "DATABASE_URL1 no configurada. En Supabase: Project Settings → Database → Transaction pooler → copia la URI y ponla en DATABASE_URL1 (Vercel).",
     };
   }
   try {
