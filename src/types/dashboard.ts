@@ -28,6 +28,12 @@ export interface DashboardData {
     newClients: number;
     pending: number;
   };
-  /** Percent of the monthly goal reached (0–100). */
+  /** Percent of the monthly sales goal reached (0–100). */
   monthlyProgress: number;
+  /** Meta económica individual (ingreso DuMo). */
+  economicTarget?: {
+    current: number;
+    goal: number;
+    progress: number;
+  };
 }

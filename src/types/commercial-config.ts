@@ -26,18 +26,19 @@ export interface CommercialPlan {
   saleType: CommercialSaleType;
   /** Precio al cliente final (WOM) — visible para asesoras. */
   womValue: number;
-  /** Lo que WOM paga a DuMo — solo admin / contabilidad. */
+  /** Lo que WOM paga a DuMo — base de contabilidad admin. */
   dumoValue: number;
   advisorCommission: number;
   status: CommercialPlanStatus;
 }
 
 export interface CommercialGlobalSettings {
+  /** Ventas totales del equipo al mes (ej. 120). */
   monthlyGoal: number;
-  profitGoal: number;
+  /** Ingreso DuMo total objetivo del mes en pesos. Se reparte entre asesoras. */
+  economicGoal: number;
+  /** Comisión por línea si el plan vendido no coincide con la tabla. */
   baseCommission: number;
-  specialBonus: number;
-  campaignCommission: number;
 }
 
 export interface CommercialConfigSnapshot {
@@ -55,10 +56,4 @@ export interface UpsertCommercialPlanInput {
   status: CommercialPlanStatus;
 }
 
-export interface UpdateCommercialSettingsInput {
-  monthlyGoal: number;
-  profitGoal: number;
-  baseCommission: number;
-  specialBonus: number;
-  campaignCommission: number;
-}
+export type UpdateCommercialSettingsInput = CommercialGlobalSettings;

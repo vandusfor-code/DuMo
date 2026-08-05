@@ -22,6 +22,12 @@ import { matchesAdvisor } from "@/lib/advisor-scope";
 import { getAuthRepository } from "@/repositories/auth.repository";
 import { getCommercialConfigurationRepository } from "@/repositories/commercial-configuration.repository";
 import { buildPlanValueIndex } from "@/lib/commercial-plan";
+import {
+  economicProgress,
+  perAdvisorEconomicGoal,
+  perAdvisorSalesGoal,
+  salesProgress,
+} from "@/lib/commercial-settings";
 import { getConfig } from "@/server/db/app-config";
 import { ADMIN_DASHBOARD_MOCK } from "@/data/mock/admin-dashboard.mock";
 import { DASHBOARD_MOCK } from "@/data/mock/dashboard.mock";
@@ -345,9 +351,6 @@ export class PostgresSalesStore {
           const perLine = await configRepo.resolveCommissionForPlan(sale.plan);
           calculatedCommission += perLine * sale.lines;
         }
-        if (finalized.length > 0) {
-          calculatedCommission += config.settings.campaignCommission * finalized.length;
-        }
 
         const paidRecord = paidRows.find((p) => p.advisor_id === advisor.id);
         const status: AdminCommissionStatus =
@@ -541,7 +544,18 @@ export class PostgresSalesStore {
   async getAdvisorDashboard(scope: AdvisorScope | null = null): Promise<DashboardData> {
     try {
       const configRepo = getCommercialConfigurationRepository();
-      const config = await withQueryTimeout(configRepo.getSnapshot(), 8000);
+      const [config, advisors] = await Promise.all([
+        withQueryTimeout(configRepo.getSnapshot(), 8000),
+        withQueryTimeout(getAuthRepository().listByRole("asesora"), 8000),
+      ]);
+      const planIndex = buildPlanValueIndex(config.plans);
+      const activeAdvisorCount = advisors.filter((a) => a.active).length || 1;
+      const personalSalesGoal = perAdvisorSalesGoal(config.settings.monthlyGoal, activeAdvisorCount);
+      const personalEconomicGoal = perAdvisorEconomicGoal(
+        config.settings.economicGoal,
+        activeAdvisorCount,
+      );
+
       const allRows = await fetchSalesWithLineCounts();
       const rows = allRows.filter((row) => matchesAdvisor(row, scope));
 
@@ -552,8 +566,7 @@ export class PostgresSalesStore {
       const monthSales = rows.filter((r) => isoFromRow(r).startsWith(monthKey));
       const daySales = rows.filter((r) => isoFromRow(r) === todayIso);
 
-      const monthlyGoal = config.settings.monthlyGoal || 300;
-      const dailyGoal = Math.max(1, Math.round(monthlyGoal / 20)) || 15;
+      const dailyGoal = Math.max(1, Math.round(personalSalesGoal / 20));
 
       const dailySeries = DAILY_BUCKETS.map((b) => ({
         label: b.label,
@@ -577,6 +590,13 @@ export class PostgresSalesStore {
       const paid = monthCommissions
         .filter((c) => c.status === "paid")
         .reduce((s, c) => s + c.amount, 0);
+
+      const monthDumoIncome = monthSales
+        .filter((r) => r.status === "finalizada")
+        .reduce((sum, r) => {
+          const { dumoValue } = resolveSaleValues(r, planIndex);
+          return sum + dumoValue * lineCount(r);
+        }, 0);
 
       const recentSales = [...rows]
         .sort((a, b) => {
@@ -604,9 +624,8 @@ export class PostgresSalesStore {
 
       const pending = rows.filter((v) => toAdvisorStatus(v.status) === "pending").length;
       const newClients = new Set(monthSales.map((v) => v.rut)).size;
-      const monthlyProgress = monthlyGoal
-        ? Math.round((monthSales.length / monthlyGoal) * 100)
-        : 0;
+      const monthlyProgress = salesProgress(monthSales.length, personalSalesGoal);
+      const economicProgressPct = economicProgress(monthDumoIncome, personalEconomicGoal);
 
       const dateFmt = new Intl.DateTimeFormat("es-CL", {
         day: "numeric",
@@ -624,9 +643,14 @@ export class PostgresSalesStore {
         },
         monthlySales: {
           count: monthSales.length,
-          goal: monthlyGoal,
+          goal: personalSalesGoal,
           monthLabel,
           series: monthlySeries,
+        },
+        economicTarget: {
+          current: monthDumoIncome,
+          goal: personalEconomicGoal,
+          progress: economicProgressPct,
         },
         commission: {
           estimated: generated,
@@ -705,8 +729,9 @@ export class PostgresSalesStore {
       const profit = income - expenses;
       const budgetLeft = budget - expenses;
       const monthlyGoal = config.settings.monthlyGoal || 0;
-      const progress =
-        monthlyGoal > 0 ? Math.round((monthSales.length / monthlyGoal) * 100) : 0;
+      const economicGoal = config.settings.economicGoal || 0;
+      const salesProgressPct = salesProgress(monthSales.length, monthlyGoal);
+      const economicProgressPct = economicProgress(income, economicGoal);
 
       const byAdvisor = new Map<string, number>();
       for (const s of monthSales) {
@@ -738,11 +763,18 @@ export class PostgresSalesStore {
       }));
 
       const alerts = [];
-      if (monthlyGoal > 0 && progress < 80) {
+      if (monthlyGoal > 0 && salesProgressPct < 80) {
         alerts.push({
           kind: "goal" as const,
-          message: `Meta mensual al ${progress}% — faltan ${Math.max(0, monthlyGoal - monthSales.length)} ventas.`,
-          progress,
+          message: `Meta de ventas al ${salesProgressPct}% — faltan ${Math.max(0, monthlyGoal - monthSales.length)} ventas.`,
+          progress: salesProgressPct,
+        });
+      }
+      if (economicGoal > 0 && economicProgressPct < 80) {
+        alerts.push({
+          kind: "goal" as const,
+          message: `Meta económica al ${economicProgressPct}% — faltan ${formatCurrency(Math.max(0, economicGoal - income))}.`,
+          progress: economicProgressPct,
         });
       }
       if (budget > 0 && expenses > budget * 0.85) {
@@ -792,15 +824,38 @@ export class PostgresSalesStore {
         monthlyGoal: {
           goal: monthlyGoal,
           current: monthSales.length,
-          progress,
+          progress: salesProgressPct,
           remaining: Math.max(0, monthlyGoal - monthSales.length),
           salesNeeded: Math.max(0, monthlyGoal - monthSales.length),
+        },
+        economicGoal: {
+          goal: economicGoal,
+          current: income,
+          progress: economicProgressPct,
+          remaining: Math.max(0, economicGoal - income),
         },
       };
     } catch (err) {
       console.error("[getAdminDashboard]", err);
       return { ...ADMIN_DASHBOARD_MOCK };
     }
+  }
+
+  async getMonthCommercialStats(monthKey: string): Promise<{
+    salesCount: number;
+    dumoIncome: number;
+  }> {
+    const configRepo = getCommercialConfigurationRepository();
+    const config = await configRepo.getSnapshot();
+    const planIndex = buildPlanValueIndex(config.plans);
+    const rows = await fetchSalesWithLineCounts();
+    const monthRows = rows.filter((r) => isoFromRow(r).startsWith(monthKey));
+    const finalized = monthRows.filter((r) => r.status === "finalizada");
+    const dumoIncome = finalized.reduce((sum, r) => {
+      const { dumoValue } = resolveSaleValues(r, planIndex);
+      return sum + dumoValue * lineCount(r);
+    }, 0);
+    return { salesCount: monthRows.length, dumoIncome };
   }
 }
 

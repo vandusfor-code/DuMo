@@ -22,6 +22,7 @@ import {
 import { AlertsCard } from "@/components/admin/alerts-card";
 import { RecentActivityCard } from "@/components/admin/recent-activity-card";
 import { MonthlyGoalCard } from "@/components/admin/monthly-goal-card";
+import { EconomicGoalCard } from "@/components/admin/economic-goal-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QueryStaleBanner, shouldShowFatalQueryError } from "@/components/shared/query-state";
 import { ErrorState } from "@/components/shared/error-state";
@@ -112,8 +113,11 @@ export default function AdminDashboardPage() {
               </ChartCard>
             </div>
 
-            {/* Meta mensual */}
-            <MonthlyGoalCard goal={data.monthlyGoal} />
+            {/* Metas del mes */}
+            <div className="space-y-6">
+              <MonthlyGoalCard goal={data.monthlyGoal} />
+              <EconomicGoalCard goal={data.economicGoal} />
+            </div>
           </div>
 
           {/* Columna derecha */}

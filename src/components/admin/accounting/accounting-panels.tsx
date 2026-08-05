@@ -55,12 +55,15 @@ export function AccountingKpis({ summary }: { summary: AccountingSummary }) {
     { icon: <DollarSign />, tint: "bg-danger-soft text-danger-ink", label: "Gastos del mes", value: money.format(summary.monthlyExpenses) },
     { icon: <PiggyBank />, tint: "bg-success-soft text-success-ink", label: "Disponible", value: money.format(summary.available) },
     { icon: <TrendingUp />, tint: "bg-[#e8f0fe] text-[#2563eb]", label: "Utilidad estimada", value: money.format(summary.estimatedProfit) },
-    { icon: <Target />, tint: "bg-warning-soft text-warning-ink", label: "Meta ventas (objetivo)", value: `${summary.monthlyGoal} ventas` },
-    { icon: <Target />, tint: "bg-[#f1f1f6] text-[#6b7280]", label: "Ventas necesarias", value: String(summary.salesNeededForGoal) },
+    { icon: <Target />, tint: "bg-warning-soft text-warning-ink", label: "Meta ventas (equipo)", value: `${summary.monthlyGoal} ventas` },
+    { icon: <Target />, tint: "bg-[#f1f1f6] text-[#6b7280]", label: "Ventas del mes", value: String(summary.currentSales) },
+    { icon: <Target />, tint: "bg-[#f1f1f6] text-[#6b7280]", label: "Faltan para meta ventas", value: String(summary.salesNeededForGoal) },
+    { icon: <DollarSign />, tint: "bg-success-soft text-success-ink", label: "Meta económica", value: money.format(summary.economicGoal) },
+    { icon: <DollarSign />, tint: "bg-brand-soft text-brand", label: "Ingreso DuMo (mes)", value: money.format(summary.currentIncome) },
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-3">
       {cards.map((c) => (
         <Card key={c.label} className="p-4">
           <span className={`grid size-10 place-items-center rounded-xl [&_svg]:size-5 ${c.tint}`}>

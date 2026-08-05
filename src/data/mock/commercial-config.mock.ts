@@ -2,11 +2,9 @@ import type { CommercialGlobalSettings, CommercialPlan } from "@/types/commercia
 import { normalizeCommercialPlan } from "@/lib/commercial-plan";
 
 export const COMMERCIAL_SETTINGS_MOCK: CommercialGlobalSettings = {
-  monthlyGoal: 300,
-  profitGoal: 120000000,
-  baseCommission: 45000,
-  specialBonus: 15000,
-  campaignCommission: 8000,
+  monthlyGoal: 120,
+  economicGoal: 8_000_000,
+  baseCommission: 18_000,
 };
 
 const RAW_PLANS: CommercialPlan[] = [

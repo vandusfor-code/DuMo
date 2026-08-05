@@ -27,4 +27,10 @@ export const ADMIN_DASHBOARD_MOCK: AdminDashboardData = {
     remaining: 0,
     salesNeeded: 0,
   },
+  economicGoal: {
+    goal: 0,
+    current: 0,
+    progress: 0,
+    remaining: 0,
+  },
 };

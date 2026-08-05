@@ -11,11 +11,8 @@ import {
   COMMERCIAL_SETTINGS_MOCK,
   findPlanCommission,
 } from "@/data/mock/commercial-config.mock";
-import {
-  normalizeCommercialPlans,
-  resolveDumoValueForPlan,
-  resolveWomValueForPlan,
-} from "@/lib/commercial-plan";
+import { normalizeCommercialPlans, resolveDumoValueForPlan, resolveWomValueForPlan } from "@/lib/commercial-plan";
+import { normalizeCommercialSettings } from "@/lib/commercial-settings";
 import { getConfig, setConfig } from "@/server/db/app-config";
 import { hasDatabase } from "@/server/db/client";
 
@@ -53,7 +50,12 @@ class PostgresCommercialConfigurationRepository implements CommercialConfigurati
   }
 
   private async loadSettings(): Promise<CommercialGlobalSettings> {
-    return getConfig(SETTINGS_KEY, { ...COMMERCIAL_SETTINGS_MOCK });
+    const stored = await getConfig<Parameters<typeof normalizeCommercialSettings>[0] | null>(
+      SETTINGS_KEY,
+      null,
+    );
+    if (stored !== null) return normalizeCommercialSettings(stored);
+    return { ...COMMERCIAL_SETTINGS_MOCK };
   }
 
   private async savePlans(plans: CommercialPlan[]) {
@@ -102,8 +104,9 @@ class PostgresCommercialConfigurationRepository implements CommercialConfigurati
   }
 
   async updateSettings(input: UpdateCommercialSettingsInput) {
-    await setConfig(SETTINGS_KEY, { ...input });
-    return { ...input };
+    const next = normalizeCommercialSettings(input);
+    await setConfig(SETTINGS_KEY, next);
+    return { ...next };
   }
 
   async resolveCommissionForPlan(planName: string) {
@@ -161,7 +164,7 @@ class MockCommercialConfigurationRepository implements CommercialConfigurationRe
   }
 
   updateSettings(input: UpdateCommercialSettingsInput) {
-    this.settings = { ...input };
+    this.settings = normalizeCommercialSettings(input);
     return Promise.resolve({ ...this.settings });
   }
 

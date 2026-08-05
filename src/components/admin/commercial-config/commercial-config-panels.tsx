@@ -132,10 +132,8 @@ export function CommercialSettingsForm({
 }: {
   settings: {
     monthlyGoal: number;
-    profitGoal: number;
+    economicGoal: number;
     baseCommission: number;
-    specialBonus: number;
-    campaignCommission: number;
   };
   onSave: (values: typeof settings) => void;
   isSaving: boolean;
@@ -143,18 +141,28 @@ export function CommercialSettingsForm({
   const [values, setValues] = useState(settings);
 
   const fields = [
-    { key: "monthlyGoal" as const, label: "Meta mensual (cantidad de ventas)", hint: "Ej: 120 = cerrar 120 ventas en el mes" },
-    { key: "profitGoal" as const, label: "Meta utilidad ($)", hint: "Utilidad en pesos que quieres generar al mes" },
-    { key: "baseCommission" as const, label: "Comisión base ($)", hint: "Por línea, si no encuentra el plan" },
-    { key: "specialBonus" as const, label: "Bonificación especial ($)", hint: "Reservado — próximamente" },
-    { key: "campaignCommission" as const, label: "Comisión por campaña ($)", hint: "Extra por cada venta finalizada" },
+    {
+      key: "monthlyGoal" as const,
+      label: "Meta de ventas (cantidad al mes)",
+      hint: "Total del equipo. Ej: 120 ventas — con 2 asesoras, 60 c/u.",
+    },
+    {
+      key: "economicGoal" as const,
+      label: "Meta económica ($)",
+      hint: "Ingreso DuMo total del mes (según Valor DuMo de los planes). Se reparte entre asesoras.",
+    },
+    {
+      key: "baseCommission" as const,
+      label: "Comisión base ($)",
+      hint: "Por línea, si no encuentra el plan en la tabla.",
+    },
   ];
 
   return (
     <Card className="p-5">
       <h3 className="text-[15px] font-semibold text-ink">Configuraciones adicionales</h3>
       <p className="mt-1 text-[13px] text-muted">
-        Estos valores alimentan todos los cálculos del sistema.
+        Metas y comisión base. Los cálculos usan Valor DuMo de los planes comerciales.
       </p>
       <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {fields.map((f) => (

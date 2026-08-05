@@ -42,9 +42,6 @@ class MockCommissionRepository implements CommissionRepository {
           const perLine = await configRepo.resolveCommissionForPlan(sale.plan);
           calculatedCommission += perLine * sale.lines;
         }
-        if (finalized.length > 0) {
-          calculatedCommission += config.settings.campaignCommission * finalized.length;
-        }
 
         const status: AdminCommissionStatus = this.paidAdvisors.has(advisor.id)
           ? "paid"

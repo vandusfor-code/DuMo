@@ -86,7 +86,10 @@ export default function DashboardPage() {
             </div>
             <div className="space-y-6">
               <QuickSummaryCard summary={data.quickSummary} />
-              <MonthlyProgressCard progress={data.monthlyProgress} />
+              <MonthlyProgressCard
+                progress={data.monthlyProgress}
+                economicProgress={data.economicTarget?.progress}
+              />
             </div>
           </div>
         </motion.div>

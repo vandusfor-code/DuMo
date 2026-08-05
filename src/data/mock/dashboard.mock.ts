@@ -96,4 +96,9 @@ export const DASHBOARD_MOCK: DashboardData = {
     pending: 12,
   },
   monthlyProgress: 42,
+  economicTarget: {
+    current: 4_200_000,
+    goal: 4_000_000,
+    progress: 100,
+  },
 };

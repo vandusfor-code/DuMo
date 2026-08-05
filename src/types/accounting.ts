@@ -37,8 +37,16 @@ export interface AccountingSummary {
   monthlyExpenses: number;
   available: number;
   estimatedProfit: number;
+  /** Meta de ventas del equipo (cantidad). */
   monthlyGoal: number;
+  /** Ventas registradas en el mes. */
+  currentSales: number;
+  /** Ventas que faltan para la meta. */
   salesNeededForGoal: number;
+  /** Meta económica del mes (ingreso DuMo objetivo). */
+  economicGoal: number;
+  /** Ingreso DuMo de ventas finalizadas en el mes. */
+  currentIncome: number;
 }
 
 export interface AccountingChartPoint {

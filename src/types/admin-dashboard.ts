@@ -38,6 +38,13 @@ export interface MonthlyGoal {
   salesNeeded: number;
 }
 
+export interface EconomicGoal {
+  goal: number;
+  current: number;
+  progress: number;
+  remaining: number;
+}
+
 export interface AdminDashboardData {
   kpis: {
     salesToday: AdminKpi;
@@ -56,4 +63,5 @@ export interface AdminDashboardData {
   alerts: AdminAlert[];
   activity: AdminActivity[];
   monthlyGoal: MonthlyGoal;
+  economicGoal: EconomicGoal;
 }

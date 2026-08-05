@@ -8,6 +8,7 @@ import type {
 } from "@/types/accounting";
 import { ACCOUNTING_MONTHLY_BUDGET } from "@/data/mock/accounting.mock";
 import { getCommercialConfigurationRepository } from "@/repositories/commercial-configuration.repository";
+import { getPostgresSalesStore } from "@/repositories/postgres-sales.repository";
 import { getConfig, setConfig } from "@/server/db/app-config";
 import { ensureSchema, getSql, hasDatabase } from "@/server/db/client";
 
@@ -49,24 +50,26 @@ function buildChart(expenses: Expense[]): AccountingChartPoint[] {
   return points;
 }
 
-async function buildSummary(expenses: Expense[], monthlyBudget: number) {
+interface MonthCommercialStats {
+  salesCount: number;
+  dumoIncome: number;
+}
+
+async function buildSummary(
+  expenses: Expense[],
+  monthlyBudget: number,
+  stats: MonthCommercialStats = { salesCount: 0, dumoIncome: 0 },
+) {
   let monthlyGoal = 0;
+  let economicGoal = 0;
   try {
     const config = await getCommercialConfigurationRepository().getSnapshot();
     monthlyGoal = config.settings.monthlyGoal;
-    const activePlans = config.plans.filter((p) => p.status === "active");
-    const avgSaleValue =
-      activePlans.length > 0
-        ? activePlans.reduce((s, p) => s + p.dumoValue, 0) / activePlans.length
-        : 1;
-    const currentIncome = 0;
+    economicGoal = config.settings.economicGoal;
     const monthlyExpenses = expenses.reduce((s, e) => s + e.amount, 0);
     const available = monthlyBudget - monthlyExpenses;
-    const estimatedProfit = currentIncome - monthlyExpenses;
-    const salesNeededForGoal =
-      avgSaleValue > 0
-        ? Math.ceil(Math.max(0, monthlyGoal - currentIncome) / avgSaleValue)
-        : 0;
+    const estimatedProfit = stats.dumoIncome - monthlyExpenses;
+    const salesNeededForGoal = Math.max(0, monthlyGoal - stats.salesCount);
 
     return {
       monthlyBudget,
@@ -74,7 +77,10 @@ async function buildSummary(expenses: Expense[], monthlyBudget: number) {
       available,
       estimatedProfit,
       monthlyGoal,
+      currentSales: stats.salesCount,
       salesNeededForGoal,
+      economicGoal,
+      currentIncome: stats.dumoIncome,
     };
   } catch (err) {
     console.error("[accounting] buildSummary", err);
@@ -83,9 +89,12 @@ async function buildSummary(expenses: Expense[], monthlyBudget: number) {
       monthlyBudget,
       monthlyExpenses,
       available: monthlyBudget - monthlyExpenses,
-      estimatedProfit: -monthlyExpenses,
+      estimatedProfit: stats.dumoIncome - monthlyExpenses,
       monthlyGoal,
-      salesNeededForGoal: 0,
+      currentSales: stats.salesCount,
+      salesNeededForGoal: Math.max(0, monthlyGoal - stats.salesCount),
+      economicGoal,
+      currentIncome: stats.dumoIncome,
     };
   }
 }
@@ -136,7 +145,14 @@ class PostgresAccountingRepository implements AccountingRepository {
     const expenses = await this.listAllExpenses();
     const filtered = filterExpenses(filters, expenses);
     const monthlyBudget = await getConfig(BUDGET_KEY, ACCOUNTING_MONTHLY_BUDGET);
-    const summary = await buildSummary(filtered, monthlyBudget);
+    const key = monthKey(filters);
+    let stats: MonthCommercialStats = { salesCount: 0, dumoIncome: 0 };
+    try {
+      stats = await getPostgresSalesStore().getMonthCommercialStats(key);
+    } catch (err) {
+      console.error("[accounting] month stats", err);
+    }
+    const summary = await buildSummary(filtered, monthlyBudget, stats);
     const chart = buildChart(expenses);
 
     return {
