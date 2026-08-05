@@ -1,14 +1,30 @@
 import "server-only";
-import type { AuthRole, AuthUser } from "@/types/auth";
-import { verifyPassword } from "@/lib/auth/password";
+import type {
+  AuthRole,
+  AuthUser,
+  ChangePasswordInput,
+  CreateUserInput,
+  UpdateProfileInput,
+  UpdateUserInput,
+} from "@/types/auth";
+import { AUTH_ROLE_LABELS } from "@/types/auth";
+import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { SEED_ADMIN, seedAdminPasswordHash } from "@/lib/auth/seed-admin";
 import { ensureSchema, getSql } from "@/server/db/client";
-import { withLatency } from "@/lib/mock";
 
 export interface AuthRepository {
   ensureSeedAdmin(): Promise<void>;
   authenticate(login: string, password: string): Promise<AuthUser | null>;
   findById(id: string): Promise<AuthUser | null>;
+  listUsers(): Promise<AuthUser[]>;
+  listByRole(role: AuthRole): Promise<AuthUser[]>;
+  createUser(input: CreateUserInput): Promise<AuthUser>;
+  updateUser(id: string, input: UpdateUserInput): Promise<AuthUser>;
+  deleteUser(id: string): Promise<void>;
+  setActive(id: string, active: boolean): Promise<AuthUser>;
+  changePassword(id: string, newPassword: string): Promise<void>;
+  changePasswordWithCurrent(id: string, input: ChangePasswordInput): Promise<void>;
+  updateProfile(id: string, input: UpdateProfileInput): Promise<AuthUser>;
 }
 
 function mapRow(r: {
@@ -27,55 +43,22 @@ function mapRow(r: {
     name: r.name,
     role: r.role as AuthRole,
     active: r.active,
-    avatarUrl: r.avatar_url,
+    avatarUrl: r.avatar_url ?? "",
   };
 }
 
-const MOCK_USER: AuthUser & { passwordHash: string } = {
-  id: SEED_ADMIN.id,
-  username: SEED_ADMIN.username,
-  email: SEED_ADMIN.email,
-  name: SEED_ADMIN.name,
-  role: SEED_ADMIN.role,
-  active: true,
-  avatarUrl: SEED_ADMIN.avatarUrl,
-  passwordHash: seedAdminPasswordHash(),
-};
-
-class MockAuthRepository implements AuthRepository {
-  private users = [MOCK_USER];
-
-  ensureSeedAdmin() {
-    return Promise.resolve();
+function requireSql() {
+  const sql = getSql();
+  if (!sql) {
+    throw new Error("DATABASE_URL no configurada. La autenticación requiere Postgres.");
   }
-
-  authenticate(login: string, password: string) {
-    const q = login.trim().toLowerCase();
-    const user = this.users.find(
-      (u) =>
-        u.active &&
-        (u.email.toLowerCase() === q || u.username.toLowerCase() === q),
-    );
-    if (!user || !verifyPassword(password, user.passwordHash)) {
-      return withLatency(null);
-    }
-    const { passwordHash: _, ...safe } = user;
-    return withLatency(safe);
-  }
-
-  findById(id: string) {
-    const user = this.users.find((u) => u.id === id);
-    if (!user) return withLatency(null);
-    const { passwordHash: _, ...safe } = user;
-    return withLatency(safe);
-  }
+  return sql;
 }
 
 class PostgresAuthRepository implements AuthRepository {
   async ensureSeedAdmin(): Promise<void> {
     await ensureSchema();
-    const sql = getSql();
-    if (!sql) return;
+    const sql = requireSql();
 
     const existing = await sql`
       SELECT id FROM users WHERE email = ${SEED_ADMIN.email} LIMIT 1
@@ -99,9 +82,7 @@ class PostgresAuthRepository implements AuthRepository {
 
   async authenticate(login: string, password: string): Promise<AuthUser | null> {
     await this.ensureSeedAdmin();
-    const sql = getSql();
-    if (!sql) return null;
-
+    const sql = requireSql();
     const q = login.trim().toLowerCase();
     const rows = await sql`
       SELECT id, username, email, password_hash, name, role, active, avatar_url
@@ -128,9 +109,7 @@ class PostgresAuthRepository implements AuthRepository {
 
   async findById(id: string): Promise<AuthUser | null> {
     await this.ensureSeedAdmin();
-    const sql = getSql();
-    if (!sql) return null;
-
+    const sql = requireSql();
     const rows = await sql`
       SELECT id, username, email, name, role, active, avatar_url
       FROM users WHERE id = ${id} LIMIT 1
@@ -139,31 +118,165 @@ class PostgresAuthRepository implements AuthRepository {
     if (!row) return null;
     return mapRow(row as Parameters<typeof mapRow>[0]);
   }
+
+  async listUsers(): Promise<AuthUser[]> {
+    await this.ensureSeedAdmin();
+    const sql = requireSql();
+    const rows = await sql`
+      SELECT id, username, email, name, role, active, avatar_url
+      FROM users
+      ORDER BY name ASC
+    `;
+    return rows.map((r) => mapRow(r as Parameters<typeof mapRow>[0]));
+  }
+
+  async listByRole(role: AuthRole): Promise<AuthUser[]> {
+    const users = await this.listUsers();
+    return users.filter((u) => u.role === role);
+  }
+
+  private async assertUnique(email: string, username: string, excludeId?: string) {
+    const sql = requireSql();
+    const emailQ = email.toLowerCase();
+    const userQ = username.toLowerCase();
+
+    const emailRows = excludeId
+      ? await sql`SELECT id FROM users WHERE lower(email) = ${emailQ} AND id <> ${excludeId} LIMIT 1`
+      : await sql`SELECT id FROM users WHERE lower(email) = ${emailQ} LIMIT 1`;
+    if (emailRows.length > 0) throw new Error("El correo ya está registrado.");
+
+    const userRows = excludeId
+      ? await sql`SELECT id FROM users WHERE lower(username) = ${userQ} AND id <> ${excludeId} LIMIT 1`
+      : await sql`SELECT id FROM users WHERE lower(username) = ${userQ} LIMIT 1`;
+    if (userRows.length > 0) throw new Error("El nombre de usuario ya existe.");
+  }
+
+  async createUser(input: CreateUserInput): Promise<AuthUser> {
+    await this.ensureSeedAdmin();
+    const sql = requireSql();
+    await this.assertUnique(input.email, input.username);
+
+    const id = `usr-${Date.now()}`;
+    await sql`
+      INSERT INTO users (id, username, email, password_hash, name, role, active, avatar_url)
+      VALUES (
+        ${id},
+        ${input.username.trim()},
+        ${input.email.trim()},
+        ${hashPassword(input.password)},
+        ${input.name.trim()},
+        ${input.role},
+        ${input.active ?? true},
+        ''
+      )
+    `;
+    const user = await this.findById(id);
+    if (!user) throw new Error("No se pudo crear el usuario.");
+    return user;
+  }
+
+  async updateUser(id: string, input: UpdateUserInput): Promise<AuthUser> {
+    await this.assertUnique(input.email, input.username, id);
+    const sql = requireSql();
+    await sql`
+      UPDATE users SET
+        username = ${input.username.trim()},
+        email = ${input.email.trim()},
+        name = ${input.name.trim()},
+        role = ${input.role},
+        active = ${input.active}
+      WHERE id = ${id}
+    `;
+    const user = await this.findById(id);
+    if (!user) throw new Error("Usuario no encontrado.");
+    return user;
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    const sql = requireSql();
+    const admins = await sql`
+      SELECT id FROM users WHERE role = 'administrador' AND active = true
+    `;
+    if (admins.length <= 1) {
+      const target = await this.findById(id);
+      if (target?.role === "administrador") {
+        throw new Error("No puedes eliminar el único administrador activo.");
+      }
+    }
+    await sql`DELETE FROM users WHERE id = ${id}`;
+  }
+
+  async setActive(id: string, active: boolean): Promise<AuthUser> {
+    const sql = requireSql();
+    if (!active) {
+      const user = await this.findById(id);
+      if (user?.role === "administrador") {
+        const admins = await sql`
+          SELECT id FROM users WHERE role = 'administrador' AND active = true AND id <> ${id}
+        `;
+        if (admins.length === 0) {
+          throw new Error("Debe existir al menos un administrador activo.");
+        }
+      }
+    }
+    await sql`UPDATE users SET active = ${active} WHERE id = ${id}`;
+    const updated = await this.findById(id);
+    if (!updated) throw new Error("Usuario no encontrado.");
+    return updated;
+  }
+
+  async changePassword(id: string, newPassword: string): Promise<void> {
+    const sql = requireSql();
+    await sql`
+      UPDATE users SET password_hash = ${hashPassword(newPassword)} WHERE id = ${id}
+    `;
+  }
+
+  async changePasswordWithCurrent(id: string, input: ChangePasswordInput): Promise<void> {
+    const sql = requireSql();
+    const rows = await sql`
+      SELECT password_hash FROM users WHERE id = ${id} LIMIT 1
+    `;
+    const row = rows[0] as { password_hash: string } | undefined;
+    if (!row || !verifyPassword(input.currentPassword, row.password_hash)) {
+      throw new Error("La contraseña actual no es correcta.");
+    }
+    await this.changePassword(id, input.newPassword);
+  }
+
+  async updateProfile(id: string, input: UpdateProfileInput): Promise<AuthUser> {
+    await this.assertUnique(input.email, input.username, id);
+    const sql = requireSql();
+    await sql`
+      UPDATE users SET
+        name = ${input.name.trim()},
+        email = ${input.email.trim()},
+        username = ${input.username.trim()}
+      WHERE id = ${id}
+    `;
+    const user = await this.findById(id);
+    if (!user) throw new Error("Usuario no encontrado.");
+    return user;
+  }
 }
 
 export function getAuthRepository(): AuthRepository {
-  if (getSql()) return new PostgresAuthRepository();
-  return new MockAuthRepository();
+  return new PostgresAuthRepository();
 }
 
-/** Rol → ruta de inicio tras login. */
 export function redirectForRole(role: AuthRole): "/admin" | "/dashboard" {
   return role === "asesora" ? "/dashboard" : "/admin";
 }
 
 export function authUserToPublicUser(user: AuthUser) {
-  const roleLabels: Record<AuthRole, string> = {
-    administrador: "Administrador",
-    supervisor: "Supervisor",
-    asesora: "Asesora Comercial",
-    sistema: "Sistema",
-  };
   return {
     id: user.id,
     name: user.name,
     email: user.email,
     username: user.username,
-    role: roleLabels[user.role],
+    role: AUTH_ROLE_LABELS[user.role],
+    roleKey: user.role,
     avatarUrl: user.avatarUrl,
+    active: user.active,
   };
 }

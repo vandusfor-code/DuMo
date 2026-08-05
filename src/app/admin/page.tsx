@@ -32,7 +32,7 @@ export default function AdminDashboardPage() {
   return (
     <div>
       <AdminPageHeader
-        title="Dashboard Ejecutivo"
+        title="Dashboard"
         subtitle="Resumen general del negocio"
       />
 

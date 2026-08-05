@@ -6,7 +6,7 @@ import type {
   AdminCommissionStatus,
 } from "@/types/admin-commission";
 import { ADMIN_SALES_MOCK } from "@/data/mock/admin-sales.mock";
-import { ADMIN_ADVISORS_MOCK } from "@/data/mock/admin-leads.mock";
+import { getAuthRepository } from "@/repositories/auth.repository";
 import { getCommercialConfigurationRepository } from "@/repositories/commercial-configuration.repository";
 import { withLatency } from "@/lib/mock";
 
@@ -29,9 +29,10 @@ class MockCommissionRepository implements CommissionRepository {
   async list(filters: AdminCommissionFilters): Promise<AdminCommissionResult> {
     const configRepo = getCommercialConfigurationRepository();
     const config = await configRepo.getSnapshot();
+    const advisors = await getAuthRepository().listByRole("asesora");
 
     const rows = await Promise.all(
-      ADMIN_ADVISORS_MOCK.map(async (advisor) => {
+      advisors.map(async (advisor) => {
         const advisorSales = ADMIN_SALES_MOCK.filter(
           (s) => s.advisor === advisor.name && inPeriod(s.date, filters),
         );

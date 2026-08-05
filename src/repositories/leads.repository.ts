@@ -12,13 +12,11 @@ import type {
 import type { ChatMessage } from "@/types/conversation";
 import { PLANS_MOCK } from "@/data/mock/leads.mock";
 import {
-  ADMIN_ADVISORS_MOCK,
-  ADMIN_CONVERSATIONS_MOCK,
-  LEAD_NOTES_MOCK,
   buildTimeline,
   getDefaultClientProfile,
   getMockMessages,
 } from "@/data/mock/admin-leads.mock";
+import { getAuthRepository } from "@/repositories/auth.repository";
 import { withLatency } from "@/lib/mock";
 import { businessDateISO } from "@/lib/date";
 import { getSheetsClient, type GoogleSheetsClient } from "@/server/google/sheets-client";
@@ -59,8 +57,8 @@ function buildLead(id: string, input: SaveLeadInput): Lead {
 /* ----------------------------- Mock ----------------------------- */
 
 class MockLeadRepository implements LeadRepository {
-  private conversations = [...ADMIN_CONVERSATIONS_MOCK];
-  private notes = [...LEAD_NOTES_MOCK];
+  private conversations: AdminConversation[] = [];
+  private notes: LeadNote[] = [];
 
   getPlans() {
     return withLatency(PLANS_MOCK);
@@ -74,7 +72,13 @@ class MockLeadRepository implements LeadRepository {
   }
 
   listAdvisors() {
-    return withLatency([...ADMIN_ADVISORS_MOCK]);
+    return getAuthRepository()
+      .listUsers()
+      .then((users) =>
+        users
+          .filter((u) => u.active && (u.role === "asesora" || u.role === "supervisor"))
+          .map((u) => ({ id: u.id, name: u.name, avatarUrl: u.avatarUrl || undefined })),
+      );
   }
 
   getMessages(conversationId: string) {
@@ -93,14 +97,14 @@ class MockLeadRepository implements LeadRepository {
     });
   }
 
-  assignAdvisor(input: AssignAdvisorInput) {
+  async assignAdvisor(input: AssignAdvisorInput) {
     const idx = this.conversations.findIndex((c) => c.id === input.conversationId);
     if (idx === -1) throw new Error("Conversación no encontrada");
-    const advisor = ADMIN_ADVISORS_MOCK.find((a) => a.id === input.advisorId);
+    const advisor = (await getAuthRepository().listUsers()).find((a) => a.id === input.advisorId);
     if (!advisor) throw new Error("Asesora no encontrada");
     this.conversations[idx] = {
       ...this.conversations[idx],
-      assignedAdvisor: advisor,
+      assignedAdvisor: { id: advisor.id, name: advisor.name, avatarUrl: advisor.avatarUrl || undefined },
       status: this.conversations[idx].status === "nuevo" ? "asignado" : this.conversations[idx].status,
     };
     return withLatency(this.conversations[idx]);
@@ -187,11 +191,17 @@ class SheetsLeadRepository implements LeadRepository {
   }
 
   listAdminConversations() {
-    return withLatency(ADMIN_CONVERSATIONS_MOCK);
+    return withLatency([]);
   }
 
   listAdvisors() {
-    return withLatency(ADMIN_ADVISORS_MOCK);
+    return getAuthRepository()
+      .listUsers()
+      .then((users) =>
+        users
+          .filter((u) => u.active && (u.role === "asesora" || u.role === "supervisor"))
+          .map((u) => ({ id: u.id, name: u.name, avatarUrl: u.avatarUrl || undefined })),
+      );
   }
 
   getMessages(conversationId: string) {
@@ -199,23 +209,15 @@ class SheetsLeadRepository implements LeadRepository {
   }
 
   getAdminDetail(conversationId: string) {
-    const conversation = ADMIN_CONVERSATIONS_MOCK.find((c) => c.id === conversationId);
-    if (!conversation) throw new Error("Conversación no encontrada");
-    return withLatency({
-      conversation,
-      messages: getMockMessages(conversationId),
-      notes: LEAD_NOTES_MOCK.filter((n) => n.conversationId === conversationId),
-      timeline: buildTimeline(conversationId),
-      client: getDefaultClientProfile(conversationId),
-    });
+    return Promise.reject(new Error("Conversación no encontrada"));
   }
 
   assignAdvisor(_input: AssignAdvisorInput): Promise<AdminConversation> {
     return Promise.reject(new Error("Asignación admin no implementada en Sheets aún"));
   }
 
-  listNotes(conversationId: string) {
-    return withLatency(LEAD_NOTES_MOCK.filter((n) => n.conversationId === conversationId));
+  listNotes(_conversationId: string) {
+    return withLatency([]);
   }
 
   addNote(_input: UpsertLeadNoteInput): Promise<LeadNote> {

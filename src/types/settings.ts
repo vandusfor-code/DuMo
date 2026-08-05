@@ -62,7 +62,6 @@ export interface SettingsSnapshot {
   company: CompanySettings;
   whatsapp: WhatsAppSettings;
   googleSheets: GoogleSheetsSettings;
-  users: SystemUser[];
   system: SystemStatus;
   logs: SystemLog[];
 }

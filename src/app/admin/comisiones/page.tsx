@@ -13,7 +13,7 @@ import {
   useAdminCommissions,
   useMarkCommissionPaid,
 } from "@/hooks/use-admin-commissions";
-import { useAdminAdvisors } from "@/hooks/use-admin-leads";
+import { useAdminUsers } from "@/hooks/use-admin-users";
 import type { AdminCommissionFilters } from "@/types/admin-commission";
 
 export default function AdminComisionesPage() {
@@ -23,7 +23,8 @@ export default function AdminComisionesPage() {
     advisor: "all",
     status: "all",
   });
-  const { data: advisors = [] } = useAdminAdvisors();
+  const { data: users = [] } = useAdminUsers();
+  const advisors = users.filter((u) => u.roleKey === "asesora").map((u) => ({ id: u.id, name: u.name }));
   const { data, isLoading, isError, refetch } = useAdminCommissions(filters);
   const markPaid = useMarkCommissionPaid();
 

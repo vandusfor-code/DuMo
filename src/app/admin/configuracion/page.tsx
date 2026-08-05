@@ -5,10 +5,8 @@ import { SettingsSections } from "@/components/admin/settings/settings-panels";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/shared/error-state";
 import {
-  useDeleteSystemUser,
   useSettings,
   useTestGoogleSheets,
-  useToggleSystemUser,
   useUpdateCompany,
   useUpdateGoogleSheets,
   useUpdateWhatsApp,
@@ -20,14 +18,12 @@ export default function AdminConfiguracionPage() {
   const updateWhatsApp = useUpdateWhatsApp();
   const updateGoogleSheets = useUpdateGoogleSheets();
   const testSheets = useTestGoogleSheets();
-  const toggleUser = useToggleSystemUser();
-  const deleteUser = useDeleteSystemUser();
 
   return (
     <div>
       <AdminPageHeader
         title="Configuración"
-        subtitle="Configuración general del sistema — empresa, integraciones y usuarios"
+        subtitle="Configuración general del sistema — empresa e integraciones"
       />
 
       {isError ? (
@@ -45,8 +41,6 @@ export default function AdminConfiguracionPage() {
           onSaveWhatsApp={(v) => updateWhatsApp.mutate(v)}
           onSaveGoogleSheets={(v) => updateGoogleSheets.mutate(v)}
           onTestGoogleSheets={() => testSheets.mutate()}
-          onToggleUser={(id, active) => toggleUser.mutate({ id, active })}
-          onDeleteUser={(id) => deleteUser.mutate(id)}
         />
       )}
     </div>
