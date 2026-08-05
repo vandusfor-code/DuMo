@@ -8,5 +8,7 @@ export function useAdminDashboard() {
   return useQuery({
     queryKey: ["admin", "dashboard"],
     queryFn: () => apiGet<AdminDashboardData>("/api/admin/dashboard"),
+    retry: 1,
+    staleTime: 30_000,
   });
 }

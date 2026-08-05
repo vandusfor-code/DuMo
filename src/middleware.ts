@@ -74,15 +74,19 @@ export async function middleware(request: NextRequest) {
     return res;
   }
 
-  // Renueva la cookie en cada navegación para que F5 no pierda la sesión.
-  const secure = isSecureRequest(
-    request.headers.get("x-forwarded-proto"),
-    request.nextUrl.protocol,
-  );
-  const freshToken = await createSessionTokenEdge(payload.userId);
-  const res = NextResponse.next();
-  res.cookies.set(SESSION_COOKIE, freshToken, sessionCookieOptionsEdge(secure));
-  return res;
+  // Renueva la cookie solo en navegación de páginas (no en cada API fetch).
+  if (!pathname.startsWith("/api/")) {
+    const secure = isSecureRequest(
+      request.headers.get("x-forwarded-proto"),
+      request.nextUrl.protocol,
+    );
+    const freshToken = await createSessionTokenEdge(payload.userId);
+    const res = NextResponse.next();
+    res.cookies.set(SESSION_COOKIE, freshToken, sessionCookieOptionsEdge(secure));
+    return res;
+  }
+
+  return NextResponse.next();
 }
 
 export const config = {

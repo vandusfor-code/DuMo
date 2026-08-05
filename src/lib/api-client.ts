@@ -29,12 +29,24 @@ async function parseError(res: Response): Promise<never> {
 }
 
 export async function apiGet<T>(url: string): Promise<T> {
-  const res = await fetch(url, {
-    headers: { Accept: "application/json" },
-    credentials: "include",
-  });
-  if (!res.ok) await parseError(res);
-  return res.json() as Promise<T>;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15_000);
+  try {
+    const res = await fetch(url, {
+      headers: { Accept: "application/json" },
+      credentials: "include",
+      signal: controller.signal,
+    });
+    if (!res.ok) await parseError(res);
+    return res.json() as Promise<T>;
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new ApiError(408, "La solicitud tardó demasiado. Intenta de nuevo.");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function apiPost<T>(url: string, body: unknown): Promise<T> {

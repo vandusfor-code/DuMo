@@ -30,7 +30,9 @@ const SETTINGS_KEY = "commercial_settings";
 class PostgresCommercialConfigurationRepository implements CommercialConfigurationRepository {
   private async loadPlans(): Promise<CommercialPlan[]> {
     const stored = await getConfig<CommercialPlan[] | null>(PLANS_KEY, null);
-    if (stored && stored.length > 0) return stored;
+    if (stored !== null) {
+      return stored.length > 0 ? stored : [...COMMERCIAL_PLANS_MOCK];
+    }
     try {
       await setConfig(PLANS_KEY, COMMERCIAL_PLANS_MOCK);
     } catch (err) {

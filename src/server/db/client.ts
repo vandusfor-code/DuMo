@@ -64,6 +64,21 @@ export async function withDbRetry<T>(fn: () => Promise<T>, retries = 3): Promise
   throw lastError;
 }
 
+/** Evita que consultas colgadas dejen la UI en skeleton eterno. */
+export async function withQueryTimeout<T>(promise: Promise<T>, ms = 8000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`Query timeout (${ms}ms)`)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function runMigrations(sql: Sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS lead_conversations (

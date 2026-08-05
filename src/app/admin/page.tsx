@@ -25,7 +25,32 @@ import { MonthlyGoalCard } from "@/components/admin/monthly-goal-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QueryStaleBanner, shouldShowFatalQueryError } from "@/components/shared/query-state";
 import { ErrorState } from "@/components/shared/error-state";
+import { ADMIN_DASHBOARD_MOCK } from "@/data/mock/admin-dashboard.mock";
 import { useAdminDashboard } from "@/hooks/use-admin-dashboard";
+
+function EmptyDashboardFallback() {
+  const empty = ADMIN_DASHBOARD_MOCK;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-card border border-line bg-card p-8 text-center"
+    >
+      <p className="text-[15px] font-medium text-ink">Sin datos de ventas aún</p>
+      <p className="mt-2 text-[14px] text-muted">
+        El dashboard mostrará KPIs cuando registres ventas en el sistema.
+      </p>
+      <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {Object.values(empty.kpis).slice(0, 4).map((kpi, i) => (
+          <div key={i} className="rounded-xl bg-canvas px-4 py-3">
+            <p className="text-[12px] text-muted">KPI</p>
+            <p className="text-[18px] font-bold text-ink">{kpi.value}</p>
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
 
 export default function AdminDashboardPage() {
   const query = useAdminDashboard();
@@ -97,7 +122,9 @@ export default function AdminDashboardPage() {
             <RecentActivityCard activity={data.activity} />
           </div>
         </motion.div>
-          ) : null}
+          ) : (
+            <EmptyDashboardFallback />
+          )}
         </>
       )}
     </div>

@@ -20,7 +20,8 @@ import { formatCurrency } from "@/lib/format";
 import { getAuthRepository } from "@/repositories/auth.repository";
 import { getCommercialConfigurationRepository } from "@/repositories/commercial-configuration.repository";
 import { getConfig } from "@/server/db/app-config";
-import { ensureSchema, getSql, withDbRetry } from "@/server/db/client";
+import { ADMIN_DASHBOARD_MOCK } from "@/data/mock/admin-dashboard.mock";
+import { ensureSchema, getSql, withDbRetry, withQueryTimeout } from "@/server/db/client";
 import {
   adminDateInPeriod,
   adminTypeToCanonical,
@@ -122,15 +123,30 @@ async function fetchSalesWithLineCounts(): Promise<SaleRow[]> {
   await ensureSchema();
   const sql = getSql();
   if (!sql) return [];
-  return withDbRetry(() =>
-    sql<SaleRow[]>`
-      SELECT s.*, COUNT(l.id)::int AS line_count
-      FROM sales s
-      LEFT JOIN sale_lines l ON l.sale_id = s.id
-      GROUP BY s.id
-      ORDER BY s.sale_date DESC, s.created_at DESC
-    `,
+  return withQueryTimeout(
+    withDbRetry(() =>
+      sql<SaleRow[]>`
+        SELECT s.*, COUNT(l.id)::int AS line_count
+        FROM sales s
+        LEFT JOIN sale_lines l ON l.sale_id = s.id
+        GROUP BY s.id
+        ORDER BY s.sale_date DESC, s.created_at DESC
+      `,
+    ),
+    8000,
   );
+}
+
+function monthExpenseBounds(monthKey: string): { start: string; end: string } {
+  const [yearStr, monthStr] = monthKey.split("-");
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const start = `${monthKey}-01`;
+  const end =
+    month >= 12
+      ? `${year + 1}-01-01`
+      : `${year}-${String(month + 1).padStart(2, "0")}-01`;
+  return { start, end };
 }
 
 export class PostgresSalesStore {
@@ -589,143 +605,157 @@ export class PostgresSalesStore {
   }
 
   async getAdminDashboard(): Promise<AdminDashboardData> {
-    const configRepo = getCommercialConfigurationRepository();
-    const config = await configRepo.getSnapshot();
-    const rows = await fetchSalesWithLineCounts();
-    const adminSales = rows.map(rowToAdminSale);
+    try {
+      const configRepo = getCommercialConfigurationRepository();
+      const [config, rows] = await Promise.all([
+        withQueryTimeout(configRepo.getSnapshot(), 8000),
+        fetchSalesWithLineCounts(),
+      ]);
+      const adminSales = rows.map(rowToAdminSale);
 
-    const todayIso = businessDateISO();
-    const todayAdmin = toAdminDate(todayIso);
-    const monthKey = businessMonth();
+      const todayIso = businessDateISO();
+      const todayAdmin = toAdminDate(todayIso);
+      const monthKey = businessMonth();
 
-    const todaySales = adminSales.filter((s) => s.date === todayAdmin);
-    const monthSales = adminSales.filter((s) => {
-      const [, m, y] = s.date.split("/");
-      return `${y}-${m}` === monthKey;
-    });
-
-    const finishedToday = todaySales.filter((s) => s.status === "finalizada").length;
-    const inDelivery = monthSales.filter((s) => s.status === "en_reparto").length;
-    const finalizedMonth = monthSales.filter((s) => s.status === "finalizada").length;
-    const conversion =
-      monthSales.length > 0
-        ? Math.round((finalizedMonth / monthSales.length) * 1000) / 10
-        : 0;
-
-    const income = monthSales
-      .filter((s) => s.status === "finalizada")
-      .reduce((sum, s) => sum + s.operatorValue * s.lines, 0);
-
-    await ensureSchema();
-    const sql = getSql();
-    let expenses = 0;
-    let budget = 0;
-    if (sql) {
-      const expenseRows = await withDbRetry(() =>
-        sql<{ amount: number | string }[]>`
-          SELECT amount FROM accounting_expenses
-          WHERE date LIKE ${`${monthKey}%`}
-        `,
-      );
-      expenses = expenseRows.reduce((s, e) => s + (Number(e.amount) || 0), 0);
-      budget = await getConfig<number>("accounting_monthly_budget", 0);
-    }
-
-    const profit = income - expenses;
-    const budgetLeft = budget - expenses;
-    const monthlyGoal = config.settings.monthlyGoal || 0;
-    const progress =
-      monthlyGoal > 0 ? Math.round((monthSales.length / monthlyGoal) * 100) : 0;
-
-    const byAdvisor = new Map<string, number>();
-    for (const s of monthSales) {
-      byAdvisor.set(s.advisor, (byAdvisor.get(s.advisor) ?? 0) + 1);
-    }
-
-    const byType = new Map<string, number>();
-    for (const s of monthSales) {
-      byType.set(s.type, (byType.get(s.type) ?? 0) + 1);
-    }
-
-    const byStatus = new Map<string, number>();
-    for (const s of monthSales) {
-      byStatus.set(s.status, (byStatus.get(s.status) ?? 0) + 1);
-    }
-
-    const salesByDay = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - (6 - i));
-      const label = d.toLocaleDateString("es-CL", { weekday: "short", day: "numeric" });
-      const adminD = toAdminDate(businessDateISO(d));
-      return { label, value: adminSales.filter((s) => s.date === adminD).length };
-    });
-
-    const activity = adminSales.slice(0, 8).map((s) => ({
-      time: s.time.replace(/\s/g, " ").slice(0, 8),
-      person: s.advisor,
-      action: `registró venta ${s.id}`,
-    }));
-
-    const alerts = [];
-    if (monthlyGoal > 0 && progress < 80) {
-      alerts.push({
-        kind: "goal" as const,
-        message: `Meta mensual al ${progress}% — faltan ${Math.max(0, monthlyGoal - monthSales.length)} ventas.`,
-        progress,
+      const todaySales = adminSales.filter((s) => s.date === todayAdmin);
+      const monthSales = adminSales.filter((s) => {
+        const [, m, y] = s.date.split("/");
+        return `${y}-${m}` === monthKey;
       });
-    }
-    if (budget > 0 && expenses > budget * 0.85) {
-      alerts.push({
-        kind: "budget" as const,
-        message: `Gastos al ${Math.round((expenses / budget) * 100)}% del presupuesto.`,
-      });
-    }
-    if (inDelivery > 0) {
-      alerts.push({
-        kind: "delivery" as const,
-        message: `${inDelivery} ventas en reparto pendientes de cierre.`,
-      });
-    }
 
-    const kpi = (value: string, deltaLabel = "mes actual") => ({
-      value,
-      delta: 0,
-      deltaLabel,
-    });
+      const finishedToday = todaySales.filter((s) => s.status === "finalizada").length;
+      const inDelivery = monthSales.filter((s) => s.status === "en_reparto").length;
+      const finalizedMonth = monthSales.filter((s) => s.status === "finalizada").length;
+      const conversion =
+        monthSales.length > 0
+          ? Math.round((finalizedMonth / monthSales.length) * 1000) / 10
+          : 0;
 
-    return {
-      kpis: {
-        salesToday: kpi(String(todaySales.length), "vs ayer"),
-        finishedToday: kpi(String(finishedToday), "vs ayer"),
-        inDelivery: kpi(String(inDelivery)),
-        salesMonth: kpi(String(monthSales.length), "vs mes anterior"),
-        conversion: kpi(`${conversion}%`),
-        profit: kpi(formatCurrency(profit)),
-        expenses: kpi(formatCurrency(expenses)),
-        budgetLeft: kpi(formatCurrency(budgetLeft)),
-      },
-      salesByAdvisor: [...byAdvisor.entries()]
-        .map(([label, value]) => ({ label, value }))
-        .sort((a, b) => b.value - a.value),
-      salesByDay,
-      salesByType: [...byType.entries()].map(([key, value]) => ({
-        label: ADMIN_TYPE_LABELS[key as keyof typeof ADMIN_TYPE_LABELS] ?? key,
+      const income = monthSales
+        .filter((s) => s.status === "finalizada")
+        .reduce((sum, s) => sum + s.operatorValue * s.lines, 0);
+
+      let expenses = 0;
+      let budget = 0;
+      const sql = getSql();
+      if (sql) {
+        const { start, end } = monthExpenseBounds(monthKey);
+        try {
+          const expenseRows = await withQueryTimeout(
+            withDbRetry(() =>
+              sql<{ amount: number | string }[]>`
+                SELECT amount FROM accounting_expenses
+                WHERE date >= ${start}::date AND date < ${end}::date
+              `,
+            ),
+            5000,
+          );
+          expenses = expenseRows.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+          budget = await withQueryTimeout(getConfig<number>("accounting_monthly_budget", 0), 5000);
+        } catch (err) {
+          console.error("[getAdminDashboard] expenses/budget", err);
+        }
+      }
+
+      const profit = income - expenses;
+      const budgetLeft = budget - expenses;
+      const monthlyGoal = config.settings.monthlyGoal || 0;
+      const progress =
+        monthlyGoal > 0 ? Math.round((monthSales.length / monthlyGoal) * 100) : 0;
+
+      const byAdvisor = new Map<string, number>();
+      for (const s of monthSales) {
+        byAdvisor.set(s.advisor, (byAdvisor.get(s.advisor) ?? 0) + 1);
+      }
+
+      const byType = new Map<string, number>();
+      for (const s of monthSales) {
+        byType.set(s.type, (byType.get(s.type) ?? 0) + 1);
+      }
+
+      const byStatus = new Map<string, number>();
+      for (const s of monthSales) {
+        byStatus.set(s.status, (byStatus.get(s.status) ?? 0) + 1);
+      }
+
+      const salesByDay = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - (6 - i));
+        const label = d.toLocaleDateString("es-CL", { weekday: "short", day: "numeric" });
+        const adminD = toAdminDate(businessDateISO(d));
+        return { label, value: adminSales.filter((s) => s.date === adminD).length };
+      });
+
+      const activity = adminSales.slice(0, 8).map((s) => ({
+        time: s.time.replace(/\s/g, " ").slice(0, 8),
+        person: s.advisor,
+        action: `registró venta ${s.id}`,
+      }));
+
+      const alerts = [];
+      if (monthlyGoal > 0 && progress < 80) {
+        alerts.push({
+          kind: "goal" as const,
+          message: `Meta mensual al ${progress}% — faltan ${Math.max(0, monthlyGoal - monthSales.length)} ventas.`,
+          progress,
+        });
+      }
+      if (budget > 0 && expenses > budget * 0.85) {
+        alerts.push({
+          kind: "budget" as const,
+          message: `Gastos al ${Math.round((expenses / budget) * 100)}% del presupuesto.`,
+        });
+      }
+      if (inDelivery > 0) {
+        alerts.push({
+          kind: "delivery" as const,
+          message: `${inDelivery} ventas en reparto pendientes de cierre.`,
+        });
+      }
+
+      const kpi = (value: string, deltaLabel = "mes actual") => ({
         value,
-      })),
-      salesByStatus: [...byStatus.entries()].map(([key, value]) => ({
-        label: ADMIN_STATUS_LABELS[key as keyof typeof ADMIN_STATUS_LABELS] ?? key,
-        value,
-      })),
-      alerts,
-      activity,
-      monthlyGoal: {
-        goal: monthlyGoal,
-        current: income,
-        progress,
-        remaining: Math.max(0, monthlyGoal - monthSales.length),
-        salesNeeded: Math.max(0, monthlyGoal - monthSales.length),
-      },
-    };
+        delta: 0,
+        deltaLabel,
+      });
+
+      return {
+        kpis: {
+          salesToday: kpi(String(todaySales.length), "vs ayer"),
+          finishedToday: kpi(String(finishedToday), "vs ayer"),
+          inDelivery: kpi(String(inDelivery)),
+          salesMonth: kpi(String(monthSales.length), "vs mes anterior"),
+          conversion: kpi(`${conversion}%`),
+          profit: kpi(formatCurrency(profit)),
+          expenses: kpi(formatCurrency(expenses)),
+          budgetLeft: kpi(formatCurrency(budgetLeft)),
+        },
+        salesByAdvisor: [...byAdvisor.entries()]
+          .map(([label, value]) => ({ label, value }))
+          .sort((a, b) => b.value - a.value),
+        salesByDay,
+        salesByType: [...byType.entries()].map(([key, value]) => ({
+          label: ADMIN_TYPE_LABELS[key as keyof typeof ADMIN_TYPE_LABELS] ?? key,
+          value,
+        })),
+        salesByStatus: [...byStatus.entries()].map(([key, value]) => ({
+          label: ADMIN_STATUS_LABELS[key as keyof typeof ADMIN_STATUS_LABELS] ?? key,
+          value,
+        })),
+        alerts,
+        activity,
+        monthlyGoal: {
+          goal: monthlyGoal,
+          current: income,
+          progress,
+          remaining: Math.max(0, monthlyGoal - monthSales.length),
+          salesNeeded: Math.max(0, monthlyGoal - monthSales.length),
+        },
+      };
+    } catch (err) {
+      console.error("[getAdminDashboard]", err);
+      return { ...ADMIN_DASHBOARD_MOCK };
+    }
   }
 }
 
