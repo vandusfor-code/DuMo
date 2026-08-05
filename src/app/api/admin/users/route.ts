@@ -1,35 +1,34 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { authService } from "@/services/auth.service";
-import { adminUsersService } from "@/services/admin-users.service";
 import { authUserToPublicUser } from "@/repositories/auth.repository";
+import { withAdminFallback } from "@/lib/admin-api-fallbacks";
+import { requireAdminSession } from "@/lib/require-admin";
+import { adminUsersService } from "@/services/admin-users.service";
 import type { CreateUserInput, UpdateUserInput } from "@/types/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-async function requireAdmin() {
-  const user = await authService.getSessionUser();
-  if (!user) return null;
-  if (user.role !== "administrador" && user.role !== "supervisor") return null;
-  return user;
-}
+export const maxDuration = 15;
 
 export async function GET() {
-  try {
-    if (!(await requireAdmin())) {
-      return NextResponse.json({ error: "No autorizado." }, { status: 403 });
-    }
-    const users = await adminUsersService.list();
-    return NextResponse.json(users.map(authUserToPublicUser));
-  } catch (error) {
-    console.error("[GET /api/admin/users]", error);
-    return NextResponse.json({ error: "No se pudieron cargar los usuarios." }, { status: 500 });
+  const session = await requireAdminSession();
+  if (!session) {
+    return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
+
+  const users = await withAdminFallback(
+    async () => {
+      const list = await adminUsersService.list();
+      return list.map(authUserToPublicUser);
+    },
+    [],
+    "GET /api/admin/users",
+  );
+  return NextResponse.json(users);
 }
 
 export async function POST(request: NextRequest) {
   try {
-    if (!(await requireAdmin())) {
+    if (!(await requireAdminSession())) {
       return NextResponse.json({ error: "No autorizado." }, { status: 403 });
     }
     const body = (await request.json()) as CreateUserInput;
@@ -47,7 +46,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    if (!(await requireAdmin())) {
+    if (!(await requireAdminSession())) {
       return NextResponse.json({ error: "No autorizado." }, { status: 403 });
     }
     const body = await request.json();
@@ -62,7 +61,7 @@ export async function PUT(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    if (!(await requireAdmin())) {
+    if (!(await requireAdminSession())) {
       return NextResponse.json({ error: "No autorizado." }, { status: 403 });
     }
     const body = await request.json();
@@ -84,7 +83,7 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    if (!(await requireAdmin())) {
+    if (!(await requireAdminSession())) {
       return NextResponse.json({ error: "No autorizado." }, { status: 403 });
     }
     const id = request.nextUrl.searchParams.get("id");

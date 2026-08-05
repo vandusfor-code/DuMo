@@ -267,14 +267,18 @@ export function ensureSchema(): Promise<void> {
   if (!sql) return Promise.resolve();
 
   if (!schemaPromise) {
-    schemaPromise = withDbRetry(() => runMigrations(sql))
+    schemaPromise = withQueryTimeout(
+      withDbRetry(() => runMigrations(sql)),
+      12_000,
+    )
       .then(() => {
         schemaReady = true;
       })
       .catch((err) => {
         schemaPromise = null;
         console.error("[ensureSchema]", err);
-        throw err;
+        // Evita bloquear cada request si la migración falla pero las tablas ya existen.
+        schemaReady = true;
       });
   }
   return schemaPromise;

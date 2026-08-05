@@ -1,21 +1,20 @@
 import { NextResponse } from "next/server";
-import { usersService } from "@/services/users.service";
+import { authUserToPublicUser } from "@/repositories/auth.repository";
+import { authService } from "@/services/auth.service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 15;
 
 export async function GET() {
   try {
-    const user = await usersService.getCurrentUser();
+    const user = await authService.getSessionUser();
     if (!user) {
       return NextResponse.json({ error: "No autenticado." }, { status: 401 });
     }
-    return NextResponse.json(user);
+    return NextResponse.json(authUserToPublicUser(user));
   } catch (error) {
     console.error("[GET /api/users/me]", error);
-    return NextResponse.json(
-      { error: "No se pudo cargar el usuario." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "No autenticado." }, { status: 401 });
   }
 }

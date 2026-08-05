@@ -10,8 +10,28 @@ import {
   createSessionToken,
   sessionCookieOptions,
   verifySessionToken,
+  type SessionPayload,
 } from "@/lib/auth/session-cookie";
-import type { AuthUser, LoginResult } from "@/types/auth";
+import { verifySessionTokenEdge } from "@/lib/auth/session-edge";
+import type { AuthRole, AuthUser, LoginResult } from "@/types/auth";
+import { withQueryTimeout } from "@/server/db/client";
+
+async function resolveSessionPayload(token: string): Promise<SessionPayload | null> {
+  return verifySessionToken(token) ?? (await verifySessionTokenEdge(token));
+}
+
+function userFromPayload(payload: SessionPayload): AuthUser | null {
+  if (!payload.role) return null;
+  return {
+    id: payload.userId,
+    username: "",
+    email: "",
+    name: "",
+    role: payload.role as AuthRole,
+    active: true,
+    avatarUrl: "",
+  };
+}
 
 export const authService = {
   async login(login: string, password: string): Promise<LoginResult | null> {
@@ -37,12 +57,23 @@ export const authService = {
     const jar = await cookies();
     const token = jar.get(SESSION_COOKIE)?.value;
     if (!token) return null;
-    const payload = verifySessionToken(token);
+    const payload = await resolveSessionPayload(token);
     if (!payload) return null;
-    const user = await getAuthRepository().findById(payload.userId);
-    if (!user || !user.active) return null;
-    void getAuthRepository().touchLastSeen(user.id);
-    return user;
+
+    try {
+      const user = await withQueryTimeout(
+        getAuthRepository().findById(payload.userId),
+        6000,
+      );
+      if (user?.active) {
+        void getAuthRepository().touchLastSeen(user.id);
+        return user;
+      }
+    } catch (err) {
+      console.error("[getSessionUser] DB lookup failed, using JWT fallback", err);
+    }
+
+    return userFromPayload(payload);
   },
 
   async getCurrentPublicUser() {
