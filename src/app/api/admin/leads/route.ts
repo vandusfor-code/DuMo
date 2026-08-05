@@ -5,7 +5,7 @@ import { adminLeadsService } from "@/services/admin-leads.service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 15;
+export const maxDuration = 20;
 
 export async function GET(request: NextRequest) {
   const session = await requireAdminSession();
@@ -38,12 +38,15 @@ export async function GET(request: NextRequest) {
     if (conversationId) {
       const messages = p.get("messages");
       if (messages === "1") {
-        const data = await withAdminFallback(
-          () => adminLeadsService.getMessages(conversationId),
-          [],
-          "GET /api/admin/leads messages",
-        );
-        return NextResponse.json(data);
+        const data = await Promise.race([
+          adminLeadsService.getMessages(conversationId),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("GET /api/admin/leads messages timeout")), 12_000),
+          ),
+        ]);
+        return NextResponse.json(data, {
+          headers: { "Cache-Control": "no-store" },
+        });
       }
       const notes = p.get("notes");
       if (notes === "1") {
@@ -64,12 +67,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Asignar pendientes antes de listar (misma razón que en la ruta de asesora).
-    await adminLeadsService.autoAssignAllPending({ skipThrottle: true });
+    await adminLeadsService.ensurePendingAssigned();
 
     const data = await Promise.race([
       adminLeadsService.listConversations(),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("GET /api/admin/leads timeout")), 10_000),
+        setTimeout(() => reject(new Error("GET /api/admin/leads timeout")), 12_000),
       ),
     ]);
     return NextResponse.json(data, {

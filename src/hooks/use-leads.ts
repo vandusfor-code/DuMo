@@ -14,16 +14,23 @@ export const leadKeys = {
 
 /** Bandeja de conversaciones — misma función para Leads y notificaciones. */
 export function fetchAdvisorConversations() {
-  return advisorApiGet<Conversation[]>("/api/leads/conversations");
+  return advisorApiGet<Conversation[]>("/api/leads/conversations", 18_000);
+}
+
+export function fetchConversationMessages(conversationId: string) {
+  return advisorApiGet<ChatMessage[]>(
+    `/api/leads/conversations/${encodeURIComponent(conversationId)}/messages`,
+    18_000,
+  );
 }
 
 export function useConversations() {
   return useQuery({
     queryKey: leadKeys.conversations,
     queryFn: fetchAdvisorConversations,
-    refetchInterval: 4000,
+    refetchInterval: 6000,
     refetchIntervalInBackground: true,
-    staleTime: 0,
+    staleTime: 3000,
     retry: 2,
     placeholderData: (prev) => prev,
   });
@@ -32,14 +39,11 @@ export function useConversations() {
 export function useConversationMessages(conversationId: string | null) {
   return useQuery({
     queryKey: leadKeys.messages(conversationId ?? ""),
-    queryFn: () =>
-      advisorApiGet<ChatMessage[]>(
-        `/api/leads/conversations/${conversationId}/messages`,
-      ),
+    queryFn: () => fetchConversationMessages(conversationId!),
     enabled: Boolean(conversationId),
-    refetchInterval: 3000,
+    refetchInterval: 5000,
     refetchIntervalInBackground: true,
-    staleTime: 0,
+    staleTime: 2000,
     retry: 2,
     placeholderData: (prev) => prev,
   });

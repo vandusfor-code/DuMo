@@ -22,11 +22,10 @@ export const leadsService = {
     return getConversationRepository().getConversations(advisorId);
   },
   async getMessages(conversationId: string): Promise<ChatMessage[]> {
-    const repo = getConversationRepository();
-    // Lee primero; marca leído después sin bloquear (ni contender) la lectura.
-    const messages = await repo.getMessages(conversationId);
-    void repo.markRead(conversationId).catch(() => {});
-    return messages;
+    return getConversationRepository().getMessages(conversationId);
+  },
+  markConversationRead(conversationId: string): Promise<void> {
+    return getConversationRepository().markRead(conversationId);
   },
   getPlans(): Promise<Plan[]> {
     return getLeadRepository().getPlans();

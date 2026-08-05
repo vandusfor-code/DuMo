@@ -90,9 +90,14 @@ type MsgRow = {
   conversation_id: string;
   direction: string;
   body: string;
-  created_at: string;
+  created_at: string | Date;
   read: boolean;
 };
+
+function isoTimestamp(value: string | Date): string {
+  if (value instanceof Date) return value.toISOString();
+  return String(value);
+}
 
 function toStatus(value: string): ConversationStatus {
   return (["new", "in_progress", "converted", "lost"] as string[]).includes(value)
@@ -138,18 +143,19 @@ class PostgresConversationRepository implements ConversationRepository {
     const rows = await withQueryTimeout(
       withDbRetry(() =>
         sql`
-          SELECT * FROM lead_messages
+          SELECT id, conversation_id, direction, body, created_at, read
+          FROM lead_messages
           WHERE conversation_id = ${conversationId}
           ORDER BY created_at ASC
         `,
       ),
-      8000,
+      10_000,
     );
     return (rows as unknown as MsgRow[]).map((r) => ({
       id: r.id,
       conversationId: r.conversation_id,
-      text: r.body,
-      time: formatChatTime(r.created_at),
+      text: r.body ?? "",
+      time: formatChatTime(isoTimestamp(r.created_at)),
       direction: r.direction === "out" ? "out" : "in",
       read: Boolean(r.read),
     }));

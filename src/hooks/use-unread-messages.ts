@@ -6,7 +6,7 @@ import { apiGet } from "@/lib/api-client";
 import { fetchAdvisorConversations, leadKeys } from "@/hooks/use-leads";
 import type { AdminConversation } from "@/types/admin-lead";
 
-export const MESSAGE_POLL_MS = 4000;
+export const MESSAGE_POLL_MS = 6000;
 
 export function useAdvisorConversationsPoll(enabled = true) {
   return useQuery({

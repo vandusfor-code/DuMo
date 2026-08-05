@@ -45,6 +45,8 @@ export interface AdminLeadsRepository {
   setAutoAssignEnabled(enabled: boolean): Promise<AutoAssignSettings>;
   autoAssignIfNeeded(conversationId: string): Promise<void>;
   autoAssignAllPending(options?: { skipThrottle?: boolean }): Promise<void>;
+  /** Asigna solo si hay chats sin asesora (consulta barata, evita saturar el pool). */
+  ensurePendingAssigned(): Promise<void>;
 }
 
 type ConvRow = {
@@ -390,6 +392,23 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
       await this.assignPendingRoundRobin(null, false);
     }
   }
+
+  async ensurePendingAssigned() {
+    const settings = await this.getAutoAssignSettings();
+    if (!settings.enabled) return;
+    await ensureSchema();
+    const sql = requireSql();
+    const pending = await withQueryTimeout(
+      sql<{ n: number }[]>`
+        SELECT 1 AS n FROM lead_conversations
+        WHERE assigned_advisor_id IS NULL
+        LIMIT 1
+      `,
+      3000,
+    );
+    if (pending.length === 0) return;
+    await this.autoAssignAllPending({ skipThrottle: true });
+  }
 }
 
 /** Throttle del barrido de auto-asignación (por instancia serverless). */
@@ -503,6 +522,10 @@ class MockAdminLeadsRepository implements AdminLeadsRepository {
   }
 
   autoAssignAllPending() {
+    return Promise.resolve();
+  }
+
+  ensurePendingAssigned() {
     return Promise.resolve();
   }
 }

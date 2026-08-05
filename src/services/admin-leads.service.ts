@@ -65,6 +65,9 @@ export const adminLeadsService = {
   autoAssignAllPending(options?: { skipThrottle?: boolean }) {
     return getAdminLeadsRepository().autoAssignAllPending(options);
   },
+  ensurePendingAssigned() {
+    return getAdminLeadsRepository().ensurePendingAssigned();
+  },
   deleteConversation(conversationId: string) {
     return getAdminLeadsRepository().deleteConversation(conversationId);
   },

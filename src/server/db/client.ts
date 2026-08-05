@@ -38,7 +38,7 @@ export function getSql(): Sql | null {
     // (polling de conversaciones + mensajes + markRead + perfil). Con max:1 se
     // encolaban todas en una sola conexión y bajo latencia de Neon se
     // congestionaban hasta el timeout. Requiere la URI con pooler de Neon.
-    max: Number(process.env.DB_POOL_MAX ?? 8) || 8,
+    max: Number(process.env.DB_POOL_MAX ?? 10) || 10,
     idle_timeout: 20,
     connect_timeout: 15,
     max_lifetime: 60 * 5,
