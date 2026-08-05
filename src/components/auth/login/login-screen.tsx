@@ -11,10 +11,10 @@ export function LoginScreen() {
 
       <div className="relative z-10 mx-auto flex w-full max-w-[1600px] flex-1 flex-col p-12">
         <div className="grid flex-1 grid-cols-1 items-center gap-12 lg:grid-cols-[45fr_55fr] lg:gap-20">
-          <div className="order-1 block md:hidden lg:block">
+          <div className="order-1 block md:hidden lg:order-1 lg:block">
             <LoginHeroPanel />
           </div>
-          <div className="order-2 md:col-span-1 lg:order-none">
+          <div className="order-2 lg:order-2">
             <LoginFormPanel />
           </div>
         </div>
