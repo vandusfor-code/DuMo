@@ -1,5 +1,5 @@
 import type { LeadLineValues } from "@/types/lead-form";
-import type { LeadSaleType } from "@/types/lead";
+import type { EquipmentMode, LeadSaleType } from "@/types/lead";
 
 /** Línea lista para persistir en una gestión de venta. */
 export function isCompleteSaleLine(line: LeadLineValues): boolean {
@@ -13,12 +13,13 @@ export function isCompleteSaleLine(line: LeadLineValues): boolean {
 }
 
 export function mapSaleLineForSave(line: LeadLineValues) {
+  const equipmentMode: EquipmentMode | "" = line.equipmentMode === "with" ? "with" : "none";
   return {
     phone: line.phone.trim(),
     saleType: line.saleType as LeadSaleType,
     planId: line.planId,
     equipment: line.equipment,
-    equipmentMode: line.equipmentMode,
+    equipmentMode,
     currentOperator: line.currentOperator,
     deliveryType: line.deliveryType,
     email: line.email,

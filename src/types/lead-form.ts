@@ -45,7 +45,7 @@ export const EMPTY_LEAD_LINE: LeadLineValues = {
   saleType: "",
   planId: "",
   equipment: "",
-  equipmentMode: "",
+  equipmentMode: "none",
   currentOperator: "",
   deliveryType: "",
   email: "",

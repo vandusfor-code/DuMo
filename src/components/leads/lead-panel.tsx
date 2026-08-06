@@ -32,6 +32,7 @@ export function LeadPanel({
   isSuccess,
   onCancel,
   savedScript,
+  scriptUnavailableReason,
 }: {
   conversation: Conversation;
   isSaving: boolean;
@@ -40,6 +41,7 @@ export function LeadPanel({
   isSuccess: boolean;
   onCancel: () => void;
   savedScript?: GeneratedSalesScript | null;
+  scriptUnavailableReason?: string | null;
 }) {
   const { control } = useFormContext<LeadFormValues>();
   const type = useWatch({ control, name: "type" });
@@ -109,7 +111,11 @@ export function LeadPanel({
           </TabsContent>
 
           <TabsContent value="script" className="outline-none">
-            <SalesScriptTab script={script} />
+            <SalesScriptTab
+              script={script}
+              gestionSaved={isSuccess}
+              unavailableReason={script ? null : scriptUnavailableReason}
+            />
           </TabsContent>
 
           <TabsContent value="notas" className="outline-none">

@@ -30,7 +30,11 @@ export const salesScriptService = {
 
     if (!script) return null;
 
-    await getLeadRepository().saveSalesScript(input.gestionId, script);
+    try {
+      await getLeadRepository().saveSalesScript(input.gestionId, script);
+    } catch (error) {
+      console.error("[salesScriptService] persist failed", error);
+    }
     return script;
   },
 

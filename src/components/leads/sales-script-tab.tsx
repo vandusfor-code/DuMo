@@ -6,16 +6,30 @@ import { Button } from "@/components/ui/button";
 import type { GeneratedSalesScript } from "@/types/sales-script";
 import { cn } from "@/lib/utils";
 
-export function SalesScriptTab({ script }: { script: GeneratedSalesScript | null | undefined }) {
+export function SalesScriptTab({
+  script,
+  unavailableReason,
+  gestionSaved,
+}: {
+  script: GeneratedSalesScript | null | undefined;
+  unavailableReason?: string | null;
+  gestionSaved?: boolean;
+}) {
   const [stepIndex, setStepIndex] = useState(0);
 
   if (!script) {
     return (
       <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-line bg-canvas/50 px-6 py-12 text-center">
         <ScrollText className="size-10 text-muted" />
-        <p className="mt-3 text-[14px] font-medium text-ink">Script no disponible</p>
-        <p className="mt-1 max-w-xs text-[13px] text-muted">
-          Guarda una gestión de venta para generar automáticamente el script de la llamada.
+        <p className="mt-3 text-[14px] font-medium text-ink">
+          {gestionSaved ? "Script no generado" : "Script no disponible"}
+        </p>
+        <p className="mt-1 max-w-sm text-[13px] text-muted">
+          {gestionSaved && unavailableReason
+            ? unavailableReason
+            : gestionSaved
+              ? "La gestión se guardó, pero no se pudo generar el script con los datos ingresados."
+              : "Guarda una gestión de venta de Portabilidad sin equipo para generar automáticamente el script de la llamada."}
         </p>
       </div>
     );

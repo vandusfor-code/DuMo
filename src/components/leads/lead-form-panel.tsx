@@ -1,18 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { useForm, FormProvider } from "react-hook-form";
 import { LeadPanel } from "./lead-panel";
 import { useSaveLead } from "@/hooks/use-leads";
 import type { Conversation } from "@/types/conversation";
 import { EMPTY_LEAD_LINE, type LeadFormValues } from "@/types/lead-form";
 import type { SaveLeadInput } from "@/types/lead";
-import type { GeneratedSalesScript } from "@/types/sales-script";
 import {
   formatSaveLeadApiError,
   isCompleteSaleLine,
   mapSaleLineForSave,
 } from "@/lib/lead-save";
+import { useForm, FormProvider } from "react-hook-form";
 
 function defaultsFor(c: Conversation): LeadFormValues {
   return {
@@ -33,7 +31,6 @@ function defaultsFor(c: Conversation): LeadFormValues {
  */
 export function LeadFormPanel({ conversation }: { conversation: Conversation }) {
   const saveLead = useSaveLead(conversation.id);
-  const [savedScript, setSavedScript] = useState<GeneratedSalesScript | null>(null);
   const methods = useForm<LeadFormValues>({
     defaultValues: defaultsFor(conversation),
   });
@@ -68,8 +65,7 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
           : [],
     };
     try {
-      const result = await saveLead.mutateAsync(input);
-      setSavedScript(result.script);
+      await saveLead.mutateAsync(input);
       methods.clearErrors("root");
     } catch (error) {
       methods.setError("root", { message: formatSaveLeadApiError(error) });
@@ -85,7 +81,8 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
           isError={Boolean(methods.formState.errors.root) || saveLead.isError}
           errorMessage={methods.formState.errors.root?.message}
           isSuccess={saveLead.isSuccess}
-          savedScript={savedScript}
+          savedScript={saveLead.data?.script ?? null}
+          scriptUnavailableReason={saveLead.data?.scriptUnavailableReason ?? null}
           onCancel={() => methods.reset(defaultsFor(conversation))}
         />
       </form>

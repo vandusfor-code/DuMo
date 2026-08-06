@@ -32,7 +32,6 @@ import {
 import type { AdminConversation, ClientProfile, LeadNote, LeadTimelineEvent } from "@/types/admin-lead";
 import { EMPTY_LEAD_LINE, type LeadFormValues } from "@/types/lead-form";
 import type { SaveLeadInput } from "@/types/lead";
-import type { GeneratedSalesScript } from "@/types/sales-script";
 import {
   formatSaveLeadApiError,
   isCompleteSaleLine,
@@ -64,10 +63,9 @@ export function AdminLeadFormPanel({
   timeline: LeadTimelineEvent[];
 }) {
   const saveLead = useSaveAdminLead(conversation.id);
-  const [savedScript, setSavedScript] = useState<GeneratedSalesScript | null>(null);
   const [activeTab, setActiveTab] = useState("gestion");
   const { data: fetchedScript } = useSalesScript(conversation.id);
-  const script = savedScript ?? fetchedScript ?? null;
+  const script = saveLead.data?.script ?? fetchedScript ?? null;
   const methods = useForm<LeadFormValues>({ defaultValues: defaultsFor(conversation) });
   const type = useWatch({ control: methods.control, name: "type" });
 
@@ -101,8 +99,7 @@ export function AdminLeadFormPanel({
           : [],
     };
     try {
-      const result = await saveLead.mutateAsync(input);
-      setSavedScript(result.script);
+      await saveLead.mutateAsync(input);
       methods.clearErrors("root");
       setActiveTab("script");
     } catch (error) {
@@ -175,7 +172,11 @@ export function AdminLeadFormPanel({
               </TabsContent>
 
               <TabsContent value="script" className="outline-none">
-                <SalesScriptTab script={script} />
+                <SalesScriptTab
+                  script={script}
+                  gestionSaved={saveLead.isSuccess}
+                  unavailableReason={script ? null : saveLead.data?.scriptUnavailableReason}
+                />
               </TabsContent>
 
               <TabsContent value="notas" className="outline-none">

@@ -4,6 +4,7 @@ import type { Plan } from "@/types/lead";
 import type { GeneratedSalesScript } from "@/types/sales-script";
 import { buildScriptContext } from "./context";
 import { assembleGeneratedScript } from "./engine";
+import { isScriptEligible } from "./eligibility";
 
 export function buildSalesScript(input: {
   gestionId: string;
@@ -12,6 +13,8 @@ export function buildSalesScript(input: {
   advisorPlans: Plan[];
   advisor?: { name: string; email: string };
 }): GeneratedSalesScript | null {
+  if (!isScriptEligible(input.gestion)) return null;
+
   const ctx = buildScriptContext({
     gestion: input.gestion,
     commercialPlans: input.commercialPlans,
@@ -19,16 +22,6 @@ export function buildSalesScript(input: {
     advisor: input.advisor,
   });
   if (!ctx) return null;
-
-  if (ctx.hasEquipment) {
-    // Futuro: PORTABILIDAD_CON_EQUIPO con su documento oficial
-    return null;
-  }
-
-  if (ctx.saleType !== "portability") {
-    // Futuro: otros flujos con documentos oficiales
-    return null;
-  }
 
   return assembleGeneratedScript({
     gestionId: input.gestionId,

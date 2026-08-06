@@ -42,4 +42,6 @@ export type GeneratedSalesScript = {
 export type SaveLeadResult = {
   lead: import("./lead").Lead;
   script: GeneratedSalesScript | null;
+  /** Por qué no se generó script, si la gestión sí se guardó. */
+  scriptUnavailableReason?: string | null;
 };
