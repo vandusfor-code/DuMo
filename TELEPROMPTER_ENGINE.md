@@ -121,7 +121,9 @@ useSalesScript(conversationId)
 | 2 | `bloque-2` | Audio | Transversal (Sin Equipo v1.0) | `block2-audio-speech.ts` |
 | 3 | `bloque-3` | Contratación | **✅ v1.0 congelado** | `block3-contratacion-con-equipo-speech.ts`, `block3-contract-summary-con-equipo-speech.ts`, `block3-equipment-financing-speech.ts`, `block3-portability-disclaimer-con-equipo.ts` |
 | 4 | `bloque-4` | Plan | **✅ v1.0 congelado** | `block4-plan-benefits-con-equipo-speech.ts` |
-| 5–12 | — | — | Pendiente | — |
+| 5 | `bloque-5` | Entrega | **✅ v1.0 congelado** | `block5-condiciones-entrega-con-equipo-speech.ts` |
+| 6 | `bloque-6` | Portabilidad | **✅ Bloque transversal v1.0 (congelado)** | `block6-portability-speech.ts` |
+| 7–12 | — | — | Pendiente | — |
 
 ### Bloque 3 congelado (v1.0)
 
@@ -139,6 +141,22 @@ useSalesScript(conversationId)
 - Multilínea: un párrafo por `planId` único; homogénea = un solo párrafo.
 - Cupón y cuotas gratis: redacción afirmativa (*tu equipo financiado*), cantidad de cuotas desde `freeDeviceInstallments.installmentNumbers.length`.
 - **No modificar copy** salvo cambio del script oficial, Oferta Comercial o hallazgo de auditoría.
+
+### Bloque 5 congelado (v1.0)
+
+- Builder único: `buildBlock5CondicionesEntregaConEquipoSpeech(ctx)`.
+- Condiciones generales (l.23) + entrega domicilio (l.25–28) o tienda (l.31–33) + contratos (l.39).
+- Garantía equipos (l.37): solo si `Number(ctx.mainEquipment.downPayment) > 0`; omitida en pie $0.
+- Sin compatibilidad multibandas, sin Ultra Express (doc Con Equipo no los incluye).
+- Normalización OTP: *código OTP*, *WhatsApp*; titular: *Si recibes el producto como titular…*
+- **No modificar copy** salvo cambio del script oficial o hallazgo de auditoría.
+
+### Bloque 6 — transversal v1.0 (congelado)
+
+- Reutiliza `buildBlock6PortabilitySpeech()` — builder único compartido con Portabilidad Sin Equipo (congelado v1.0).
+- **No modificar** el builder; cambios solo vía nueva versión aprobada en ambos flujos.
+- Ramas: `cap` (prepago → postpago) + `portabilityProcess` (dudas).
+- Mismo comportamiento UI que Portabilidad Sin Equipo.
 
 ---
 
