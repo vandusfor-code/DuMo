@@ -44,34 +44,15 @@ export async function middleware(request: NextRequest) {
   const payload = token ? await verifySessionTokenEdge(token) : null;
 
   if (!payload) {
+    // IMPORTANTE: NO se borra la cookie aquí. Antes, un solo 401 (un fallo
+    // puntual de verificación) destruía la sesión y el usuario quedaba fuera
+    // sin haber pulsado "Cerrar sesión". La cookie solo se borra en /logout.
     if (pathname.startsWith("/api/")) {
-      const res = NextResponse.json({ error: "No autenticado." }, { status: 401 });
-      res.cookies.set(SESSION_COOKIE, "", {
-        ...sessionCookieOptionsEdge(
-          isSecureRequest(
-            request.headers.get("x-forwarded-proto"),
-            request.nextUrl.protocol,
-          ),
-        ),
-        maxAge: 0,
-        expires: new Date(0),
-      });
-      return res;
+      return NextResponse.json({ error: "No autenticado." }, { status: 401 });
     }
     const login = new URL("/login", request.url);
     login.searchParams.set("next", pathname);
-    const res = NextResponse.redirect(login);
-    res.cookies.set(SESSION_COOKIE, "", {
-      ...sessionCookieOptionsEdge(
-        isSecureRequest(
-          request.headers.get("x-forwarded-proto"),
-          request.nextUrl.protocol,
-        ),
-      ),
-      maxAge: 0,
-      expires: new Date(0),
-    });
-    return res;
+    return NextResponse.redirect(login);
   }
 
   // ── Separación por rol ──────────────────────────────────────────────
