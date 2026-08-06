@@ -21,10 +21,12 @@ import {
   DELIVERY_TYPE_LABELS,
   EQUIPMENT_MODE_LABELS,
   LEAD_SALE_TYPE_LABELS,
+  LINE_ACCOUNT_TYPE_LABELS,
   type CurrentOperator,
   type DeliveryType,
   type EquipmentMode,
   type LeadSaleType,
+  type LineAccountType,
   type Plan,
 } from "@/types/lead";
 import type { LeadFormValues } from "@/types/lead-form";
@@ -32,6 +34,7 @@ import type { LeadFormValues } from "@/types/lead-form";
 const SALE_TYPE_OPTIONS = Object.entries(LEAD_SALE_TYPE_LABELS) as [LeadSaleType, string][];
 const EQUIPMENT_MODE_OPTIONS = Object.entries(EQUIPMENT_MODE_LABELS) as [EquipmentMode, string][];
 const OPERATOR_OPTIONS = Object.entries(CURRENT_OPERATOR_LABELS) as [CurrentOperator, string][];
+const ACCOUNT_TYPE_OPTIONS = Object.entries(LINE_ACCOUNT_TYPE_LABELS) as [LineAccountType, string][];
 const DELIVERY_OPTIONS = Object.entries(DELIVERY_TYPE_LABELS) as [DeliveryType, string][];
 
 function ReadOnlyValue({ label, value }: { label: string; value: string }) {
@@ -315,6 +318,30 @@ export function SaleLine({
                     </SelectTrigger>
                     <SelectContent>
                       {DELIVERY_OPTIONS.map(([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </FormField>
+
+            <FormField label="Modalidad línea actual">
+              <Controller
+                control={control}
+                name={`lines.${index}.accountType`}
+                render={({ field }) => (
+                  <Select
+                    value={field.value || "postpaid"}
+                    onValueChange={field.onChange}
+                  >
+                    <SelectTrigger className="h-11 text-[14px]">
+                      <SelectValue placeholder="Selecciona" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ACCOUNT_TYPE_OPTIONS.map(([value, label]) => (
                         <SelectItem key={value} value={value}>
                           {label}
                         </SelectItem>

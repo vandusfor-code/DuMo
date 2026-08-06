@@ -19,6 +19,11 @@ export function chileGreeting(now = new Date()): string {
   return "Buenas noches";
 }
 
-export function chileGreetingWithComma(now = new Date()): string {
-  return `${chileGreeting(now)}.`;
+export function chileGreetingPhrase(now = new Date()): string {
+  const g = chileGreeting(now);
+  return g.charAt(0).toLowerCase() + g.slice(1);
+}
+
+export function chileSaludoCompleto(now = new Date()): string {
+  return `Hola, ${chileGreetingPhrase(now)}.`;
 }

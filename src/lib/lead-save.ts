@@ -1,5 +1,5 @@
 import type { LeadLineValues } from "@/types/lead-form";
-import type { EquipmentMode, LeadSaleType } from "@/types/lead";
+import type { EquipmentMode, LeadSaleType, LineAccountType } from "@/types/lead";
 
 /** Línea lista para persistir en una gestión de venta. */
 export function isCompleteSaleLine(line: LeadLineValues): boolean {
@@ -14,6 +14,7 @@ export function isCompleteSaleLine(line: LeadLineValues): boolean {
 
 export function mapSaleLineForSave(line: LeadLineValues) {
   const equipmentMode: EquipmentMode | "" = line.equipmentMode === "with" ? "with" : "none";
+  const accountType: LineAccountType = line.accountType === "prepaid" ? "prepaid" : "postpaid";
   return {
     phone: line.phone.trim(),
     saleType: line.saleType as LeadSaleType,
@@ -33,6 +34,7 @@ export function mapSaleLineForSave(line: LeadLineValues) {
     equipmentInstallments: line.equipmentInstallments,
     equipmentInstallmentValue: line.equipmentInstallmentValue,
     equipmentCommercialText: line.equipmentCommercialText,
+    accountType,
   };
 }
 

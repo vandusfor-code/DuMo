@@ -9,7 +9,7 @@ import {
 import { regionName } from "@/data/chile-regions";
 import { computeContractSummary } from "@/lib/lead-contract-summary";
 import { formatCurrency, formatLongDate } from "@/lib/format";
-import { chileGreetingWithComma } from "@/lib/sales-script/chile-time";
+import { chileSaludoCompleto } from "@/lib/sales-script/chile-time";
 import { buildMultilineContractSpeech } from "@/lib/sales-script/multiline-contract";
 import type { LeadLineValues } from "@/types/lead-form";
 import type { Plan } from "@/types/lead";
@@ -79,6 +79,7 @@ function mapLineToFormLine(line: SaveLeadInput["lines"][number]): LeadLineValues
     equipmentInstallments: line.equipmentInstallments,
     equipmentInstallmentValue: line.equipmentInstallmentValue,
     equipmentCommercialText: line.equipmentCommercialText,
+    accountType: line.accountType ?? "postpaid",
   };
 }
 
@@ -158,7 +159,7 @@ export function buildScriptContext(input: {
   const totalMonthly = summary.totalMonthly || planValue;
 
   const vars: Record<string, string> = {
-    saludo: chileGreetingWithComma(),
+    saludo: chileSaludoCompleto(),
     nombre_cliente: clientName,
     cliente_nombre: clientName,
     cliente_primer_nombre: clientFirst,

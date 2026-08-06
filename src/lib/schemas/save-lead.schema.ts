@@ -33,6 +33,8 @@ export const currentOperatorSchema = z.enum([
 
 export const deliveryTypeSchema = z.enum(["home", "store"]);
 
+export const lineAccountTypeSchema = z.enum(["prepaid", "postpaid"]);
+
 export const leadLineSchema = z.object({
   phone: z.string().trim().min(1, "El número de línea es obligatorio."),
   saleType: leadSaleTypeSchema,
@@ -59,6 +61,7 @@ export const leadLineSchema = z.object({
   equipmentInstallments: z.string().trim().optional().default(""),
   equipmentInstallmentValue: z.string().trim().optional().default(""),
   equipmentCommercialText: z.string().trim().optional().default(""),
+  accountType: lineAccountTypeSchema.optional().default("postpaid"),
 });
 
 export const saveLeadSchema = z.object({

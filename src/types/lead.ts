@@ -35,6 +35,11 @@ export const EQUIPMENT_LEAD_TYPES: LeadSaleType[] = ["portability", "renewal"];
 
 export type LineAccountType = "prepaid" | "postpaid";
 
+export const LINE_ACCOUNT_TYPE_LABELS: Record<LineAccountType, string> = {
+  prepaid: "Prepago",
+  postpaid: "Postpago",
+};
+
 export type EquipmentMode = "none" | "with";
 
 export type CurrentOperator =

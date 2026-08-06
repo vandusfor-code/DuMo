@@ -4,10 +4,23 @@ export type SalesScriptStep = {
   title: string;
   /** Texto final listo para leer en voz alta. Sin instrucciones internas. */
   content: string;
-  /** Si existe, la asesora debe elegir Sí/No antes de avanzar. */
-  branch?: {
-    yesNextId: string;
-    noNextId: string;
+  /**
+   * Bifurcación en el mismo paso — no crea pasos adicionales.
+   * Sí/No muestra el discurso correspondiente y luego permite continuar.
+   */
+  branch?: SalesScriptBranch;
+};
+
+export type SalesScriptBranch = {
+  /** Discurso si el cliente responde Sí (ej. CAP recibido, aclarar dudas). */
+  yesSpeech?: string;
+  /** Discurso si el cliente responde No (ej. corrección de datos, CAP pendiente). */
+  noSpeech?: string;
+  /** Segunda ronda tras noSpeech (ej. prefijo 809). */
+  followUp?: {
+    prompt: string;
+    yesSpeech: string;
+    noSpeech?: string;
   };
 };
 
