@@ -87,10 +87,16 @@ export interface LeadSaleLine {
   currentOperator?: CurrentOperator | "";
   deliveryType?: DeliveryType | "";
   email?: string;
+  deliveryAddress?: string;
+  region?: string;
+  comuna?: string;
+  equipmentCatalogId?: string;
   equipmentModel?: string;
   equipmentValue?: string;
   equipmentDownPayment?: string;
   equipmentInstallments?: string;
+  equipmentInstallmentValue?: string;
+  equipmentCommercialText?: string;
 }
 
 /** Registro de gestión guardado. */
@@ -124,9 +130,15 @@ export interface SaveLeadInput {
     currentOperator: CurrentOperator | "";
     deliveryType: DeliveryType | "";
     email: string;
+    deliveryAddress: string;
+    region: string;
+    comuna: string;
+    equipmentCatalogId: string;
     equipmentModel: string;
     equipmentValue: string;
     equipmentDownPayment: string;
     equipmentInstallments: string;
+    equipmentInstallmentValue: string;
+    equipmentCommercialText: string;
   }[];
 }

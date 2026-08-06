@@ -4,6 +4,7 @@ import { useFieldArray, useFormContext } from "react-hook-form";
 import { AnimatePresence } from "framer-motion";
 import { Plus } from "lucide-react";
 import { SaleLine } from "./sale-line";
+import { SaleContractSummary } from "./sale-contract-summary";
 import { usePlans } from "@/hooks/use-leads";
 import { EMPTY_LEAD_LINE, type LeadFormValues } from "@/types/lead-form";
 import { PLANS_MOCK } from "@/data/mock/leads.mock";
@@ -44,6 +45,8 @@ export function SaleDetails() {
         <Plus className="size-[18px]" />
         Agregar otra línea
       </button>
+
+      <SaleContractSummary />
     </div>
   );
 }

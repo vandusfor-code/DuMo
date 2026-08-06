@@ -49,10 +49,16 @@ export const leadLineSchema = z.object({
     .refine((v) => !v || z.string().email().safeParse(v).success, {
       message: "Correo electrónico inválido.",
     }),
+  deliveryAddress: z.string().trim().optional().default(""),
+  region: z.string().trim().min(1, "Selecciona una región."),
+  comuna: z.string().trim().min(1, "Selecciona una comuna."),
+  equipmentCatalogId: z.string().trim().optional().default(""),
   equipmentModel: z.string().trim().optional().default(""),
   equipmentValue: z.string().trim().optional().default(""),
   equipmentDownPayment: z.string().trim().optional().default(""),
   equipmentInstallments: z.string().trim().optional().default(""),
+  equipmentInstallmentValue: z.string().trim().optional().default(""),
+  equipmentCommercialText: z.string().trim().optional().default(""),
 });
 
 export const saveLeadSchema = z.object({

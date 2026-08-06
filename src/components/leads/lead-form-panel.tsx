@@ -56,10 +56,16 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
                 currentOperator: l.currentOperator,
                 deliveryType: l.deliveryType,
                 email: l.email,
+                deliveryAddress: l.deliveryAddress,
+                region: l.region,
+                comuna: l.comuna,
+                equipmentCatalogId: l.equipmentCatalogId,
                 equipmentModel: l.equipmentModel,
                 equipmentValue: l.equipmentValue,
                 equipmentDownPayment: l.equipmentDownPayment,
                 equipmentInstallments: l.equipmentInstallments,
+                equipmentInstallmentValue: l.equipmentInstallmentValue,
+                equipmentCommercialText: l.equipmentCommercialText,
               }))
           : [],
     };
