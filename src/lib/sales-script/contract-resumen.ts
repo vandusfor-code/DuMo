@@ -4,13 +4,20 @@ import {
   isUpsellingLine,
   type LineSpeechDetail,
 } from "@/lib/sales-script/teleprompter/speech-builders";
+import {
+  getAdditionalLineUnitPrice,
+} from "@/lib/sales-script/teleprompter/contract-pricing";
 import { joinNaturalList, optionalClause, speechValue } from "@/lib/sales-script/teleprompter/speech-utils";
+import { buildContractPromotionSuffix } from "@/lib/commercial-plan-offer";
 
-/** Sufijo inline para boletas $0 y promociones (doc línea 11). */
-export function buildPromotionInlineSuffix(promotions: string[]): string {
-  const active = promotions.map((p) => p.trim()).filter(Boolean);
-  if (active.length === 0) return "";
-  return `, con ${joinNaturalList(active)} aplicables en los meses correspondientes de tu facturación`;
+const PORTABILITY_DISCLAIMER =
+  "Recuerda que si por algún motivo el número no se porta, los beneficios explicados quedarán sin efecto, por eso es importante que cumplas con las condiciones de portabilidad que te explicaré en breve.";
+
+function contractPromoSuffix(ctx: ScriptBuildContext): string {
+  return buildContractPromotionSuffix({
+    saleType: ctx.saleType,
+    lineDetails: ctx.lineDetails,
+  });
 }
 
 function hasDistinctPlansPerLine(lineDetails: LineSpeechDetail[]): boolean {
@@ -21,111 +28,130 @@ function hasDistinctPlansPerLine(lineDetails: LineSpeechDetail[]): boolean {
   );
 }
 
-function buildDataValidationParagraph(v: Record<string, string>): string {
-  const parts: string[] = [`Tu nombre completo es ${speechValue(v.nombre_cliente, "el titular del servicio")}`];
+/** Parte A — validación de datos (script oficial, línea 9). */
+export function buildContractDataValidationIntro(ctx: ScriptBuildContext): string {
+  const v = ctx.vars;
+  const parts: string[] = [
+    `Tú Nombre Completo es ${speechValue(v.nombre_cliente, "el titular del servicio")}`,
+  ];
 
   if (v.rut?.trim()) parts.push(`RUT ${v.rut}`);
 
   const domicilio = optionalClause("domiciliado en {value}", v.direccion_completa);
   if (domicilio) parts.push(domicilio);
 
-  if (v.correo?.trim()) parts.push(`correo electrónico ${v.correo}`);
+  if (v.correo?.trim()) parts.push(`y correo electrónico ${v.correo}`);
 
   const contacto = speechValue(v.telefono, "");
-  if (contacto) parts.push(`y tu número de contacto es ${contacto}`);
+  if (contacto) parts.push(`tú número de contacto es el ${contacto}`);
 
-  return `${parts.join(", ")}.`;
+  return [
+    "Continuamos con un breve resumen de tu contratación:",
+    "",
+    `${parts.join(", ")}.`,
+    "",
+    "¿Son correctos tus datos?",
+  ].join("\n");
 }
 
-function buildHomogeneousMultilineClause(
+function buildHomogeneousMultilineBody(
+  ctx: ScriptBuildContext,
   lineDetails: LineSpeechDetail[],
-  additionalLineValue: number,
-  totalMonthly: number,
+  promoSuffix: string,
 ): string {
+  const v = ctx.vars;
   const main = lineDetails[0];
-  const add = formatCurrency(additionalLineValue);
-  const total = formatCurrency(totalMonthly);
+  const additionalPrice = getAdditionalLineUnitPrice(ctx.planDetail);
   const additional = lineDetails.length - 1;
+  const addLabel = formatCurrency(additionalPrice);
+  const total = formatCurrency(ctx.totalMonthly);
 
+  const intro = [
+    `Según las condiciones acordadas, aceptas contratar hoy con fecha ${speechValue(v.fecha_contratacion, "hoy")} la portabilidad de tu número ${speechValue(v.numero_portar, "tu número a portar")} proveniente de la compañía ${speechValue(v.operador_actual, "tu operador actual")} a WOM con el plan ${main.planName}.`,
+  ];
+
+  let multilineDetail: string;
   if (additional === 1) {
-    return ` con el ${main.planName} por un valor mensual transparente de ${main.planValueLabel} en tu línea principal, más una línea adicional a ${add}, para un total mensual de ${total}`;
+    multilineDetail = `La línea principal queda con su valor transparente de ${main.planValueLabel} y la línea adicional queda con un monto a pagar de ${addLabel} al mes de forma transparente, para un total mensual de ${total}`;
+  } else {
+    const adj = additional === 2 ? "dos" : additional === 3 ? "tres" : String(additional);
+    multilineDetail = `La línea principal queda con su valor transparente de ${main.planValueLabel} y las ${adj} líneas adicionales quedan con un monto a pagar de ${addLabel} al mes de forma transparente cada una, para un total mensual de ${total}`;
   }
 
-  const adj = additional === 2 ? "dos" : String(additional);
-  return ` con el ${main.planName} por un valor mensual transparente de ${main.planValueLabel} en tu línea principal, y ${adj} líneas adicionales a ${add} cada una, para un total mensual de ${total}`;
+  const promo = promoSuffix ? `${promoSuffix}.` : "";
+  return [...intro, `${multilineDetail}${promo}`, PORTABILITY_DISCLAIMER].join("\n\n");
 }
 
-function buildHeterogeneousMultilineClause(
+function buildHeterogeneousMultilineBody(
+  ctx: ScriptBuildContext,
   lineDetails: LineSpeechDetail[],
-  totalMonthly: number,
+  promoSuffix: string,
 ): string {
+  const v = ctx.vars;
   const linePhrases = lineDetails.map((line) => {
     const role = line.isMain ? "tu línea principal" : `tu línea adicional ${line.index}`;
-    return `${role} al ${line.planName} por ${line.planValueLabel}`;
+    return `${role} al plan ${line.planName} por el monto mensual de ${line.planValueLabel}`;
   });
-  return `: ${joinNaturalList(linePhrases)}, para un total mensual de ${formatCurrency(totalMonthly)}`;
+
+  return [
+    `Según las condiciones acordadas, aceptas contratar hoy con fecha ${speechValue(v.fecha_contratacion, "hoy")} la portabilidad de tu número ${speechValue(v.numero_portar, "tu número a portar")} proveniente de la compañía ${speechValue(v.operador_actual, "tu operador actual")} a WOM: ${joinNaturalList(linePhrases)}, para un total mensual de ${formatCurrency(ctx.totalMonthly)}${promoSuffix}.`,
+    PORTABILITY_DISCLAIMER,
+  ].join("\n\n");
 }
 
-function buildUpsellingClause(ctx: ScriptBuildContext, promoSuffix: string): string {
+function buildSingleLineBody(ctx: ScriptBuildContext, promoSuffix: string): string {
+  const v = ctx.vars;
+  const line = ctx.lineDetails[0];
+  const planName = line?.planName ?? v.plan;
+  const planValue = line?.planValueLabel ?? v.valor_plan;
+  const promo = promoSuffix ? `${promoSuffix}.` : "";
+
+  return [
+    `Según las condiciones acordadas, aceptas contratar hoy con fecha ${speechValue(v.fecha_contratacion, "hoy")} la portabilidad de tu número ${speechValue(v.numero_portar, "tu número a portar")} proveniente de la compañía ${speechValue(v.operador_actual, "tu operador actual")} a WOM con el plan ${planName}, por el monto mensual de ${planValue}${promo}`,
+    PORTABILITY_DISCLAIMER,
+  ].join("\n\n");
+}
+
+/** Upselling / homologación — reemplaza el discurso estándar (script oficial, línea 14). */
+function buildUpsellingBody(ctx: ScriptBuildContext, promoSuffix: string): string {
   const main = ctx.lineDetails[0];
   const phone = speechValue(ctx.vars.numero_portar, "el número a portar");
   const planName = main?.planName ?? ctx.vars.plan;
   const planValue = main?.planValueLabel ?? ctx.vars.valor_plan;
+  const promo = promoSuffix ? `${promoSuffix}.` : "";
 
   return [
-    `Según las condiciones acordadas, aceptas contratar hoy ${ctx.vars.fecha_contratacion} la portabilidad de tu número ${phone}, proveniente de ${speechValue(ctx.vars.operador_actual, "tu operador actual")}, a WOM.`,
-    "",
-    `Aceptas modificar el plan actual de ese número al ${planName} con un monto a pagar de ${planValue}${promoSuffix}.`,
-    "",
+    `Aceptas modificar el plan actual para el número ${phone} al nuevo plan ${planName} con un monto a pagar de ${planValue}${promo}`,
     "Recuerda que si tenías algún beneficio anterior quedará inválido, pero ganarás los beneficios obtenidos con este nuevo plan.",
-  ].join("\n");
+  ].join("\n\n");
 }
 
-/**
- * Párrafo central de contratación — un solo discurso continuo, sin repetir el nombre del plan.
- */
-export function buildContractCoreSpeech(ctx: ScriptBuildContext): string {
-  const v = ctx.vars;
-  const promotions = ctx.planDetail?.promotions ?? [];
-  const promoSuffix = buildPromotionInlineSuffix(promotions);
+/** Parte B — resumen de contratación (tras validar datos). */
+export function buildContractSummarySpeech(ctx: ScriptBuildContext): string {
+  const promoSuffix = contractPromoSuffix(ctx);
   const lineDetails = ctx.lineDetails;
 
   if (isUpsellingLine(ctx.mainLine)) {
-    return buildUpsellingClause(ctx, promoSuffix);
+    return buildUpsellingBody(ctx, promoSuffix);
   }
 
-  const operador = speechValue(v.operador_actual, "tu operador actual");
-  const fecha = speechValue(v.fecha_contratacion, "hoy");
-  const numero = speechValue(v.numero_portar, "tu número a portar");
-  const base = `Según las condiciones acordadas, aceptas contratar hoy ${fecha} la portabilidad de tu número ${numero}, proveniente de ${operador}, a WOM`;
-
   if (lineDetails.length <= 1) {
-    const planName = lineDetails[0]?.planName ?? v.plan;
-    const planValue = lineDetails[0]?.planValueLabel ?? v.valor_plan;
-    return `${base} con el ${planName} por un valor mensual transparente de ${planValue}${promoSuffix}.`;
+    return buildSingleLineBody(ctx, promoSuffix);
   }
 
   if (hasDistinctPlansPerLine(lineDetails)) {
-    return `${base}${buildHeterogeneousMultilineClause(lineDetails, ctx.totalMonthly)}${promoSuffix}.`;
+    return buildHeterogeneousMultilineBody(ctx, lineDetails, promoSuffix);
   }
 
-  const additionalLineValue = ctx.planDetail?.additionalLineValue ?? 7_990;
-  return `${base}${buildHomogeneousMultilineClause(lineDetails, additionalLineValue, ctx.totalMonthly)}${promoSuffix}.`;
+  return buildHomogeneousMultilineBody(ctx, lineDetails, promoSuffix);
 }
 
-/** Discurso completo del bloque Contratación. */
-export function buildContractResumenSpeech(ctx: ScriptBuildContext): string {
-  const v = ctx.vars;
+/** @deprecated Usar buildContractDataValidationIntro + buildContractSummarySpeech */
+export function buildContractCoreSpeech(ctx: ScriptBuildContext): string {
+  return buildContractSummarySpeech(ctx);
+}
 
-  return [
-    "Continuemos con un breve resumen de tu contratación.",
-    "",
-    buildDataValidationParagraph(v),
-    "",
-    buildContractCoreSpeech(ctx),
-    "",
-    "Si por algún motivo el número no se porta, los beneficios explicados quedarán sin efecto. Por eso es importante cumplir con las condiciones de portabilidad que te explicaré en breve.",
-    "",
-    "¿Son correctos tus datos?",
-  ].join("\n");
+/** Discurso completo legacy — preferir intro + summary por separado. */
+export function buildContractResumenSpeech(ctx: ScriptBuildContext): string {
+  return [buildContractDataValidationIntro(ctx), "", buildContractSummarySpeech(ctx)].join("\n");
 }

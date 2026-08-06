@@ -3,6 +3,7 @@ import type { SaveLeadInput } from "@/types/lead";
 import type { GeneratedSalesScript } from "@/types/sales-script";
 import { buildSalesScript } from "@/lib/sales-script/builder";
 import { getCommercialConfigurationRepository } from "@/repositories/commercial-configuration.repository";
+import { getDeliveryConfigurationRepository } from "@/repositories/delivery-configuration.repository";
 import { getLeadRepository } from "@/repositories/leads.repository";
 
 export const salesScriptService = {
@@ -15,9 +16,10 @@ export const salesScriptService = {
       return null;
     }
 
-    const [commercialConfig, advisorPlans] = await Promise.all([
+    const [commercialConfig, advisorPlans, deliveryConfig] = await Promise.all([
       getCommercialConfigurationRepository().getSnapshot(),
       getLeadRepository().getPlans(),
+      getDeliveryConfigurationRepository().getConfig(),
     ]);
 
     const script = buildSalesScript({
@@ -26,6 +28,7 @@ export const salesScriptService = {
       commercialPlans: commercialConfig.plans,
       advisorPlans,
       advisor: input.advisor,
+      deliveryConfig,
     });
 
     if (!script) return null;

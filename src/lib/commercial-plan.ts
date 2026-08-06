@@ -1,36 +1,66 @@
 import type { CommercialPlan, UpsertCommercialPlanInput } from "@/types/commercial-config";
+import {
+  deriveAdditionalLineValue,
+  deriveMaxLines,
+  resolvePlanOffer,
+} from "@/lib/commercial-plan-offer";
 
-/** Plan almacenado con campos legacy (operatorPayment). */
-type StoredCommercialPlan = CommercialPlan & {
+/** Plan almacenado con campos legacy previos a la oferta estructurada. */
+type StoredCommercialPlan = Omit<Partial<CommercialPlan>, "offer"> & {
+  id: string;
+  name: string;
+  operator: string;
+  saleType: CommercialPlan["saleType"];
+  womValue?: number;
   operatorPayment?: number;
   additionalLineValue?: number;
   maxLines?: number;
-  benefits?: string[];
-  promotions?: string[];
-  commercialText?: string;
+  dumoValue?: number;
+  advisorCommission?: number;
+  offer?: CommercialPlan["offer"];
   specialConditions?: string;
+  status: CommercialPlan["status"];
+  /** @deprecated Migrado a offer */
+  benefits?: string[];
+  /** @deprecated Migrado a offer.freeBills */
+  promotions?: string[];
+  /** @deprecated Eliminado — usar offer */
+  commercialText?: string;
+  /** @deprecated Migrado a offer */
+  specs?: {
+    gb?: string;
+    minutes?: string;
+    sms?: string;
+    appsLibres?: string;
+    roaming?: string;
+    clubWom?: string;
+    pedidosYa?: string;
+    cuponEquipos?: string;
+    cuotasGratis?: string;
+    maxAdditionalLines?: number;
+  };
 };
 
-/** Normaliza planes guardados antes de la migración Valor Wom / Valor DuMo. */
 export function normalizeCommercialPlan(raw: StoredCommercialPlan): CommercialPlan {
   const legacy = raw.operatorPayment;
   const womValue = raw.womValue ?? legacy ?? 0;
   const dumoValue = raw.dumoValue ?? legacy ?? 0;
+  const offer = resolvePlanOffer(raw);
+  const additionalLineValue = deriveAdditionalLineValue(offer) || raw.additionalLineValue || 0;
+  const maxLines = deriveMaxLines(offer) || raw.maxLines || 1;
+
   return {
     id: raw.id,
     name: raw.name,
     operator: raw.operator,
     saleType: raw.saleType,
     womValue,
-    additionalLineValue: raw.additionalLineValue ?? womValue,
-    maxLines: raw.maxLines ?? 5,
+    additionalLineValue,
+    maxLines,
     dumoValue,
-    advisorCommission: raw.advisorCommission,
-    benefits: raw.benefits ?? [],
-    promotions: raw.promotions ?? [],
-    commercialText: raw.commercialText ?? "",
+    advisorCommission: raw.advisorCommission ?? 0,
+    offer,
     specialConditions: raw.specialConditions ?? "",
-    specs: raw.specs,
     status: raw.status,
   };
 }
@@ -49,11 +79,8 @@ export function toPlanInput(plan: Omit<CommercialPlan, "id">): UpsertCommercialP
     maxLines: plan.maxLines,
     dumoValue: plan.dumoValue,
     advisorCommission: plan.advisorCommission,
-    benefits: plan.benefits,
-    promotions: plan.promotions,
-    commercialText: plan.commercialText,
+    offer: plan.offer,
     specialConditions: plan.specialConditions,
-    specs: plan.specs,
     status: plan.status,
   };
 }

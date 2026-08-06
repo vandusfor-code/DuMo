@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, ScrollText, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { GeneratedSalesScript, SalesScriptStep } from "@/types/sales-script";
+import { cn } from "@/lib/utils";
 
 type BranchPhase = "idle" | "answered" | "cap-done" | "809-followup" | "809-done";
 
@@ -23,6 +24,10 @@ export function SalesScriptTab({
   const [capChoice, setCapChoice] = useState<"yes" | "no" | null>(null);
   const [condicionesChoice, setCondicionesChoice] = useState<"yes" | "no" | null>(null);
   const [acceptanceChoice, setAcceptanceChoice] = useState<"yes" | "no" | null>(null);
+  const [externalAudioAcknowledged, setExternalAudioAcknowledged] = useState(false);
+  const [contractSummaryRevealed, setContractSummaryRevealed] = useState(false);
+  const [npsQuestionAcknowledged, setNpsQuestionAcknowledged] = useState(false);
+  const [consulta809Revealed, setConsulta809Revealed] = useState(false);
 
   useEffect(() => {
     setBlockIndex(0);
@@ -40,6 +45,10 @@ export function SalesScriptTab({
     setCapChoice(null);
     setCondicionesChoice(null);
     setAcceptanceChoice(null);
+    setExternalAudioAcknowledged(false);
+    setContractSummaryRevealed(false);
+    setNpsQuestionAcknowledged(false);
+    setConsulta809Revealed(false);
   }
 
   const blocks = script?.steps ?? [];
@@ -49,13 +58,48 @@ export function SalesScriptTab({
   const displayContent = useMemo(
     () =>
       current
-        ? resolveContent(current, branchPhase, choice, followUpChoice, capChoice, condicionesChoice, acceptanceChoice)
+        ? resolveContent(
+            current,
+            branchPhase,
+            choice,
+            followUpChoice,
+            capChoice,
+            condicionesChoice,
+            acceptanceChoice,
+            externalAudioAcknowledged,
+            contractSummaryRevealed,
+            npsQuestionAcknowledged,
+            consulta809Revealed,
+          )
         : "",
-    [current, branchPhase, choice, followUpChoice, capChoice, condicionesChoice, acceptanceChoice],
+    [
+      current,
+      branchPhase,
+      choice,
+      followUpChoice,
+      capChoice,
+      condicionesChoice,
+      acceptanceChoice,
+      externalAudioAcknowledged,
+      contractSummaryRevealed,
+      npsQuestionAcknowledged,
+      consulta809Revealed,
+    ],
   );
 
   const canContinue = current
-    ? canAdvanceBlock(current, branchPhase, choice, followUpChoice, capChoice, condicionesChoice, acceptanceChoice)
+    ? canAdvanceBlock(
+        current,
+        branchPhase,
+        choice,
+        followUpChoice,
+        capChoice,
+        condicionesChoice,
+        acceptanceChoice,
+        externalAudioAcknowledged,
+        contractSummaryRevealed,
+        npsQuestionAcknowledged,
+      )
     : false;
 
   if (!script) {
@@ -84,6 +128,9 @@ export function SalesScriptTab({
     acceptanceChoice,
     choice,
     followUpChoice,
+    externalAudioAcknowledged,
+    contractSummaryRevealed,
+    npsQuestionAcknowledged,
   );
 
   const showCapButtons = interaction === "cap";
@@ -95,9 +142,49 @@ export function SalesScriptTab({
   const showSimpleButtons = interaction === "binary";
   const showNav = interaction === "navigate";
 
+  const advisorNoteOnYes =
+    current?.branch?.externalAudio?.advisorNoteOnYes ??
+    current?.branch?.portabilityProcess?.advisorNoteOnYes ??
+    (condicionesChoice === "yes" ? current?.branch?.condicionesDudas?.advisorNoteOnYes : undefined);
+
+  const advisorNoteOnNo =
+    current?.branch?.dataValidation?.advisorNoteOnNo ??
+    (acceptanceChoice === "no" ? current?.branch?.acceptance?.advisorNoteOnNo : undefined);
+
+  const advisorNote809Start = current?.branch?.prefijo809?.advisorNoteOnBlockStart;
+  const advisorNote809OnAccept =
+    choice === "yes" || followUpChoice === "yes"
+      ? current?.branch?.prefijo809?.advisorNoteOnYes
+      : undefined;
+  const advisorNoteNps = current?.branch?.npsSurvey?.advisorNoteBeforeContinue;
+  const advisorNoteReferral = current?.branch?.referral?.advisorNote;
+
+  const awaitingExternalAudioReturn =
+    Boolean(current?.branch?.externalAudio) && !externalAudioAcknowledged;
+  const awaitingDataCorrection =
+    Boolean(current?.branch?.dataValidation) && choice === "no" && !contractSummaryRevealed;
+  const awaitingNpsResponse =
+    Boolean(current?.branch?.npsSurvey) && !npsQuestionAcknowledged;
+
+  const show809ConsultaButton =
+    Boolean(current?.branch?.prefijo809?.consultaSpeech) && choice === null && !consulta809Revealed;
+
   return (
     <div className="space-y-4">
-      <AdvisorSummaryCard script={script} blockIndex={blockIndex} blocksCount={blocks.length} />
+      <div className="rounded-2xl border border-line bg-canvas/50 px-4 py-3">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-brand">
+          {script.flowTitle}
+          {script.meta.accountModalityLabel ? (
+            <span className="ml-2 font-normal text-muted">· {script.meta.accountModalityLabel}</span>
+          ) : null}
+        </p>
+        <div className="mt-2 grid grid-cols-2 gap-2 text-[12px] sm:grid-cols-4">
+          <MetaItem label="Cliente" value={script.meta.clientName} />
+          <MetaItem label="Plan" value={script.meta.planName} />
+          <MetaItem label="Total" value={script.meta.totalMonthlyLabel} highlight />
+          <MetaItem label="Avance" value={`${blockIndex + 1} / ${blocks.length}`} />
+        </div>
+      </div>
 
       <div className="rounded-2xl border border-line bg-card p-5">
         <div className="h-1 overflow-hidden rounded-full bg-canvas">
@@ -113,12 +200,61 @@ export function SalesScriptTab({
           </p>
         ) : null}
 
+        {advisorNote809Start ? (
+          <div className="mt-4 rounded-lg border border-dashed border-line bg-canvas/80 px-4 py-3 text-[13px] leading-relaxed text-muted italic">
+            {advisorNote809Start}
+          </div>
+        ) : null}
+
         <div
           className="mt-3 select-none whitespace-pre-wrap text-[15px] leading-[1.75] text-ink"
           onCopy={(e) => e.preventDefault()}
         >
           {displayContent}
         </div>
+
+        {advisorNoteNps && awaitingNpsResponse ? (
+          <div className="mt-4 rounded-lg border border-dashed border-line bg-canvas/80 px-4 py-3 text-[13px] leading-relaxed text-muted italic">
+            {advisorNoteNps}
+          </div>
+        ) : null}
+
+        {advisorNoteReferral ? (
+          <div className="mt-4 rounded-lg border border-dashed border-line bg-canvas/80 px-4 py-3 text-[13px] leading-relaxed text-muted italic">
+            {advisorNoteReferral}
+          </div>
+        ) : null}
+
+        {advisorNoteOnYes && (choice === "yes" || condicionesChoice === "yes") ? (
+          <div className="mt-4 rounded-lg border border-dashed border-line bg-canvas/80 px-4 py-3 text-[13px] leading-relaxed text-muted italic">
+            {advisorNoteOnYes}
+          </div>
+        ) : null}
+
+        {advisorNoteOnNo && (awaitingDataCorrection || acceptanceChoice === "no") ? (
+          <div className="mt-4 rounded-lg border border-dashed border-line bg-canvas/80 px-4 py-3 text-[13px] leading-relaxed text-muted italic">
+            {advisorNoteOnNo}
+          </div>
+        ) : null}
+
+        {advisorNote809OnAccept ? (
+          <div className="mt-4 rounded-lg border border-dashed border-line bg-canvas/80 px-4 py-3 text-[13px] leading-relaxed text-muted italic">
+            {advisorNote809OnAccept}
+          </div>
+        ) : null}
+
+        {show809ConsultaButton ? (
+          <div className="mt-4">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setConsulta809Revealed(true)}
+            >
+              El cliente consulta más
+            </Button>
+          </div>
+        ) : null}
 
         {showCapButtons ? (
           <BranchButtons
@@ -177,10 +313,13 @@ export function SalesScriptTab({
             onYes={() => {
               setChoice("yes");
               setBranchPhase("answered");
+              if (current?.branch?.dataValidation) {
+                setContractSummaryRevealed(true);
+              }
             }}
             onNo={() => {
               setChoice("no");
-              if (current?.branch?.prefijo809?.followUpPrompt) {
+              if (current?.branch?.prefijo809?.followUpPrompt || current?.branch?.prefijo809?.noSpeech) {
                 setBranchPhase("809-followup");
               } else {
                 setBranchPhase("answered");
@@ -196,7 +335,10 @@ export function SalesScriptTab({
         !showSimpleButtons &&
         !show809Buttons &&
         !show809FollowUp &&
-        showNav ? (
+        showNav &&
+        !(Boolean(current?.branch?.externalAudio) && externalAudioAcknowledged && choice !== null) &&
+        !(Boolean(current?.branch?.dataValidation) && contractSummaryRevealed) &&
+        !awaitingNpsResponse ? (
           <div className="mt-6 flex items-center justify-between gap-3">
             <Button
               type="button"
@@ -211,9 +353,37 @@ export function SalesScriptTab({
             <Button
               type="button"
               size="sm"
-              disabled={blockIndex >= blocks.length - 1 || !canContinue}
-              onClick={() => setBlockIndex((i) => Math.min(blocks.length - 1, i + 1))}
+              disabled={
+                (blockIndex >= blocks.length - 1 || !canContinue) &&
+                !awaitingExternalAudioReturn &&
+                !awaitingDataCorrection &&
+                !awaitingNpsResponse
+              }
+              onClick={() => {
+                if (awaitingExternalAudioReturn) {
+                  setExternalAudioAcknowledged(true);
+                  return;
+                }
+                if (awaitingDataCorrection) {
+                  setContractSummaryRevealed(true);
+                  return;
+                }
+                if (awaitingNpsResponse) {
+                  setNpsQuestionAcknowledged(true);
+                  return;
+                }
+                setBlockIndex((i) => Math.min(blocks.length - 1, i + 1));
+              }}
             >
+              Continuar
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        ) : null}
+
+        {awaitingNpsResponse ? (
+          <div className="mt-6 flex justify-end">
+            <Button type="button" size="sm" onClick={() => setNpsQuestionAcknowledged(true)}>
               Continuar
               <ChevronRight className="size-4" />
             </Button>
@@ -239,7 +409,12 @@ export function SalesScriptTab({
           showAcceptanceButtons ||
           showSimpleButtons ||
           show809Buttons ||
-          show809FollowUp) &&
+          show809FollowUp ||
+          (Boolean(current?.branch?.externalAudio) &&
+            externalAudioAcknowledged &&
+            choice !== null) ||
+          (Boolean(current?.branch?.dataValidation) && contractSummaryRevealed) ||
+          (Boolean(current?.branch?.npsSurvey) && npsQuestionAcknowledged)) &&
         canContinue ? (
           <div className="mt-4 flex justify-end">
             <Button type="button" size="sm" onClick={() => setBlockIndex((i) => i + 1)}>
@@ -261,6 +436,10 @@ function resolveContent(
   capChoice: "yes" | "no" | null,
   condicionesChoice: "yes" | "no" | null,
   acceptanceChoice: "yes" | "no" | null,
+  externalAudioAcknowledged: boolean,
+  contractSummaryRevealed: boolean,
+  npsQuestionAcknowledged: boolean,
+  consulta809Revealed: boolean,
 ): string {
   const base = step.content;
   const b = step.branch;
@@ -268,24 +447,51 @@ function resolveContent(
 
   const parts = [base];
 
+  if (b.externalAudio) {
+    if (externalAudioAcknowledged) {
+      parts.push("", b.externalAudio.postAudioQuestion);
+    }
+    return parts.join("\n");
+  }
+
+  if (b.npsSurvey) {
+    if (npsQuestionAcknowledged) {
+      parts.push("", b.npsSurvey.postQuestionSpeech);
+    }
+    return parts.join("\n");
+  }
+
+  if (b.dataValidation) {
+    if (contractSummaryRevealed) {
+      parts.push("", b.dataValidation.postValidationSpeech);
+    }
+    return parts.join("\n");
+  }
+
   if (b.cap && capChoice === "yes") parts.push("", b.cap.yesSpeech);
   if (b.cap && capChoice === "no") parts.push("", b.cap.noSpeech);
 
-  if (condicionesChoice === "yes" && b.condicionesDudas?.yesSpeech) {
+  if (condicionesChoice !== null && b.acceptance?.postCondicionesSpeech) {
+    parts.push("", b.acceptance.postCondicionesSpeech);
+  } else if (condicionesChoice === "yes" && b.condicionesDudas?.yesSpeech) {
     parts.push("", b.condicionesDudas.yesSpeech);
   }
-  if (acceptanceChoice === "no" && b.acceptance?.noSpeech) {
+
+  if (acceptanceChoice === "no" && b.acceptance?.noSpeech && !b.acceptance.advisorNoteOnNo) {
     parts.push("", b.acceptance.noSpeech);
   }
 
-  if (choice === "yes" && b.yesSpeech) parts.push("", b.yesSpeech);
+  if (choice === "yes" && b.yesSpeech && !b.portabilityProcess) parts.push("", b.yesSpeech);
   if (choice === "no" && b.noSpeech) parts.push("", b.noSpeech);
 
   if (b.prefijo809) {
+    if (consulta809Revealed && b.prefijo809.consultaSpeech) {
+      parts.push("", b.prefijo809.consultaSpeech);
+    }
     if (choice === "yes") parts.push("", b.prefijo809.yesSpeech);
     if (choice === "no") {
       parts.push("", b.prefijo809.noSpeech);
-      if (phase === "809-followup" || phase === "809-done") {
+      if (b.prefijo809.followUpPrompt && (phase === "809-followup" || phase === "809-done")) {
         parts.push("", b.prefijo809.followUpPrompt);
       }
     }
@@ -304,37 +510,68 @@ function canAdvanceBlock(
   capChoice: "yes" | "no" | null,
   condicionesChoice: "yes" | "no" | null,
   acceptanceChoice: "yes" | "no" | null,
+  externalAudioAcknowledged: boolean,
+  contractSummaryRevealed: boolean,
+  npsQuestionAcknowledged: boolean,
 ): boolean {
   const b = step.branch;
   if (!b) return true;
+
+  if (b.externalAudio) {
+    if (!externalAudioAcknowledged) return true;
+    return choice !== null;
+  }
+
+  if (b.npsSurvey) {
+    return npsQuestionAcknowledged;
+  }
+
+  if (b.dataValidation) {
+    return contractSummaryRevealed;
+  }
 
   if (b.cap && capChoice === null) return false;
   if (b.cap && capChoice !== null && choice === null) return false;
 
   if (b.condicionesDudas && condicionesChoice === null) return false;
-  if (b.acceptance && condicionesChoice !== null && acceptanceChoice === null) return false;
-
-  if (b.prefijo809 && acceptanceChoice !== null && choice === null) return false;
-  if (b.prefijo809 && choice === "no" && followUpChoice === null && phase === "809-followup") {
+  if (b.acceptance?.postCondicionesSpeech && condicionesChoice !== null && acceptanceChoice === null) {
+    return false;
+  }
+  if (b.acceptance && !b.acceptance.postCondicionesSpeech && condicionesChoice !== null && acceptanceChoice === null) {
     return false;
   }
 
-  if ((b.yesSpeech || b.noSpeech) && !b.cap && !b.prefijo809 && !b.condicionesDudas && choice === null) {
+  if (b.prefijo809 && !b.condicionesDudas) {
+    if (choice === null) return false;
+    if (choice === "no" && followUpChoice === null && phase === "809-followup") return false;
+    if (choice === "yes" || followUpChoice !== null) return true;
+    return false;
+  }
+
+  if (b.portabilityProcess && !b.cap && choice === null) return false;
+
+  if (
+    (b.yesSpeech || b.noSpeech) &&
+    !b.cap &&
+    !b.prefijo809 &&
+    !b.condicionesDudas &&
+    !b.dataValidation &&
+    !b.portabilityProcess &&
+    choice === null
+  ) {
     return false;
   }
 
   if (b.cap && capChoice !== null && choice !== null) return true;
+
   if (b.condicionesDudas && condicionesChoice !== null && acceptanceChoice !== null) {
-    if (b.prefijo809 && choice === null) return false;
-    if (b.prefijo809 && choice === "no" && followUpChoice === null && phase === "809-followup") {
-      return false;
-    }
-    if (b.prefijo809 && choice !== null && (choice === "yes" || followUpChoice !== null)) return true;
-    if (!b.prefijo809) return true;
+    return true;
   }
+
   if (b.prefijo809 && !b.condicionesDudas && choice !== null && (choice === "yes" || followUpChoice !== null)) {
     return true;
   }
+
   if (!b.cap && !b.prefijo809 && !b.condicionesDudas && choice !== null) return true;
 
   return capChoice !== null || condicionesChoice !== null || acceptanceChoice !== null || choice !== null;
@@ -362,6 +599,9 @@ function getInteractionMode(
   acceptanceChoice: "yes" | "no" | null,
   choice: "yes" | "no" | null,
   followUpChoice: "yes" | "no" | null,
+  externalAudioAcknowledged: boolean,
+  contractSummaryRevealed: boolean,
+  npsQuestionAcknowledged: boolean,
 ):
   | "cap"
   | "dudas"
@@ -373,72 +613,56 @@ function getInteractionMode(
   | "navigate" {
   const b = step?.branch;
   if (!b) return "navigate";
+
+  if (b.externalAudio && externalAudioAcknowledged && choice !== null) return "navigate";
+  if (b.externalAudio && !externalAudioAcknowledged) return "navigate";
+  if (b.externalAudio && externalAudioAcknowledged && choice === null) return "binary";
+
+  if (b.npsSurvey && !npsQuestionAcknowledged) return "navigate";
+  if (b.npsSurvey && npsQuestionAcknowledged) return "navigate";
+
+  if (b.dataValidation && contractSummaryRevealed) return "navigate";
+  if (b.dataValidation && choice === "no" && !contractSummaryRevealed) return "navigate";
+  if (b.dataValidation && choice === null) return "binary";
+
   if (b.cap && capChoice === null) return "cap";
   if (b.cap && capChoice !== null && choice === null) return "dudas";
+
   if (b.condicionesDudas && condicionesChoice === null) return "condiciones-dudas";
   if (b.acceptance && condicionesChoice !== null && acceptanceChoice === null) return "acceptance";
-  if (b.prefijo809 && acceptanceChoice !== null && choice === null) return "809";
-  if (b.prefijo809 && choice === "no" && followUpChoice === null) return "809-followup";
+
+  if (b.prefijo809 && !b.condicionesDudas && choice === null) return "809";
+  if (b.prefijo809 && !b.condicionesDudas && choice === "no" && followUpChoice === null) {
+    return "809-followup";
+  }
+
   if (
     choice === null &&
-    (b.yesSpeech || b.noSpeech) &&
+    (b.yesSpeech || b.noSpeech || b.portabilityProcess) &&
     !b.cap &&
     !b.prefijo809 &&
-    !b.condicionesDudas
+    !b.condicionesDudas &&
+    !b.dataValidation
   ) {
-    return "binary";
+    return b.portabilityProcess ? "dudas" : "binary";
   }
+
   return "navigate";
 }
 
-function AdvisorSummaryCard({
-  script,
-  blockIndex,
-  blocksCount,
+function MetaItem({
+  label,
+  value,
+  highlight,
 }: {
-  script: GeneratedSalesScript;
-  blockIndex: number;
-  blocksCount: number;
+  label: string;
+  value: string;
+  highlight?: boolean;
 }) {
-  const s = script.meta.advisorSummary;
-  const items = [
-    { icon: "👤", label: "Cliente", value: script.meta.clientName },
-    { icon: "📱", label: "Operador actual", value: s?.currentOperator ?? "—" },
-    { icon: "📦", label: "Tipo", value: script.meta.saleTypeLabel },
-    { icon: "📋", label: "Plan", value: script.meta.planName },
-    { icon: "💰", label: "Valor", value: s?.planValueLabel ?? script.meta.totalMonthlyLabel },
-    { icon: "➕", label: "Líneas", value: String(s?.lineCount ?? 1) },
-    { icon: "🚚", label: "Entrega", value: s?.deliveryLabel ?? "—" },
-    { icon: "📅", label: "Fecha entrega", value: s?.deliveryDate ?? "—" },
-  ];
-
   return (
-    <div className="sticky top-0 z-10 rounded-2xl border border-line bg-canvas/95 px-4 py-3 shadow-sm backdrop-blur-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-brand">
-          {script.flowTitle}
-          {script.meta.accountModalityLabel ? (
-            <span className="ml-2 font-normal text-muted">· {script.meta.accountModalityLabel}</span>
-          ) : null}
-        </p>
-        <p className="text-[11px] text-muted">
-          Bloque {blockIndex + 1} / {blocksCount}
-        </p>
-      </div>
-      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[12px] sm:grid-cols-4 lg:grid-cols-8">
-        {items.map((item) => (
-          <div key={item.label} className="min-w-0">
-            <p className="truncate text-[10px] uppercase tracking-wide text-muted">
-              {item.icon} {item.label}
-            </p>
-            <p className="truncate font-medium text-ink">{item.value || "—"}</p>
-          </div>
-        ))}
-      </div>
-      <div className="mt-2 flex items-center justify-between border-t border-line/60 pt-2 text-[12px]">
-        <span className="text-muted">Total mensual</span>
-        <span className="font-semibold text-brand">{script.meta.totalMonthlyLabel}</span>
-      </div>
+    <div>
+      <p className="text-[10px] uppercase tracking-wide text-muted">{label}</p>
+      <p className={cn("mt-0.5 font-medium", highlight ? "text-brand" : "text-ink")}>{value || "—"}</p>
     </div>
   );
 }

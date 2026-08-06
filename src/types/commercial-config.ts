@@ -19,54 +19,79 @@ export const COMMERCIAL_SALE_TYPE_LABELS: Record<CommercialSaleType, string> = {
   postpago: "Postpago",
 };
 
+/** Cupón de descuento en equipos y accesorios. */
+export type PlanHandsetCoupon = {
+  enabled: boolean;
+  percent: number;
+  limitAmount: number;
+  periodMonths: number;
+};
+
+/** Cuotas gratis al financiar equipo. */
+export type PlanFreeDeviceInstallments = {
+  enabled: boolean;
+  installmentNumbers: number[];
+};
+
+/** PedidosYa Plus — solo Plan M. */
+export type PlanPedidosYaPlus = {
+  enabled: boolean;
+  conditions: string;
+};
+
+/** Boletas promocionales ($0). */
+export type PlanFreeBills = {
+  billNumbers: number[];
+  /** Línea principal en Portabilidad. */
+  appliesToMainLine: boolean;
+  /** Líneas adicionales en Portabilidad y Línea Nueva. */
+  appliesToAdditionalLines: boolean;
+};
+
+/**
+ * Oferta comercial estructurada — única fuente de verdad para el teleprompter.
+ * El motor construye el discurso desde estos atributos; nunca desde párrafos fijos.
+ */
+export type PlanOffer = {
+  dataAllowance: string;
+  unlimitedMinutes: boolean;
+  unlimitedSms: boolean;
+  freeApps: boolean;
+  roamingWhatsapp: boolean;
+  roamingGb: number | null;
+  additionalLinePrice: number | null;
+  maxAdditionalLines: number;
+  clubWom: boolean;
+  clubBenefits: string[];
+  handsetCoupon: PlanHandsetCoupon | null;
+  freeDeviceInstallments: PlanFreeDeviceInstallments | null;
+  pedidosYaPlus: PlanPedidosYaPlus | null;
+  freeBills: PlanFreeBills;
+};
+
 export interface CommercialPlan {
   id: string;
   name: string;
   operator: string;
   saleType: CommercialSaleType;
-  /** Precio al cliente final (WOM) — visible para asesoras. */
+  /** Precio mensual al cliente (WOM). */
   womValue: number;
-  /** Valor mensual por línea adicional. */
+  /** Valor mensual por línea adicional — derivado de offer.additionalLinePrice. */
   additionalLineValue: number;
-  /** Cantidad máxima de líneas permitidas. */
+  /** Cantidad máxima de líneas (principal + adicionales). */
   maxLines: number;
-  /** Lo que WOM paga a DuMo — base de contabilidad admin. */
   dumoValue: number;
   advisorCommission: number;
-  /** Beneficios incluidos (etiquetas cortas para admin). */
-  benefits: string[];
-  /** Promociones activas (ej. 3° boleta $0). */
-  promotions: string[];
-  /** Texto comercial oficial que lee la asesora en el script. */
-  commercialText: string;
-  /** Condiciones especiales del plan. */
+  /** Oferta estructurada — fuente de verdad para teleprompter. */
+  offer: PlanOffer;
   specialConditions: string;
-  /** Especificaciones técnicas para variables del motor de scripts. */
-  specs?: CommercialPlanSpecs;
   status: CommercialPlanStatus;
 }
 
-export interface CommercialPlanSpecs {
-  gb: string;
-  sms: string;
-  minutes: string;
-  appsLibres: string;
-  roaming: string;
-  clubWom: string;
-  pedidosYa: string;
-  cuponEquipos: string;
-  cuotasGratis: string;
-  maxAdditionalLines: number;
-}
-
 export interface CommercialGlobalSettings {
-  /** Ventas totales del equipo al mes (ej. 120). */
   monthlyGoal: number;
-  /** Ingreso DuMo total objetivo del mes en pesos. Se reparte entre asesoras. */
   economicGoal: number;
-  /** Comisión por línea si el plan vendido no coincide con la tabla. */
   baseCommission: number;
-  /** Presupuesto mensual de gastos — base para disponible y presupuesto restante. */
   monthlyBudget: number;
 }
 
@@ -84,11 +109,8 @@ export interface UpsertCommercialPlanInput {
   maxLines: number;
   dumoValue: number;
   advisorCommission: number;
-  benefits: string[];
-  promotions: string[];
-  commercialText: string;
+  offer: PlanOffer;
   specialConditions: string;
-  specs?: CommercialPlanSpecs;
   status: CommercialPlanStatus;
 }
 

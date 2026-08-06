@@ -28,7 +28,14 @@ import {
   COMMERCIAL_SALE_TYPE_LABELS,
   type CommercialPlan,
   type CommercialPlanStatus,
+  type PlanOffer,
 } from "@/types/commercial-config";
+import {
+  DEFAULT_CLUB_BENEFITS,
+  EMPTY_PLAN_OFFER,
+  deriveAdditionalLineValue,
+  deriveMaxLines,
+} from "@/lib/commercial-plan-offer";
 import { cn } from "@/lib/utils";
 
 const money = new Intl.NumberFormat("es-CL", {
@@ -65,6 +72,7 @@ export function CommercialPlansTable({
             <TableHead>Nombre plan</TableHead>
             <TableHead>Operador</TableHead>
             <TableHead>Tipo venta</TableHead>
+            <TableHead>Datos</TableHead>
             <TableHead>Valor Wom</TableHead>
             <TableHead>Valor DuMo</TableHead>
             <TableHead>Comisión asesora</TableHead>
@@ -78,6 +86,7 @@ export function CommercialPlansTable({
               <TableCell className="font-semibold text-ink">{p.name}</TableCell>
               <TableCell>{p.operator}</TableCell>
               <TableCell>{COMMERCIAL_SALE_TYPE_LABELS[p.saleType]}</TableCell>
+              <TableCell className="text-muted">{p.offer.dataAllowance || "—"}</TableCell>
               <TableCell>{money.format(p.womValue)}</TableCell>
               <TableCell>{money.format(p.dumoValue)}</TableCell>
               <TableCell>{money.format(p.advisorCommission)}</TableCell>
@@ -195,6 +204,180 @@ export function CommercialSettingsForm({
   );
 }
 
+function OfferFieldsEditor({
+  offer,
+  onChange,
+}: {
+  offer: PlanOffer;
+  onChange: (offer: PlanOffer) => void;
+}) {
+  const set = (patch: Partial<PlanOffer>) => onChange({ ...offer, ...patch });
+
+  return (
+    <div className="space-y-4 rounded-xl border border-line bg-canvas/30 p-4">
+      <p className="text-[13px] font-semibold text-ink">Oferta estructurada (teleprompter)</p>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block">
+          <span className="text-[12px] text-muted">Datos (GB)</span>
+          <input
+            value={offer.dataAllowance}
+            onChange={(e) => set({ dataAllowance: e.target.value })}
+            placeholder="150 GB / 300 GB / GB Libres"
+            className="mt-1 h-10 w-full rounded-lg border border-line px-3 text-[13px]"
+          />
+        </label>
+        <label className="block">
+          <span className="text-[12px] text-muted">Líneas adicionales máx.</span>
+          <input
+            type="number"
+            value={offer.maxAdditionalLines}
+            onChange={(e) => set({ maxAdditionalLines: Number(e.target.value) })}
+            className="mt-1 h-10 w-full rounded-lg border border-line px-3 text-[13px]"
+          />
+        </label>
+        <label className="block">
+          <span className="text-[12px] text-muted">Precio línea adicional ($)</span>
+          <input
+            type="number"
+            value={offer.additionalLinePrice ?? ""}
+            onChange={(e) =>
+              set({ additionalLinePrice: e.target.value ? Number(e.target.value) : null })
+            }
+            placeholder="7990 o vacío si no aplica"
+            className="mt-1 h-10 w-full rounded-lg border border-line px-3 text-[13px]"
+          />
+        </label>
+        <label className="block">
+          <span className="text-[12px] text-muted">Roaming GB extra</span>
+          <input
+            type="number"
+            value={offer.roamingGb ?? ""}
+            onChange={(e) => set({ roamingGb: e.target.value ? Number(e.target.value) : null })}
+            placeholder="3 o vacío"
+            className="mt-1 h-10 w-full rounded-lg border border-line px-3 text-[13px]"
+          />
+        </label>
+      </div>
+
+      <div className="flex flex-wrap gap-4 text-[13px]">
+        {(
+          [
+            ["unlimitedMinutes", "Minutos libres"],
+            ["unlimitedSms", "SMS libres"],
+            ["freeApps", "Apps Libres"],
+            ["roamingWhatsapp", "WhatsApp roaming"],
+            ["clubWom", "Club WOM"],
+          ] as const
+        ).map(([key, label]) => (
+          <label key={key} className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={offer[key]}
+              onChange={(e) => set({ [key]: e.target.checked })}
+            />
+            {label}
+          </label>
+        ))}
+      </div>
+
+      <label className="block">
+        <span className="text-[12px] text-muted">Comercios Club WOM (uno por línea)</span>
+        <textarea
+          value={offer.clubBenefits.join("\n")}
+          onChange={(e) =>
+            set({
+              clubBenefits: e.target.value
+                .split("\n")
+                .map((s) => s.trim())
+                .filter(Boolean),
+            })
+          }
+          className="mt-1 min-h-[60px] w-full rounded-lg border border-line px-3 py-2 text-[13px]"
+        />
+      </label>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="flex items-center gap-2 text-[13px]">
+          <input
+            type="checkbox"
+            checked={offer.handsetCoupon?.enabled ?? false}
+            onChange={(e) =>
+              set({
+                handsetCoupon: e.target.checked
+                  ? {
+                      enabled: true,
+                      percent: offer.handsetCoupon?.percent ?? 10,
+                      limitAmount: offer.handsetCoupon?.limitAmount ?? 100_000,
+                      periodMonths: offer.handsetCoupon?.periodMonths ?? 24,
+                    }
+                  : null,
+              })
+            }
+          />
+          Cupón equipos
+        </label>
+        <label className="flex items-center gap-2 text-[13px]">
+          <input
+            type="checkbox"
+            checked={offer.pedidosYaPlus?.enabled ?? false}
+            onChange={(e) =>
+              set({
+                pedidosYaPlus: e.target.checked
+                  ? { enabled: true, conditions: offer.pedidosYaPlus?.conditions ?? "" }
+                  : null,
+              })
+            }
+          />
+          PedidosYa Plus
+        </label>
+      </div>
+
+      <label className="block">
+        <span className="text-[12px] text-muted">Boletas $0 (números separados por coma, ej: 3,6)</span>
+        <input
+          value={offer.freeBills.billNumbers.join(",")}
+          onChange={(e) =>
+            set({
+              freeBills: {
+                ...offer.freeBills,
+                billNumbers: e.target.value
+                  .split(",")
+                  .map((s) => Number(s.trim()))
+                  .filter((n) => !Number.isNaN(n)),
+              },
+            })
+          }
+          className="mt-1 h-10 w-full rounded-lg border border-line px-3 text-[13px]"
+        />
+      </label>
+
+      <div className="flex flex-wrap gap-4 text-[13px]">
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={offer.freeBills.appliesToMainLine}
+            onChange={(e) =>
+              set({ freeBills: { ...offer.freeBills, appliesToMainLine: e.target.checked } })
+            }
+          />
+          Boletas $0 — línea principal (Portabilidad)
+        </label>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={offer.freeBills.appliesToAdditionalLines}
+            onChange={(e) =>
+              set({ freeBills: { ...offer.freeBills, appliesToAdditionalLines: e.target.checked } })
+            }
+          />
+          Boletas $0 — líneas adicionales
+        </label>
+      </div>
+    </div>
+  );
+}
+
 export function CommercialPlanDialog({
   open,
   initial,
@@ -210,13 +393,14 @@ export function CommercialPlanDialog({
   const [operator, setOperator] = useState(initial?.operator ?? "");
   const [saleType, setSaleType] = useState(initial?.saleType ?? "portabilidad");
   const [womValue, setWomValue] = useState(initial?.womValue ?? 0);
-  const [additionalLineValue, setAdditionalLineValue] = useState(initial?.additionalLineValue ?? initial?.womValue ?? 0);
-  const [maxLines, setMaxLines] = useState(initial?.maxLines ?? 5);
   const [dumoValue, setDumoValue] = useState(initial?.dumoValue ?? 0);
   const [advisorCommission, setAdvisorCommission] = useState(initial?.advisorCommission ?? 0);
-  const [benefitsText, setBenefitsText] = useState((initial?.benefits ?? []).join("\n"));
-  const [promotionsText, setPromotionsText] = useState((initial?.promotions ?? []).join("\n"));
-  const [commercialText, setCommercialText] = useState(initial?.commercialText ?? "");
+  const [offer, setOffer] = useState<PlanOffer>(
+    initial?.offer ?? {
+      ...EMPTY_PLAN_OFFER,
+      clubBenefits: [...DEFAULT_CLUB_BENEFITS],
+    },
+  );
   const [specialConditions, setSpecialConditions] = useState(initial?.specialConditions ?? "");
   const [status, setStatus] = useState<CommercialPlanStatus>(initial?.status ?? "active");
 
@@ -237,7 +421,7 @@ export function CommercialPlanDialog({
             ))}
           </select>
           <label className="block">
-            <span className="text-[13px] text-muted">Valor Wom (precio al cliente)</span>
+            <span className="text-[13px] text-muted">Valor Wom (precio mensual al cliente)</span>
             <input type="number" value={womValue} onChange={(e) => setWomValue(Number(e.target.value))} className="mt-1.5 h-11 w-full rounded-xl border border-line px-4 text-[14px]" />
           </label>
           <label className="block">
@@ -245,29 +429,12 @@ export function CommercialPlanDialog({
             <input type="number" value={dumoValue} onChange={(e) => setDumoValue(Number(e.target.value))} className="mt-1.5 h-11 w-full rounded-xl border border-line px-4 text-[14px]" />
           </label>
           <label className="block">
-            <span className="text-[13px] text-muted">Valor línea adicional ($)</span>
-            <input type="number" value={additionalLineValue} onChange={(e) => setAdditionalLineValue(Number(e.target.value))} className="mt-1.5 h-11 w-full rounded-xl border border-line px-4 text-[14px]" />
-          </label>
-          <label className="block">
-            <span className="text-[13px] text-muted">Cantidad máxima de líneas</span>
-            <input type="number" value={maxLines} onChange={(e) => setMaxLines(Number(e.target.value))} className="mt-1.5 h-11 w-full rounded-xl border border-line px-4 text-[14px]" />
-          </label>
-          <label className="block">
             <span className="text-[13px] text-muted">Comisión asesora</span>
             <input type="number" value={advisorCommission} onChange={(e) => setAdvisorCommission(Number(e.target.value))} className="mt-1.5 h-11 w-full rounded-xl border border-line px-4 text-[14px]" />
           </label>
-          <label className="block">
-            <span className="text-[13px] text-muted">Beneficios (uno por línea — Script de Venta)</span>
-            <textarea value={benefitsText} onChange={(e) => setBenefitsText(e.target.value)} className="mt-1.5 min-h-[72px] w-full rounded-xl border border-line px-4 py-3 text-[14px]" />
-          </label>
-          <label className="block">
-            <span className="text-[13px] text-muted">Promociones (una por línea)</span>
-            <textarea value={promotionsText} onChange={(e) => setPromotionsText(e.target.value)} className="mt-1.5 min-h-[60px] w-full rounded-xl border border-line px-4 py-3 text-[14px]" />
-          </label>
-          <label className="block">
-            <span className="text-[13px] text-muted">Texto comercial (Script de Venta)</span>
-            <textarea value={commercialText} onChange={(e) => setCommercialText(e.target.value)} className="mt-1.5 min-h-[60px] w-full rounded-xl border border-line px-4 py-3 text-[14px]" />
-          </label>
+
+          <OfferFieldsEditor offer={offer} onChange={setOffer} />
+
           <label className="block">
             <span className="text-[13px] text-muted">Condiciones especiales</span>
             <textarea value={specialConditions} onChange={(e) => setSpecialConditions(e.target.value)} className="mt-1.5 min-h-[48px] w-full rounded-xl border border-line px-4 py-3 text-[14px]" />
@@ -279,24 +446,26 @@ export function CommercialPlanDialog({
         </div>
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-          <Button onClick={() => {
-            onSave({
-              name,
-              operator,
-              saleType,
-              womValue,
-              additionalLineValue,
-              maxLines,
-              dumoValue,
-              advisorCommission,
-              benefits: benefitsText.split("\n").map((s) => s.trim()).filter(Boolean),
-              promotions: promotionsText.split("\n").map((s) => s.trim()).filter(Boolean),
-              commercialText,
-              specialConditions,
-              status,
-            });
-            onClose();
-          }}>
+          <Button
+            onClick={() => {
+              const additionalLineValue = deriveAdditionalLineValue(offer);
+              const maxLines = deriveMaxLines(offer);
+              onSave({
+                name,
+                operator,
+                saleType,
+                womValue,
+                additionalLineValue,
+                maxLines,
+                dumoValue,
+                advisorCommission,
+                offer,
+                specialConditions,
+                status,
+              });
+              onClose();
+            }}
+          >
             Guardar
           </Button>
         </div>

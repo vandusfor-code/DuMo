@@ -4,10 +4,9 @@ import { CURRENT_OPERATOR_LABELS } from "@/types/lead";
 import { formatCurrency } from "@/lib/format";
 import type { Plan } from "@/types/lead";
 import {
-  buildConversationalBenefitsSpeech,
+  buildBlock4BenefitsSpeech,
   buildStructuredBenefitItems,
 } from "@/lib/sales-script/teleprompter/plan-benefits-speech";
-import { joinNaturalList, toBenefitPhrase } from "@/lib/sales-script/teleprompter/speech-utils";
 
 export type LineSpeechDetail = {
   index: number;
@@ -40,7 +39,18 @@ export function buildBenefitsSpeech(
   planValueLabel: string,
   plan: CommercialPlan | null,
 ): string {
-  return buildConversationalBenefitsSpeech(clientName, planName, planValueLabel, plan);
+  const line: LineSpeechDetail = {
+    index: 0,
+    phone: "",
+    planId: plan?.id ?? "",
+    planName: planName || plan?.name || "",
+    planValue: plan?.womValue ?? 0,
+    planValueLabel: planValueLabel || (plan ? formatCurrency(plan.womValue) : ""),
+    benefitItems: plan ? buildStructuredBenefitItems(plan) : [],
+    plan,
+    isMain: true,
+  };
+  return buildBlock4BenefitsSpeech(clientName, [line]);
 }
 
 export function buildLineDetails(input: {
@@ -68,45 +78,11 @@ export function buildLineDetails(input: {
   });
 }
 
-function buildLineBenefitsParagraph(
-  clientName: string,
-  line: LineSpeechDetail,
-  roleLabel: string,
-): string {
-  const name = line.isMain ? clientName : clientName;
-  const phrases = line.benefitItems.map(toBenefitPhrase);
-
-  if (phrases.length === 0) {
-    return `En ${roleLabel}, el ${line.planName} tiene un valor mensual transparente de ${line.planValueLabel}.`;
-  }
-
-  if (phrases.length <= 4) {
-    return `En ${roleLabel}, el ${line.planName} por ${line.planValueLabel} incluye ${joinNaturalList(phrases)}.`;
-  }
-
-  const mid = Math.ceil(phrases.length / 2);
-  return `En ${roleLabel}, el ${line.planName} por ${line.planValueLabel} incluye ${joinNaturalList(phrases.slice(0, mid))}. Además, cuenta con ${joinNaturalList(phrases.slice(mid))}.`;
-}
-
 export function buildMultilineBenefitsSpeech(
   clientName: string,
   lineDetails: LineSpeechDetail[],
 ): string {
-  const uniquePlans = new Set(lineDetails.map((l) => l.planId));
-
-  if (uniquePlans.size === 1 && lineDetails.length === 1) {
-    const line = lineDetails[0];
-    return buildBenefitsSpeech(clientName, line.planName, line.planValueLabel, line.plan);
-  }
-
-  const parts = lineDetails.map((line) => {
-    const role = line.isMain
-      ? `tu línea principal (${line.phone})`
-      : `tu línea adicional ${line.index} (${line.phone})`;
-    return buildLineBenefitsParagraph(clientName, line, role);
-  });
-
-  return parts.join("\n\n");
+  return buildBlock4BenefitsSpeech(clientName, lineDetails);
 }
 
 export function buildUpsellingSpeech(input: {

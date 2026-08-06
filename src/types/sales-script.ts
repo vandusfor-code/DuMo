@@ -14,26 +14,55 @@ export type SalesScriptBranch = {
   yesSpeech?: string;
   /** Discurso adicional si el cliente responde No (corrección, reconfirmación). */
   noSpeech?: string;
-  /** Bloque Aceptación — ¿Te queda alguna duda con las condiciones? */
+  /** Bloque 9 — ¿Te queda alguna duda con las condiciones? */
   condicionesDudas?: {
-    yesSpeech: string;
+    yesSpeech?: string;
+    advisorNoteOnYes?: string;
   };
-  /** Bloque Aceptación — ¿Lo aceptas? (VDI) */
+  /** Bloque 9 — ¿Lo aceptas? (VDI) */
   acceptance?: {
-    noSpeech: string;
+    postCondicionesSpeech?: string;
+    noSpeech?: string;
+    advisorNoteOnNo?: string;
   };
   /** Solo Prepago → Postpago: ramificación CAP dentro del bloque Portabilidad. */
   cap?: {
     yesSpeech: string;
     noSpeech: string;
   };
-  /** Prefijo 809 dentro del bloque Aceptación. */
+  /** Bloque 10 — Prefijo 809. */
   prefijo809?: {
+    advisorNoteOnBlockStart?: string;
     yesSpeech: string;
     noSpeech: string;
     followUpPrompt: string;
     followUpYesSpeech: string;
     followUpNoSpeech: string;
+    consultaSpeech?: string;
+    advisorNoteOnYes?: string;
+  };
+  /** Bloque 2 — grabación legal en plataforma WOM (acción externa, no DuMo). */
+  externalAudio?: {
+    postAudioQuestion: string;
+    advisorNoteOnYes: string;
+  };
+  /** Bloque 3 — validación de datos antes del resumen de contratación. */
+  dataValidation?: {
+    postValidationSpeech: string;
+    advisorNoteOnNo: string;
+  };
+  /** Bloque 6 — ¿Alguna duda con el proceso de porta? */
+  portabilityProcess?: {
+    advisorNoteOnYes: string;
+  };
+  /** Bloque 8 — Encuesta NPS (dos fases). */
+  npsSurvey?: {
+    postQuestionSpeech: string;
+    advisorNoteBeforeContinue: string;
+  };
+  /** Bloque 11 — Referido. */
+  referral?: {
+    advisorNote: string;
   };
 };
 

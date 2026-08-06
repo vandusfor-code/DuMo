@@ -1,5 +1,5 @@
 /**
- * Flujo Portabilidad sin Equipo → teleprompter de 9 bloques.
+ * Flujo Portabilidad sin Equipo → teleprompter de 12 bloques.
  */
 
 import type { ScriptBuildContext } from "@/lib/sales-script/context";

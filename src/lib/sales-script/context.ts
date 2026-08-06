@@ -14,7 +14,15 @@ import {
   buildLineDetails,
   type LineSpeechDetail,
 } from "@/lib/sales-script/teleprompter/speech-builders";
+import { computeTeleprompterMonthlyTotal } from "@/lib/sales-script/teleprompter/contract-pricing";
+import { DEFAULT_DELIVERY_TELEPROMPTER_CONFIG } from "@/data/defaults/delivery-stores.default";
+import {
+  type DeliveryTeleprompterConfig,
+  resolvePickupStore,
+} from "@/lib/sales-script/teleprompter/delivery-config";
+import { getTeleprompterContextError } from "@/lib/sales-script/teleprompter/teleprompter-validation";
 import { joinNaturalList } from "@/lib/sales-script/teleprompter/speech-utils";
+import { formatFreeBillsLabels } from "@/lib/commercial-plan-offer";
 import type { LeadLineValues } from "@/types/lead-form";
 import type { Plan } from "@/types/lead";
 
@@ -28,11 +36,29 @@ export type ScriptBuildContext = {
   requiresCapCode: boolean;
   deliveryIsHome: boolean;
   deliveryIsStore: boolean;
+  /** Teléfonos de contacto para entrega — extensible cuando el CRM agregue un segundo. */
+  contactPhones: string[];
+  /** Despacho Ultra Express (NOMAD 3h) — preparado para variable futura en gestión. */
+  isUltraExpressDelivery: boolean;
   lineCount: number;
   totalMonthly: number;
   lineDetails: LineSpeechDetail[];
   accountType: "prepaid" | "postpaid";
 };
+
+export { getTeleprompterContextError } from "@/lib/sales-script/teleprompter/teleprompter-validation";
+
+function buildContactPhones(gestion: SaveLeadInput): string[] {
+  const contact = formatPhone569(gestion.phone);
+  return contact ? [contact] : [];
+}
+
+function resolveIsUltraExpressDelivery(
+  _mainLine: SaveLeadInput["lines"][number],
+): boolean {
+  // Future: leer flag de gestión (p. ej. mainLine.deliverySpeed === "ultra_express").
+  return false;
+}
 
 function formatPhone569(phone: string): string {
   const digits = phone.replace(/\D/g, "");
@@ -105,7 +131,21 @@ export function buildScriptContext(input: {
   commercialPlans: CommercialPlan[];
   advisorPlans: Plan[];
   advisor?: { name: string; email: string };
+  deliveryConfig?: DeliveryTeleprompterConfig;
 }): ScriptBuildContext | null {
+  const deliveryConfig = input.deliveryConfig ?? DEFAULT_DELIVERY_TELEPROMPTER_CONFIG;
+
+  if (
+    getTeleprompterContextError({
+      gestion: input.gestion,
+      commercialPlans: input.commercialPlans,
+      advisorPlans: input.advisorPlans,
+      deliveryConfig,
+    })
+  ) {
+    return null;
+  }
+
   const lines = input.gestion.lines;
   if (lines.length === 0) return null;
 
@@ -118,9 +158,6 @@ export function buildScriptContext(input: {
   const additionalLineValue = planDetail?.additionalLineValue ?? 7_990;
   const summary = computeContractSummary(lines.map(mapLineToFormLine), input.advisorPlans);
 
-  const specs = planDetail?.specs;
-  const promotions = planDetail?.promotions ?? [];
-
   const regionLabel = mainLine.region ? regionName(mainLine.region) : "";
   const direccionCompleta = [mainLine.deliveryAddress, mainLine.comuna, regionLabel]
     .filter(Boolean)
@@ -129,6 +166,9 @@ export function buildScriptContext(input: {
   const hasEquipment = lines.some((l) => l.equipmentMode === "with");
   const deliveryIsHome = mainLine.deliveryType === "home";
   const deliveryIsStore = mainLine.deliveryType === "store";
+  const contactPhones = buildContactPhones(input.gestion);
+  const isUltraExpressDelivery = resolveIsUltraExpressDelivery(mainLine);
+  const pickupStore = deliveryIsStore ? resolvePickupStore(deliveryConfig, null) : null;
   const accountType = mainLine.accountType ?? "postpaid";
   const requiresCapCode =
     saleType === "portability" && accountType === "prepaid" && mainLine.currentOperator !== "wom";
@@ -156,8 +196,22 @@ export function buildScriptContext(input: {
     advisorPlans: input.advisorPlans,
   });
 
-  const totalMonthly = summary.totalMonthly || computeTotalMonthlyFromLines(lineDetails);
+  const totalMonthly =
+    computeTeleprompterMonthlyTotal(lineDetails, planDetail) ||
+    summary.totalMonthly ||
+    computeTotalMonthlyFromLines(lineDetails);
   const mainBenefitItems = lineDetails[0]?.benefitItems ?? [];
+  const promoBillNumbers = new Set<number>();
+  for (const line of lineDetails) {
+    const freeBills = line.plan?.offer.freeBills;
+    if (!freeBills || freeBills.billNumbers.length === 0) continue;
+    const applies = line.isMain
+      ? freeBills.appliesToMainLine
+      : freeBills.appliesToAdditionalLines &&
+        (saleType === "portability" || saleType === "new_line");
+    if (applies) freeBills.billNumbers.forEach((n) => promoBillNumbers.add(n));
+  }
+  const promoLabels = formatFreeBillsLabels([...promoBillNumbers].sort((a, b) => a - b));
 
   const vars: Record<string, string> = {
     saludo: chileSaludoCompleto(),
@@ -183,8 +237,8 @@ export function buildScriptContext(input: {
     plan: planName,
     valor_plan: formatCurrency(planValue),
     beneficios: joinNaturalList(mainBenefitItems),
-    promociones: promotions.join(" y "),
-    promociones_lista: promotions.join(", "),
+    promociones: promoLabels.join(" y "),
+    promociones_lista: promoLabels.join(", "),
     resumen_multilinea: "",
     lineas: String(lines.length),
     cantidad_lineas: String(lines.length),
@@ -193,13 +247,19 @@ export function buildScriptContext(input: {
     valor_linea_adicional: formatCurrency(additionalLineValue),
     valor_total: formatCurrency(totalMonthly),
     total_mensual: formatCurrency(totalMonthly),
-    gb: specs?.gb ?? "",
-    roaming: specs?.roaming ?? "",
-    apps_libres: specs?.appsLibres ?? "",
-    club_wom: specs?.clubWom ?? "",
-    pedidosya: specs?.pedidosYa ?? "",
-    cupon_equipos: specs?.cuponEquipos ?? "",
-    cuotas_gratis: specs?.cuotasGratis ?? "",
+    gb: planDetail?.offer.dataAllowance ?? "",
+    roaming: planDetail?.offer.roamingWhatsapp
+      ? planDetail.offer.roamingGb
+        ? `WhatsApp + ${planDetail.offer.roamingGb} GB`
+        : "WhatsApp Libre"
+      : "",
+    apps_libres: planDetail?.offer.freeApps ? "Sí" : "",
+    club_wom: planDetail?.offer.clubWom ? "Sí" : "",
+    pedidosya: planDetail?.offer.pedidosYaPlus?.enabled ? "Sí" : "",
+    cupon_equipos: planDetail?.offer.handsetCoupon?.enabled ? "Sí" : "",
+    cuotas_gratis: planDetail?.offer.freeDeviceInstallments?.enabled
+      ? planDetail.offer.freeDeviceInstallments.installmentNumbers.join(", ")
+      : "",
     equipo: equipmentLine?.equipment || equipmentLine?.equipmentModel || "",
     pie,
     cuotas,
@@ -211,9 +271,9 @@ export function buildScriptContext(input: {
     tipo_entrega: mainLine.deliveryType
       ? DELIVERY_TYPE_LABELS[mainLine.deliveryType]
       : "",
-    nombre_sucursal: "WOM Store Costanera Center",
-    direccion_sucursal: "Av. Andrés Bello 2425, Providencia, Santiago",
-    horario_sucursal: "Lunes a sábado de 10:00 a 20:00 hrs",
+    nombre_sucursal: pickupStore?.name ?? "",
+    direccion_sucursal: pickupStore?.address ?? "",
+    horario_sucursal: pickupStore?.schedule ?? "",
     codigo_retiro: "WOM-" + input.gestion.conversationId.slice(-6).toUpperCase(),
     correo_ejecutivo: input.advisor?.email || "asesor@ventas.wom.cl",
     nombre_ejecutivo: executiveName,
@@ -232,6 +292,8 @@ export function buildScriptContext(input: {
     requiresCapCode,
     deliveryIsHome,
     deliveryIsStore,
+    contactPhones,
+    isUltraExpressDelivery,
     lineCount: lines.length,
     totalMonthly,
     lineDetails,

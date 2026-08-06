@@ -1,7 +1,10 @@
 import "server-only";
 import { getLeadRepository } from "@/repositories/leads.repository";
 import { salesScriptService } from "@/services/sales-script.service";
+import { getCommercialConfigurationRepository } from "@/repositories/commercial-configuration.repository";
 import { getScriptUnavailableReason } from "@/lib/sales-script/eligibility";
+import { getScriptBuildError } from "@/lib/sales-script/builder";
+import { getDeliveryConfigurationRepository } from "@/repositories/delivery-configuration.repository";
 import type { SaveLeadInput } from "@/types/lead";
 import type { SaveLeadResult } from "@/types/sales-script";
 
@@ -23,8 +26,17 @@ export async function saveLeadWithScript(
           advisor,
         });
         if (!script) {
-          scriptUnavailableReason =
-            "No se pudo generar el script con los datos guardados. Revisa la gestión e intenta de nuevo.";
+          const [commercialConfig, advisorPlans, deliveryConfig] = await Promise.all([
+            getCommercialConfigurationRepository().getSnapshot(),
+            getLeadRepository().getPlans(),
+            getDeliveryConfigurationRepository().getConfig(),
+          ]);
+          scriptUnavailableReason = getScriptBuildError({
+            gestion: input,
+            commercialPlans: commercialConfig.plans,
+            advisorPlans,
+            deliveryConfig,
+          });
         }
       } catch (error) {
         console.error("[saveLeadWithScript] script generation failed", error);

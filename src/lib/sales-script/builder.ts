@@ -2,9 +2,27 @@ import type { SaveLeadInput } from "@/types/lead";
 import type { CommercialPlan } from "@/types/commercial-config";
 import type { Plan } from "@/types/lead";
 import type { GeneratedSalesScript } from "@/types/sales-script";
-import { buildScriptContext } from "./context";
+import { buildScriptContext, getTeleprompterContextError } from "./context";
 import { assembleGeneratedScript } from "./engine";
-import { isScriptEligible } from "./eligibility";
+import { getScriptUnavailableReason, isScriptEligible } from "./eligibility";
+import type { DeliveryTeleprompterConfig } from "@/lib/sales-script/teleprompter/delivery-config";
+
+export function getScriptBuildError(input: {
+  gestion: SaveLeadInput;
+  commercialPlans: CommercialPlan[];
+  advisorPlans: Plan[];
+  deliveryConfig: DeliveryTeleprompterConfig;
+}): string | null {
+  const eligibilityReason = getScriptUnavailableReason(input.gestion);
+  if (eligibilityReason) return eligibilityReason;
+
+  return getTeleprompterContextError({
+    gestion: input.gestion,
+    commercialPlans: input.commercialPlans,
+    advisorPlans: input.advisorPlans,
+    deliveryConfig: input.deliveryConfig,
+  });
+}
 
 export function buildSalesScript(input: {
   gestionId: string;
@@ -12,6 +30,7 @@ export function buildSalesScript(input: {
   commercialPlans: CommercialPlan[];
   advisorPlans: Plan[];
   advisor?: { name: string; email: string };
+  deliveryConfig: DeliveryTeleprompterConfig;
 }): GeneratedSalesScript | null {
   if (!isScriptEligible(input.gestion)) return null;
 
@@ -20,6 +39,7 @@ export function buildSalesScript(input: {
     commercialPlans: input.commercialPlans,
     advisorPlans: input.advisorPlans,
     advisor: input.advisor,
+    deliveryConfig: input.deliveryConfig,
   });
   if (!ctx) return null;
 
