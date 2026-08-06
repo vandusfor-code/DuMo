@@ -57,16 +57,26 @@ export type PlanOffer = {
   unlimitedMinutes: boolean;
   unlimitedSms: boolean;
   freeApps: boolean;
+  /** Apps incluidas cuando freeApps es true (Bloque 4 Con Equipo). */
+  freeAppNames: string[];
   roamingWhatsapp: boolean;
   roamingGb: number | null;
   additionalLinePrice: number | null;
   maxAdditionalLines: number;
   clubWom: boolean;
   clubBenefits: string[];
+  /** Si true, el Bloque 4 Con Equipo enumera clubBenefits en el discurso. */
+  clubWomListPartners: boolean;
   handsetCoupon: PlanHandsetCoupon | null;
   freeDeviceInstallments: PlanFreeDeviceInstallments | null;
   pedidosYaPlus: PlanPedidosYaPlus | null;
+  /** Texto corto PedidosYa en Bloque 4 Con Equipo (sin condiciones). */
+  pedidosYaTeleprompterLabel: string;
   freeBills: PlanFreeBills;
+  /** Encabezado oficial Bloque 4 Con Equipo (ej. PLAN SIMPLE W 150 GB). */
+  teleprompterHeading: string;
+  /** Frase de datos en Bloque 4 Con Equipo (ej. 150 Gigas, Gigas Libres). */
+  dataAllowanceSpeechLabel: string;
 };
 
 export interface CommercialPlan {

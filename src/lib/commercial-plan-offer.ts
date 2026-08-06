@@ -9,61 +9,99 @@ import { formatCurrency } from "@/lib/format";
 
 export const DEFAULT_CLUB_BENEFITS = ["Cinépolis", "Farmacias Ahumada", "Lipigas"];
 
+export const DEFAULT_FREE_APP_NAMES = [
+  "WhatsApp",
+  "Facebook",
+  "X",
+  "Instagram",
+  "Spotify",
+  "TikTok",
+];
+
 export const EMPTY_PLAN_OFFER: PlanOffer = {
   dataAllowance: "",
   unlimitedMinutes: false,
   unlimitedSms: false,
   freeApps: false,
+  freeAppNames: [],
   roamingWhatsapp: false,
   roamingGb: null,
   additionalLinePrice: null,
   maxAdditionalLines: 0,
   clubWom: false,
   clubBenefits: [],
+  clubWomListPartners: false,
   handsetCoupon: null,
   freeDeviceInstallments: null,
   pedidosYaPlus: null,
+  pedidosYaTeleprompterLabel: "",
   freeBills: {
     billNumbers: [],
     appliesToMainLine: false,
     appliesToAdditionalLines: false,
   },
+  teleprompterHeading: "",
+  dataAllowanceSpeechLabel: "",
 };
 
+/** Completa campos opcionales de oferta al cargar desde almacenamiento o legacy. */
+export function normalizePlanOffer(offer: PlanOffer): PlanOffer {
+  return {
+    ...EMPTY_PLAN_OFFER,
+    ...offer,
+    freeAppNames: offer.freeAppNames ?? [],
+    clubBenefits: offer.clubBenefits ?? [],
+    dataAllowanceSpeechLabel:
+      offer.dataAllowanceSpeechLabel?.trim() || offer.dataAllowance?.trim() || "",
+    teleprompterHeading: offer.teleprompterHeading?.trim() ?? "",
+    pedidosYaTeleprompterLabel: offer.pedidosYaTeleprompterLabel?.trim() ?? "",
+    clubWomListPartners: offer.clubWomListPartners ?? false,
+  };
+}
+
 /** Oferta Comercial Julio 2026 — Plan W. */
-export const PLAN_W_OFFER: PlanOffer = {
+export const PLAN_W_OFFER: PlanOffer = normalizePlanOffer({
   dataAllowance: "150 GB",
+  dataAllowanceSpeechLabel: "150 Gigas",
+  teleprompterHeading: "PLAN SIMPLE W 150 GB",
   unlimitedMinutes: true,
   unlimitedSms: true,
   freeApps: true,
+  freeAppNames: [...DEFAULT_FREE_APP_NAMES],
   roamingWhatsapp: false,
   roamingGb: null,
   additionalLinePrice: null,
   maxAdditionalLines: 0,
   clubWom: true,
-  clubBenefits: [...DEFAULT_CLUB_BENEFITS],
+  clubBenefits: [...DEFAULT_CLUB_BENEFITS, "FlixBus"],
+  clubWomListPartners: true,
   handsetCoupon: null,
   freeDeviceInstallments: null,
   pedidosYaPlus: null,
+  pedidosYaTeleprompterLabel: "",
   freeBills: {
     billNumbers: [3, 6],
     appliesToMainLine: true,
     appliesToAdditionalLines: false,
   },
-};
+});
 
 /** Oferta Comercial Julio 2026 — Plan O. */
-export const PLAN_O_OFFER: PlanOffer = {
+export const PLAN_O_OFFER: PlanOffer = normalizePlanOffer({
   dataAllowance: "300 GB",
+  dataAllowanceSpeechLabel: "300 Gigas",
+  teleprompterHeading: "PLAN SIMPLE O 300 GB",
   unlimitedMinutes: true,
   unlimitedSms: true,
   freeApps: true,
+  freeAppNames: [...DEFAULT_FREE_APP_NAMES],
   roamingWhatsapp: true,
   roamingGb: null,
   additionalLinePrice: 7_990,
   maxAdditionalLines: 4,
   clubWom: true,
   clubBenefits: [...DEFAULT_CLUB_BENEFITS],
+  clubWomListPartners: false,
   handsetCoupon: {
     enabled: true,
     percent: 10,
@@ -75,25 +113,30 @@ export const PLAN_O_OFFER: PlanOffer = {
     installmentNumbers: [18],
   },
   pedidosYaPlus: null,
+  pedidosYaTeleprompterLabel: "",
   freeBills: {
     billNumbers: [3, 6],
     appliesToMainLine: true,
     appliesToAdditionalLines: true,
   },
-};
+});
 
 /** Oferta Comercial Julio 2026 — Plan M. */
-export const PLAN_M_OFFER: PlanOffer = {
+export const PLAN_M_OFFER: PlanOffer = normalizePlanOffer({
   dataAllowance: "GB Libres",
+  dataAllowanceSpeechLabel: "Gigas Libres",
+  teleprompterHeading: "PLAN SIMPLE M GB LIBRES",
   unlimitedMinutes: true,
   unlimitedSms: true,
   freeApps: true,
+  freeAppNames: [...DEFAULT_FREE_APP_NAMES],
   roamingWhatsapp: true,
   roamingGb: 3,
   additionalLinePrice: 7_990,
   maxAdditionalLines: 4,
   clubWom: true,
   clubBenefits: [...DEFAULT_CLUB_BENEFITS],
+  clubWomListPartners: false,
   handsetCoupon: {
     enabled: true,
     percent: 10,
@@ -109,12 +152,13 @@ export const PLAN_M_OFFER: PlanOffer = {
     conditions:
       "Incluido sin costo adicional por 12 meses. No debes haber tenido una suscripción activa en los últimos 3 meses. Si ya tienes el servicio activo, el beneficio puede extenderse a un tercero. Se activa mediante un correo con enlace enviado por WOM.",
   },
+  pedidosYaTeleprompterLabel: "Suscripción PedidosYa Plus gratis",
   freeBills: {
     billNumbers: [3, 6],
     appliesToMainLine: true,
     appliesToAdditionalLines: true,
   },
-};
+});
 
 const OFFER_BY_PLAN_ID: Record<string, PlanOffer> = {
   "plan-w": PLAN_W_OFFER,
@@ -192,11 +236,11 @@ export function resolvePlanOffer(raw: {
   promotions?: string[];
   additionalLineValue?: number;
 }): PlanOffer {
-  if (raw.offer && isOfferConfigured(raw.offer)) return raw.offer;
-  if (OFFER_BY_PLAN_ID[raw.id]) return { ...OFFER_BY_PLAN_ID[raw.id] };
+  if (raw.offer && isOfferConfigured(raw.offer)) return normalizePlanOffer(raw.offer);
+  if (OFFER_BY_PLAN_ID[raw.id]) return normalizePlanOffer(OFFER_BY_PLAN_ID[raw.id]!);
 
   const byName = resolveOfferByPlanName(raw.name);
-  if (byName) return byName;
+  if (byName) return normalizePlanOffer(byName);
 
   const specs = raw.specs;
   if (!specs) return { ...EMPTY_PLAN_OFFER };
@@ -213,17 +257,19 @@ export function resolvePlanOffer(raw: {
     })
     .filter((n): n is number => n !== null);
 
-  return {
+  return normalizePlanOffer({
     dataAllowance: specs.gb ?? "",
     unlimitedMinutes: isActive(specs.minutes),
     unlimitedSms: isActive(specs.sms),
     freeApps: isActive(specs.appsLibres),
+    freeAppNames: isActive(specs.appsLibres) ? [...DEFAULT_FREE_APP_NAMES] : [],
     roamingWhatsapp: isActive(specs.roaming),
     roamingGb: specs.roaming?.includes("3 GB") ? 3 : null,
     additionalLinePrice: raw.additionalLineValue && raw.additionalLineValue > 0 ? raw.additionalLineValue : null,
     maxAdditionalLines: specs.maxAdditionalLines ?? 0,
     clubWom: isActive(specs.clubWom),
     clubBenefits: isActive(specs.clubWom) ? [...DEFAULT_CLUB_BENEFITS] : [],
+    clubWomListPartners: false,
     handsetCoupon: isActive(specs.cuponEquipos)
       ? {
           enabled: true,
@@ -241,12 +287,17 @@ export function resolvePlanOffer(raw: {
     pedidosYaPlus: isActive(specs.pedidosYa)
       ? { enabled: true, conditions: PLAN_M_OFFER.pedidosYaPlus!.conditions }
       : null,
+    pedidosYaTeleprompterLabel: isActive(specs.pedidosYa)
+      ? PLAN_M_OFFER.pedidosYaTeleprompterLabel
+      : "",
     freeBills: {
       billNumbers: billNumbers.length > 0 ? billNumbers : [],
       appliesToMainLine: billNumbers.length > 0,
       appliesToAdditionalLines: billNumbers.length > 0,
     },
-  };
+    teleprompterHeading: "",
+    dataAllowanceSpeechLabel: specs.gb ?? "",
+  });
 }
 
 export function deriveAdditionalLineValue(offer: PlanOffer): number {

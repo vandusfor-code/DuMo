@@ -120,7 +120,8 @@ useSalesScript(conversationId)
 | 1 | `bloque-1` | Inicio | Transversal (Sin Equipo v1.0) | `block1-saludo-speech.ts` |
 | 2 | `bloque-2` | Audio | Transversal (Sin Equipo v1.0) | `block2-audio-speech.ts` |
 | 3 | `bloque-3` | Contratación | **✅ v1.0 congelado** | `block3-contratacion-con-equipo-speech.ts`, `block3-contract-summary-con-equipo-speech.ts`, `block3-equipment-financing-speech.ts`, `block3-portability-disclaimer-con-equipo.ts` |
-| 4–12 | — | — | Pendiente | — |
+| 4 | `bloque-4` | Plan | **✅ v1.0 congelado** | `block4-plan-benefits-con-equipo-speech.ts` |
+| 5–12 | — | — | Pendiente | — |
 
 ### Bloque 3 congelado (v1.0)
 
@@ -129,6 +130,15 @@ useSalesScript(conversationId)
 - Párrafo equipo: único builder `buildBlock3EquipmentFinancingSpeech(ctx.mainEquipment)` — datos exclusivamente de `brand`, `model`, `color`, `downPayment`, `installments`, `installmentValue`.
 - Rama condicional: `downPayment > 0` → pago inicial + link 24 h; `downPayment === 0` → sin pago inicial, sin link.
 - **No modificar copy** salvo cambio del script oficial o hallazgo de auditoría.
+
+### Bloque 4 congelado (v1.0)
+
+- Builder único: `buildBlock4PlanBenefitsConEquipoSpeech(ctx)` — discurso desde `CommercialPlan.offer` vía `ctx.lineDetails`.
+- Campos de oferta: `teleprompterHeading`, `dataAllowanceSpeechLabel`, `freeAppNames`, `clubBenefits`, `clubWomListPartners`, `pedidosYaTeleprompterLabel`, `handsetCoupon`, `freeDeviceInstallments`, flags de roaming/minutos/SMS/apps.
+- Sin nombre del cliente, sin valor mensual, sin instrucción *“Dependiendo del plan que lleve”*, sin cierre multilínea Sin Equipo.
+- Multilínea: un párrafo por `planId` único; homogénea = un solo párrafo.
+- Cupón y cuotas gratis: redacción afirmativa (*tu equipo financiado*), cantidad de cuotas desde `freeDeviceInstallments.installmentNumbers.length`.
+- **No modificar copy** salvo cambio del script oficial, Oferta Comercial o hallazgo de auditoría.
 
 ---
 
