@@ -10,7 +10,11 @@ import { regionName } from "@/data/chile-regions";
 import { computeContractSummary } from "@/lib/lead-contract-summary";
 import { formatCurrency, formatLongDate } from "@/lib/format";
 import { chileSaludoCompleto } from "@/lib/sales-script/chile-time";
-import { buildMultilineContractSpeech } from "@/lib/sales-script/multiline-contract";
+import {
+  buildLineDetails,
+  type LineSpeechDetail,
+} from "@/lib/sales-script/teleprompter/speech-builders";
+import { joinNaturalList } from "@/lib/sales-script/teleprompter/speech-utils";
 import type { LeadLineValues } from "@/types/lead-form";
 import type { Plan } from "@/types/lead";
 
@@ -26,6 +30,8 @@ export type ScriptBuildContext = {
   deliveryIsStore: boolean;
   lineCount: number;
   totalMonthly: number;
+  lineDetails: LineSpeechDetail[];
+  accountType: "prepaid" | "postpaid";
 };
 
 function formatPhone569(phone: string): string {
@@ -80,19 +86,18 @@ function mapLineToFormLine(line: SaveLeadInput["lines"][number]): LeadLineValues
     equipmentInstallmentValue: line.equipmentInstallmentValue,
     equipmentCommercialText: line.equipmentCommercialText,
     accountType: line.accountType ?? "postpaid",
+    isUpselling: line.isUpselling,
   };
-}
-
-function buildPromotionsSpeech(promotions: string[]): string {
-  if (promotions.length === 0) return "";
-  const list = promotions.join(" y ");
-  return `Además, cuentas con las promociones ${list}, aplicables en los meses correspondientes de tu facturación.`;
 }
 
 function firstName(fullName: string): string {
   const trimmed = fullName.trim();
   if (!trimmed) return "";
   return trimmed.split(/\s+/)[0] ?? trimmed;
+}
+
+function computeTotalMonthlyFromLines(lineDetails: LineSpeechDetail[]): number {
+  return lineDetails.reduce((sum, line) => sum + line.planValue, 0);
 }
 
 export function buildScriptContext(input: {
@@ -115,22 +120,11 @@ export function buildScriptContext(input: {
 
   const specs = planDetail?.specs;
   const promotions = planDetail?.promotions ?? [];
-  /** Beneficios solo desde catálogo comercial — nunca hardcodeados en el flujo. */
-  const benefitsText = planDetail?.commercialText?.trim() ?? "";
-  const promotionsSpeech = buildPromotionsSpeech(promotions);
 
   const regionLabel = mainLine.region ? regionName(mainLine.region) : "";
   const direccionCompleta = [mainLine.deliveryAddress, mainLine.comuna, regionLabel]
     .filter(Boolean)
     .join(", ");
-
-  const multilineSpeech = buildMultilineContractSpeech({
-    lineCount: lines.length,
-    planName,
-    mainValue: planValue,
-    additionalLineValue,
-    totalMonthly: summary.totalMonthly || planValue + additionalLineValue * Math.max(0, lines.length - 1),
-  });
 
   const hasEquipment = lines.some((l) => l.equipmentMode === "with");
   const deliveryIsHome = mainLine.deliveryType === "home";
@@ -156,7 +150,14 @@ export function buildScriptContext(input: {
     ? formatCurrency(Number(equipmentLine.equipmentValue))
     : "";
 
-  const totalMonthly = summary.totalMonthly || planValue;
+  const lineDetails = buildLineDetails({
+    lines: input.gestion.lines,
+    commercialPlans: input.commercialPlans,
+    advisorPlans: input.advisorPlans,
+  });
+
+  const totalMonthly = summary.totalMonthly || computeTotalMonthlyFromLines(lineDetails);
+  const mainBenefitItems = lineDetails[0]?.benefitItems ?? [];
 
   const vars: Record<string, string> = {
     saludo: chileSaludoCompleto(),
@@ -181,10 +182,10 @@ export function buildScriptContext(input: {
       : "",
     plan: planName,
     valor_plan: formatCurrency(planValue),
-    beneficios: benefitsText,
-    promociones: promotionsSpeech,
+    beneficios: joinNaturalList(mainBenefitItems),
+    promociones: promotions.join(" y "),
     promociones_lista: promotions.join(", "),
-    resumen_multilinea: multilineSpeech,
+    resumen_multilinea: "",
     lineas: String(lines.length),
     cantidad_lineas: String(lines.length),
     cantidad_lineas_adicionales: String(Math.max(0, lines.length - 1)),
@@ -233,5 +234,7 @@ export function buildScriptContext(input: {
     deliveryIsStore,
     lineCount: lines.length,
     totalMonthly,
+    lineDetails,
+    accountType,
   };
 }

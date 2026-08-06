@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, ScrollText, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { GeneratedSalesScript, SalesScriptBranch, SalesScriptStep } from "@/types/sales-script";
-import { cn } from "@/lib/utils";
+import type { GeneratedSalesScript, SalesScriptStep } from "@/types/sales-script";
 
-type BranchPhase = "ask" | "resolved" | "followup";
+type BranchPhase = "idle" | "answered" | "cap-done" | "809-followup" | "809-done";
 
 export function SalesScriptTab({
   script,
@@ -17,25 +16,47 @@ export function SalesScriptTab({
   unavailableReason?: string | null;
   gestionSaved?: boolean;
 }) {
-  const [stepIndex, setStepIndex] = useState(0);
-  const [branchPhase, setBranchPhase] = useState<BranchPhase>("ask");
-  const [branchChoice, setBranchChoice] = useState<"yes" | "no" | null>(null);
+  const [blockIndex, setBlockIndex] = useState(0);
+  const [branchPhase, setBranchPhase] = useState<BranchPhase>("idle");
+  const [choice, setChoice] = useState<"yes" | "no" | null>(null);
   const [followUpChoice, setFollowUpChoice] = useState<"yes" | "no" | null>(null);
+  const [capChoice, setCapChoice] = useState<"yes" | "no" | null>(null);
+  const [condicionesChoice, setCondicionesChoice] = useState<"yes" | "no" | null>(null);
+  const [acceptanceChoice, setAcceptanceChoice] = useState<"yes" | "no" | null>(null);
 
   useEffect(() => {
-    setStepIndex(0);
+    setBlockIndex(0);
     resetBranch();
   }, [script?.id]);
 
   useEffect(() => {
     resetBranch();
-  }, [stepIndex]);
+  }, [blockIndex]);
 
   function resetBranch() {
-    setBranchPhase("ask");
-    setBranchChoice(null);
+    setBranchPhase("idle");
+    setChoice(null);
     setFollowUpChoice(null);
+    setCapChoice(null);
+    setCondicionesChoice(null);
+    setAcceptanceChoice(null);
   }
+
+  const blocks = script?.steps ?? [];
+  const current = blocks[blockIndex];
+  const progress = blocks.length > 0 ? ((blockIndex + 1) / blocks.length) * 100 : 0;
+
+  const displayContent = useMemo(
+    () =>
+      current
+        ? resolveContent(current, branchPhase, choice, followUpChoice, capChoice, condicionesChoice, acceptanceChoice)
+        : "",
+    [current, branchPhase, choice, followUpChoice, capChoice, condicionesChoice, acceptanceChoice],
+  );
+
+  const canContinue = current
+    ? canAdvanceBlock(current, branchPhase, choice, followUpChoice, capChoice, condicionesChoice, acceptanceChoice)
+    : false;
 
   if (!script) {
     return (
@@ -55,244 +76,369 @@ export function SalesScriptTab({
     );
   }
 
-  const steps = script.steps;
-  const current = steps[stepIndex];
-  const progress = steps.length > 0 ? ((stepIndex + 1) / steps.length) * 100 : 0;
-  const displayContent = resolveDisplayContent(current, branchPhase, branchChoice, followUpChoice);
-  const canContinue = canAdvance(current, branchPhase, branchChoice, followUpChoice);
+  const sectionLabel = current?.sectionLabel ?? current?.title ?? "";
+  const interaction = getInteractionMode(
+    current,
+    capChoice,
+    condicionesChoice,
+    acceptanceChoice,
+    choice,
+    followUpChoice,
+  );
 
-  function handleBranch(choice: "yes" | "no") {
-    if (!current?.branch) return;
-    setBranchChoice(choice);
-    if (choice === "no" && current.branch.followUp && current.branch.noSpeech) {
-      setBranchPhase("resolved");
-    } else if (choice === "no" && current.branch.followUp && !current.branch.noSpeech) {
-      setBranchPhase("followup");
-    } else {
-      setBranchPhase("resolved");
-    }
-  }
-
-  function handleFollowUp(choice: "yes" | "no") {
-    setFollowUpChoice(choice);
-    setBranchPhase("resolved");
-  }
+  const showCapButtons = interaction === "cap";
+  const showDudasButtons = interaction === "dudas";
+  const showCondicionesButtons = interaction === "condiciones-dudas";
+  const showAcceptanceButtons = interaction === "acceptance";
+  const show809Buttons = interaction === "809";
+  const show809FollowUp = interaction === "809-followup";
+  const showSimpleButtons = interaction === "binary";
+  const showNav = interaction === "navigate";
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-line bg-canvas/50 p-4">
-        <div className="grid grid-cols-2 gap-3 text-[13px] sm:grid-cols-4">
-          <InfoItem label="Cliente" value={script.meta.clientName} />
-          <InfoItem label="Tipo" value={script.meta.saleTypeLabel} />
-          <InfoItem label="Plan" value={script.meta.planName} />
-          <InfoItem label="Total" value={script.meta.totalMonthlyLabel} highlight />
-        </div>
-      </div>
+      <AdvisorSummaryCard script={script} blockIndex={blockIndex} blocksCount={blocks.length} />
 
       <div className="rounded-2xl border border-line bg-card p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[12px] font-semibold uppercase tracking-wide text-brand">
-              {script.flowTitle}
-            </p>
-            <p className="mt-1 text-[13px] text-muted">
-              Paso {stepIndex + 1} de {steps.length}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-canvas">
+        <div className="h-1 overflow-hidden rounded-full bg-canvas">
           <div
             className="h-full rounded-full bg-brand transition-all duration-300"
             style={{ width: `${progress}%` }}
           />
         </div>
 
-        <h4 className="mt-5 text-[15px] font-semibold text-ink">{current?.title}</h4>
+        {sectionLabel ? (
+          <p className="mt-4 text-[10px] font-semibold uppercase tracking-widest text-muted">
+            {sectionLabel}
+          </p>
+        ) : null}
+
         <div
-          className="mt-3 select-none whitespace-pre-wrap text-[14px] leading-relaxed text-ink"
+          className="mt-3 select-none whitespace-pre-wrap text-[15px] leading-[1.75] text-ink"
           onCopy={(e) => e.preventDefault()}
         >
           {displayContent}
         </div>
 
-        <StepControls
-          current={current}
-          branchPhase={branchPhase}
-          branchChoice={branchChoice}
-          followUpChoice={followUpChoice}
-          canContinue={canContinue}
-          stepIndex={stepIndex}
-          totalSteps={steps.length}
-          onBranch={handleBranch}
-          onFollowUp={handleFollowUp}
-          onPrev={() => setStepIndex((i) => Math.max(0, i - 1))}
-          onNext={() => setStepIndex((i) => Math.min(steps.length - 1, i + 1))}
-        />
+        {showCapButtons ? (
+          <BranchButtons
+            onYes={() => {
+              setCapChoice("yes");
+              setBranchPhase("cap-done");
+            }}
+            onNo={() => {
+              setCapChoice("no");
+              setBranchPhase("cap-done");
+            }}
+          />
+        ) : null}
+
+        {showDudasButtons ? (
+          <BranchButtons
+            onYes={() => {
+              setChoice("yes");
+              setBranchPhase("answered");
+            }}
+            onNo={() => {
+              setChoice("no");
+              setBranchPhase("answered");
+            }}
+          />
+        ) : null}
+
+        {showCondicionesButtons ? (
+          <BranchButtons
+            onYes={() => {
+              setCondicionesChoice("yes");
+              setBranchPhase("answered");
+            }}
+            onNo={() => {
+              setCondicionesChoice("no");
+              setBranchPhase("answered");
+            }}
+          />
+        ) : null}
+
+        {showAcceptanceButtons ? (
+          <BranchButtons
+            onYes={() => {
+              setAcceptanceChoice("yes");
+              setBranchPhase("answered");
+            }}
+            onNo={() => {
+              setAcceptanceChoice("no");
+              setBranchPhase("answered");
+            }}
+          />
+        ) : null}
+
+        {showSimpleButtons || show809Buttons ? (
+          <BranchButtons
+            onYes={() => {
+              setChoice("yes");
+              setBranchPhase("answered");
+            }}
+            onNo={() => {
+              setChoice("no");
+              if (current?.branch?.prefijo809?.followUpPrompt) {
+                setBranchPhase("809-followup");
+              } else {
+                setBranchPhase("answered");
+              }
+            }}
+          />
+        ) : null}
+
+        {!showCapButtons &&
+        !showDudasButtons &&
+        !showCondicionesButtons &&
+        !showAcceptanceButtons &&
+        !showSimpleButtons &&
+        !show809Buttons &&
+        !show809FollowUp &&
+        showNav ? (
+          <div className="mt-6 flex items-center justify-between gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={blockIndex === 0}
+              onClick={() => setBlockIndex((i) => Math.max(0, i - 1))}
+            >
+              <ChevronLeft className="size-4" />
+              Anterior
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={blockIndex >= blocks.length - 1 || !canContinue}
+              onClick={() => setBlockIndex((i) => Math.min(blocks.length - 1, i + 1))}
+            >
+              Continuar
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        ) : null}
+
+        {show809FollowUp ? (
+          <BranchButtons
+            onYes={() => {
+              setFollowUpChoice("yes");
+              setBranchPhase("809-done");
+            }}
+            onNo={() => {
+              setFollowUpChoice("no");
+              setBranchPhase("809-done");
+            }}
+          />
+        ) : null}
+
+        {(showCapButtons ||
+          showDudasButtons ||
+          showCondicionesButtons ||
+          showAcceptanceButtons ||
+          showSimpleButtons ||
+          show809Buttons ||
+          show809FollowUp) &&
+        canContinue ? (
+          <div className="mt-4 flex justify-end">
+            <Button type="button" size="sm" onClick={() => setBlockIndex((i) => i + 1)}>
+              Continuar
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        ) : null}
       </div>
     </div>
   );
 }
 
-function resolveDisplayContent(
-  step: SalesScriptStep | undefined,
+function resolveContent(
+  step: SalesScriptStep,
   phase: BranchPhase,
   choice: "yes" | "no" | null,
   followUpChoice: "yes" | "no" | null,
+  capChoice: "yes" | "no" | null,
+  condicionesChoice: "yes" | "no" | null,
+  acceptanceChoice: "yes" | "no" | null,
 ): string {
-  if (!step) return "";
   const base = step.content;
-  const branch = step.branch;
-  if (!branch || phase === "ask") return base;
+  const b = step.branch;
+  if (!b) return base;
 
-  if (phase === "followup" && branch.followUp) {
-    return [base, "", branch.followUp.prompt].join("\n");
+  const parts = [base];
+
+  if (b.cap && capChoice === "yes") parts.push("", b.cap.yesSpeech);
+  if (b.cap && capChoice === "no") parts.push("", b.cap.noSpeech);
+
+  if (condicionesChoice === "yes" && b.condicionesDudas?.yesSpeech) {
+    parts.push("", b.condicionesDudas.yesSpeech);
+  }
+  if (acceptanceChoice === "no" && b.acceptance?.noSpeech) {
+    parts.push("", b.acceptance.noSpeech);
   }
 
-  if (choice === "yes" && branch.yesSpeech) {
-    return [base, "", branch.yesSpeech].join("\n");
+  if (choice === "yes" && b.yesSpeech) parts.push("", b.yesSpeech);
+  if (choice === "no" && b.noSpeech) parts.push("", b.noSpeech);
+
+  if (b.prefijo809) {
+    if (choice === "yes") parts.push("", b.prefijo809.yesSpeech);
+    if (choice === "no") {
+      parts.push("", b.prefijo809.noSpeech);
+      if (phase === "809-followup" || phase === "809-done") {
+        parts.push("", b.prefijo809.followUpPrompt);
+      }
+    }
+    if (followUpChoice === "yes") parts.push("", b.prefijo809.followUpYesSpeech);
+    if (followUpChoice === "no") parts.push("", b.prefijo809.followUpNoSpeech);
   }
 
-  if (choice === "no" && branch.noSpeech) {
-    const parts = [base, "", branch.noSpeech];
-    if (branch.followUp && phase === "resolved" && !followUpChoice) {
-      parts.push("", branch.followUp.prompt);
-    }
-    if (followUpChoice === "yes" && branch.followUp?.yesSpeech) {
-      parts.push("", branch.followUp.yesSpeech);
-    }
-    if (followUpChoice === "no" && branch.followUp?.noSpeech) {
-      parts.push("", branch.followUp.noSpeech);
-    }
-    return parts.join("\n");
-  }
-
-  return base;
+  return parts.join("\n");
 }
 
-function canAdvance(
-  step: SalesScriptStep | undefined,
+function canAdvanceBlock(
+  step: SalesScriptStep,
   phase: BranchPhase,
   choice: "yes" | "no" | null,
   followUpChoice: "yes" | "no" | null,
+  capChoice: "yes" | "no" | null,
+  condicionesChoice: "yes" | "no" | null,
+  acceptanceChoice: "yes" | "no" | null,
 ): boolean {
-  if (!step?.branch) return true;
-  if (phase === "ask") return false;
-  if (step.branch.followUp && choice === "no" && followUpChoice === null && phase === "resolved") {
+  const b = step.branch;
+  if (!b) return true;
+
+  if (b.cap && capChoice === null) return false;
+  if (b.cap && capChoice !== null && choice === null) return false;
+
+  if (b.condicionesDudas && condicionesChoice === null) return false;
+  if (b.acceptance && condicionesChoice !== null && acceptanceChoice === null) return false;
+
+  if (b.prefijo809 && acceptanceChoice !== null && choice === null) return false;
+  if (b.prefijo809 && choice === "no" && followUpChoice === null && phase === "809-followup") {
     return false;
   }
-  if (phase === "followup") return false;
-  return choice !== null && (followUpChoice !== null || !needsFollowUp(step.branch, choice));
-}
 
-function needsFollowUp(branch: SalesScriptBranch, choice: "yes" | "no"): boolean {
-  return choice === "no" && Boolean(branch.followUp) && Boolean(branch.noSpeech);
-}
-
-function StepControls({
-  current,
-  branchPhase,
-  branchChoice,
-  followUpChoice,
-  canContinue,
-  stepIndex,
-  totalSteps,
-  onBranch,
-  onFollowUp,
-  onPrev,
-  onNext,
-}: {
-  current: SalesScriptStep | undefined;
-  branchPhase: BranchPhase;
-  branchChoice: "yes" | "no" | null;
-  followUpChoice: "yes" | "no" | null;
-  canContinue: boolean;
-  stepIndex: number;
-  totalSteps: number;
-  onBranch: (c: "yes" | "no") => void;
-  onFollowUp: (c: "yes" | "no") => void;
-  onPrev: () => void;
-  onNext: () => void;
-}) {
-  const branch = current?.branch;
-
-  if (branch && branchPhase === "ask") {
-    return (
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-        <Button type="button" size="sm" className="flex-1 gap-2" onClick={() => onBranch("yes")}>
-          <Check className="size-4" />
-          Sí
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="flex-1 gap-2"
-          onClick={() => onBranch("no")}
-        >
-          <X className="size-4" />
-          No
-        </Button>
-      </div>
-    );
+  if ((b.yesSpeech || b.noSpeech) && !b.cap && !b.prefijo809 && !b.condicionesDudas && choice === null) {
+    return false;
   }
 
-  if (
-    branch?.followUp &&
-    branchChoice === "no" &&
-    branchPhase === "resolved" &&
-    followUpChoice === null &&
-    branch.noSpeech
-  ) {
-    return (
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-        <Button type="button" size="sm" className="flex-1 gap-2" onClick={() => onFollowUp("yes")}>
-          <Check className="size-4" />
-          Sí
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="flex-1 gap-2"
-          onClick={() => onFollowUp("no")}
-        >
-          <X className="size-4" />
-          No
-        </Button>
-      </div>
-    );
+  if (b.cap && capChoice !== null && choice !== null) return true;
+  if (b.condicionesDudas && condicionesChoice !== null && acceptanceChoice !== null) {
+    if (b.prefijo809 && choice === null) return false;
+    if (b.prefijo809 && choice === "no" && followUpChoice === null && phase === "809-followup") {
+      return false;
+    }
+    if (b.prefijo809 && choice !== null && (choice === "yes" || followUpChoice !== null)) return true;
+    if (!b.prefijo809) return true;
   }
+  if (b.prefijo809 && !b.condicionesDudas && choice !== null && (choice === "yes" || followUpChoice !== null)) {
+    return true;
+  }
+  if (!b.cap && !b.prefijo809 && !b.condicionesDudas && choice !== null) return true;
 
+  return capChoice !== null || condicionesChoice !== null || acceptanceChoice !== null || choice !== null;
+}
+
+function BranchButtons({ onYes, onNo }: { onYes: () => void; onNo: () => void }) {
   return (
-    <div className="mt-6 flex items-center justify-between gap-3">
-      <Button type="button" variant="secondary" size="sm" disabled={stepIndex === 0} onClick={onPrev}>
-        <ChevronLeft className="size-4" />
-        Anterior
+    <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+      <Button type="button" size="sm" className="flex-1 gap-2" onClick={onYes}>
+        <Check className="size-4" />
+        Sí
       </Button>
-      <Button type="button" size="sm" disabled={stepIndex >= totalSteps - 1 || !canContinue} onClick={onNext}>
-        Siguiente
-        <ChevronRight className="size-4" />
+      <Button type="button" variant="secondary" size="sm" className="flex-1 gap-2" onClick={onNo}>
+        <X className="size-4" />
+        No
       </Button>
     </div>
   );
 }
 
-function InfoItem({
-  label,
-  value,
-  highlight,
+function getInteractionMode(
+  step: SalesScriptStep | undefined,
+  capChoice: "yes" | "no" | null,
+  condicionesChoice: "yes" | "no" | null,
+  acceptanceChoice: "yes" | "no" | null,
+  choice: "yes" | "no" | null,
+  followUpChoice: "yes" | "no" | null,
+):
+  | "cap"
+  | "dudas"
+  | "condiciones-dudas"
+  | "acceptance"
+  | "809"
+  | "809-followup"
+  | "binary"
+  | "navigate" {
+  const b = step?.branch;
+  if (!b) return "navigate";
+  if (b.cap && capChoice === null) return "cap";
+  if (b.cap && capChoice !== null && choice === null) return "dudas";
+  if (b.condicionesDudas && condicionesChoice === null) return "condiciones-dudas";
+  if (b.acceptance && condicionesChoice !== null && acceptanceChoice === null) return "acceptance";
+  if (b.prefijo809 && acceptanceChoice !== null && choice === null) return "809";
+  if (b.prefijo809 && choice === "no" && followUpChoice === null) return "809-followup";
+  if (
+    choice === null &&
+    (b.yesSpeech || b.noSpeech) &&
+    !b.cap &&
+    !b.prefijo809 &&
+    !b.condicionesDudas
+  ) {
+    return "binary";
+  }
+  return "navigate";
+}
+
+function AdvisorSummaryCard({
+  script,
+  blockIndex,
+  blocksCount,
 }: {
-  label: string;
-  value: string;
-  highlight?: boolean;
+  script: GeneratedSalesScript;
+  blockIndex: number;
+  blocksCount: number;
 }) {
+  const s = script.meta.advisorSummary;
+  const items = [
+    { icon: "👤", label: "Cliente", value: script.meta.clientName },
+    { icon: "📱", label: "Operador actual", value: s?.currentOperator ?? "—" },
+    { icon: "📦", label: "Tipo", value: script.meta.saleTypeLabel },
+    { icon: "📋", label: "Plan", value: script.meta.planName },
+    { icon: "💰", label: "Valor", value: s?.planValueLabel ?? script.meta.totalMonthlyLabel },
+    { icon: "➕", label: "Líneas", value: String(s?.lineCount ?? 1) },
+    { icon: "🚚", label: "Entrega", value: s?.deliveryLabel ?? "—" },
+    { icon: "📅", label: "Fecha entrega", value: s?.deliveryDate ?? "—" },
+  ];
+
   return (
-    <div className="border-b border-line/60 pb-2 last:border-0 sm:border-b-0 sm:pb-0">
-      <p className="text-[11px] uppercase tracking-wide text-muted">{label}</p>
-      <p className={cn("mt-0.5 text-[14px] font-medium", highlight ? "text-brand" : "text-ink")}>
-        {value || "—"}
-      </p>
+    <div className="sticky top-0 z-10 rounded-2xl border border-line bg-canvas/95 px-4 py-3 shadow-sm backdrop-blur-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-brand">
+          {script.flowTitle}
+          {script.meta.accountModalityLabel ? (
+            <span className="ml-2 font-normal text-muted">· {script.meta.accountModalityLabel}</span>
+          ) : null}
+        </p>
+        <p className="text-[11px] text-muted">
+          Bloque {blockIndex + 1} / {blocksCount}
+        </p>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[12px] sm:grid-cols-4 lg:grid-cols-8">
+        {items.map((item) => (
+          <div key={item.label} className="min-w-0">
+            <p className="truncate text-[10px] uppercase tracking-wide text-muted">
+              {item.icon} {item.label}
+            </p>
+            <p className="truncate font-medium text-ink">{item.value || "—"}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 flex items-center justify-between border-t border-line/60 pt-2 text-[12px]">
+        <span className="text-muted">Total mensual</span>
+        <span className="font-semibold text-brand">{script.meta.totalMonthlyLabel}</span>
+      </div>
     </div>
   );
 }

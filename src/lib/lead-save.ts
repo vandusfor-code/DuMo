@@ -35,6 +35,7 @@ export function mapSaleLineForSave(line: LeadLineValues) {
     equipmentInstallmentValue: line.equipmentInstallmentValue,
     equipmentCommercialText: line.equipmentCommercialText,
     accountType,
+    isUpselling: Boolean(line.isUpselling),
   };
 }
 

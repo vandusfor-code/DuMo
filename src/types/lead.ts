@@ -147,7 +147,9 @@ export interface SaveLeadInput {
     equipmentInstallments: string;
     equipmentInstallmentValue: string;
     equipmentCommercialText: string;
-    /** Prepago → postpago: activa paso CAP en portabilidad. */
+    /** Prepago → postpago: activa bloque CAP en portabilidad. */
     accountType?: LineAccountType;
+    /** Homologación / upselling (doc oficial línea 14). */
+    isUpselling?: boolean;
   }[];
 }

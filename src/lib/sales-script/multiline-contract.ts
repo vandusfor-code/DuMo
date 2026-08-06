@@ -1,4 +1,5 @@
 import { formatCurrency } from "@/lib/format";
+import type { LineSpeechDetail } from "@/lib/sales-script/teleprompter/speech-builders";
 
 /** Texto de contratación multilínea listo para leer en voz alta. */
 export function buildMultilineContractSpeech(input: {
@@ -28,20 +29,30 @@ export function buildMultilineContractSpeech(input: {
 
   if (lineCount === 3) {
     return [
-      `Tu línea principal quedará con un valor mensual de ${main}.`,
+      `Tu línea principal quedará con el ${planName} por un valor mensual de ${main}.`,
       `Además contratarás 2 líneas adicionales por ${add} cada una.`,
       `El valor mensual total será de ${total}.`,
     ].join("\n\n");
   }
 
   return [
-    "Línea principal:",
-    planName,
-    main,
-    "",
-    `${additional} líneas adicionales:`,
-    `${add} cada una.`,
-    "",
+    `Tu línea principal quedará con el ${planName} por un valor mensual de ${main}.`,
+    `Además contratarás ${additional} líneas adicionales por ${add} cada una.`,
     `El valor mensual total será de ${total}.`,
-  ].join("\n");
+  ].join("\n\n");
+}
+
+/** Multilínea con planes o valores distintos por línea (doc línea 12-13). */
+export function buildHeterogeneousMultilineSpeech(
+  lineDetails: LineSpeechDetail[],
+  totalMonthly: number,
+): string {
+  const parts = lineDetails.map((line) => {
+    const role = line.isMain
+      ? "Tu línea principal"
+      : `Tu línea adicional ${line.index}`;
+    return `${role} ${line.phone} quedará con el ${line.planName} por un valor mensual de ${line.planValueLabel}.`;
+  });
+  parts.push(`El total mensual de tu contratación será de ${formatCurrency(totalMonthly)}.`);
+  return parts.join("\n\n");
 }

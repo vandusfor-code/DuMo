@@ -1,26 +1,39 @@
-/** Un paso del recorrido guiado del script de venta. */
+/** Un bloque del teleprompter — discurso listo para leer en voz alta. */
 export type SalesScriptStep = {
   id: string;
-  title: string;
-  /** Texto final listo para leer en voz alta. Sin instrucciones internas. */
+  /** Etiqueta discreta para orientar a la asesora — NO forma parte del discurso. */
+  sectionLabel?: string;
+  /** @deprecated Usar sectionLabel. Mantenido por compatibilidad con scripts persistidos. */
+  title?: string;
   content: string;
-  /**
-   * Bifurcación en el mismo paso — no crea pasos adicionales.
-   * Sí/No muestra el discurso correspondiente y luego permite continuar.
-   */
   branch?: SalesScriptBranch;
 };
 
 export type SalesScriptBranch = {
-  /** Discurso si el cliente responde Sí (ej. CAP recibido, aclarar dudas). */
+  /** Discurso adicional si el cliente responde Sí (dudas, aclaraciones). */
   yesSpeech?: string;
-  /** Discurso si el cliente responde No (ej. corrección de datos, CAP pendiente). */
+  /** Discurso adicional si el cliente responde No (corrección, reconfirmación). */
   noSpeech?: string;
-  /** Segunda ronda tras noSpeech (ej. prefijo 809). */
-  followUp?: {
-    prompt: string;
+  /** Bloque Aceptación — ¿Te queda alguna duda con las condiciones? */
+  condicionesDudas?: {
     yesSpeech: string;
-    noSpeech?: string;
+  };
+  /** Bloque Aceptación — ¿Lo aceptas? (VDI) */
+  acceptance?: {
+    noSpeech: string;
+  };
+  /** Solo Prepago → Postpago: ramificación CAP dentro del bloque Portabilidad. */
+  cap?: {
+    yesSpeech: string;
+    noSpeech: string;
+  };
+  /** Prefijo 809 dentro del bloque Aceptación. */
+  prefijo809?: {
+    yesSpeech: string;
+    noSpeech: string;
+    followUpPrompt: string;
+    followUpYesSpeech: string;
+    followUpNoSpeech: string;
   };
 };
 
@@ -31,10 +44,17 @@ export type StructuredScriptStep = {
   variables: string[];
 };
 
-/** Representación estructurada persistida del script (no es un bloque de texto). */
 export type StructuredScriptPayload = {
   tipo: string;
   pasos: StructuredScriptStep[];
+};
+
+export type SalesScriptAdvisorSummary = {
+  currentOperator: string;
+  deliveryLabel: string;
+  deliveryDate: string;
+  lineCount: number;
+  planValueLabel: string;
 };
 
 export type SalesScriptMeta = {
@@ -42,9 +62,12 @@ export type SalesScriptMeta = {
   saleTypeLabel: string;
   planName: string;
   totalMonthlyLabel: string;
+  /** Prepago | Postpago — orientación interna en barra meta. */
+  accountModalityLabel?: string;
+  /** Resumen fijo para la asesora — no forma parte del discurso. */
+  advisorSummary?: SalesScriptAdvisorSummary;
 };
 
-/** Script generado automáticamente al guardar una gestión de venta. */
 export type GeneratedSalesScript = {
   id: string;
   gestionId: string;
@@ -60,6 +83,5 @@ export type GeneratedSalesScript = {
 export type SaveLeadResult = {
   lead: import("./lead").Lead;
   script: GeneratedSalesScript | null;
-  /** Por qué no se generó script, si la gestión sí se guardó. */
   scriptUnavailableReason?: string | null;
 };

@@ -1,33 +1,6 @@
 import type { ScriptBuildContext } from "./context";
-import {
-  buildPortabilidadSinEquipoFlow,
-  SCRIPT_TIPO,
-} from "./flows/portabilidad-sin-equipo.flow";
+import { resolveScriptFlow } from "./flows/registry";
 import type { GeneratedSalesScript, StructuredScriptPayload } from "@/types/sales-script";
-
-export function buildPortabilityNoEquipmentScript(ctx: ScriptBuildContext): {
-  steps: GeneratedSalesScript["steps"];
-  structured: StructuredScriptPayload;
-  flowTitle: string;
-  flowKey: string;
-} {
-  const steps = buildPortabilidadSinEquipoFlow(ctx);
-  const structured: StructuredScriptPayload = {
-    tipo: SCRIPT_TIPO,
-    pasos: steps.map((s, i) => ({
-      id: i + 1,
-      titulo: s.title,
-      texto: s.content,
-      variables: [],
-    })),
-  };
-  return {
-    steps,
-    structured,
-    flowTitle: "Portabilidad sin equipo",
-    flowKey: SCRIPT_TIPO,
-  };
-}
 
 export function assembleGeneratedScript(input: {
   gestionId: string;
@@ -35,16 +8,51 @@ export function assembleGeneratedScript(input: {
   ctx: ScriptBuildContext;
   meta: GeneratedSalesScript["meta"];
 }): GeneratedSalesScript {
-  const built = buildPortabilityNoEquipmentScript(input.ctx);
+  const flow = resolveScriptFlow(input.ctx);
+  const steps = flow.buildSteps(input.ctx);
+  const structured: StructuredScriptPayload = {
+    tipo: flow.key,
+    pasos: steps.map((s, i) => ({
+      id: i + 1,
+      titulo: s.sectionLabel ?? s.title ?? "",
+      texto: s.content,
+      variables: [],
+    })),
+  };
+
   return {
     id: `SCRIPT-${Date.now()}`,
     gestionId: input.gestionId,
     conversationId: input.conversationId,
-    flowTitle: built.flowTitle,
-    flowKey: built.flowKey,
-    meta: input.meta,
-    steps: built.steps,
-    structured: built.structured,
+    flowTitle: flow.title,
+    flowKey: flow.key,
+    meta: {
+      ...input.meta,
+      accountModalityLabel:
+        input.ctx.accountType === "prepaid" ? "Prepago → Postpago" : "Postpago → Postpago",
+    },
+    steps,
+    structured,
     createdAt: new Date().toISOString(),
+  };
+}
+
+/** @deprecated Usar assembleGeneratedScript — mantiene compatibilidad con imports existentes. */
+export function buildPortabilityNoEquipmentScript(ctx: ScriptBuildContext) {
+  const flow = resolveScriptFlow(ctx);
+  const steps = flow.buildSteps(ctx);
+  return {
+    steps,
+    structured: {
+      tipo: flow.key,
+      pasos: steps.map((s, i) => ({
+        id: i + 1,
+        titulo: s.sectionLabel ?? s.title ?? "",
+        texto: s.content,
+        variables: [],
+      })),
+    },
+    flowTitle: flow.title,
+    flowKey: flow.key,
   };
 }

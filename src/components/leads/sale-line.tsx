@@ -352,6 +352,26 @@ export function SaleLine({
               />
             </FormField>
 
+            {index === 0 ? (
+              <FormField label="Homologación / Upselling">
+                <Controller
+                  control={control}
+                  name={`lines.${index}.isUpselling`}
+                  render={({ field }) => (
+                    <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-line bg-canvas/40 px-3 py-2.5 text-[13px] text-ink">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(field.value)}
+                        onChange={(e) => field.onChange(e.target.checked)}
+                        className="size-4 rounded border-line accent-brand"
+                      />
+                      Cliente modifica su plan actual (homologación)
+                    </label>
+                  )}
+                />
+              </FormField>
+            ) : null}
+
             <FormField label="Correo electrónico" htmlFor={`line-${index}-email`}>
               <InputGroup icon={<Mail />}>
                 <Input

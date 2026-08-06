@@ -30,6 +30,8 @@ export interface LeadLineValues {
   equipmentCommercialText: string;
   /** Modalidad línea actual — define si aplica bloque CAP (prepago → postpago). */
   accountType: LineAccountType | "";
+  /** Homologación / upselling (doc oficial línea 14). */
+  isUpselling?: boolean;
 }
 
 /** Shape of the commercial-management form (React Hook Form). */
@@ -63,4 +65,5 @@ export const EMPTY_LEAD_LINE: LeadLineValues = {
   equipmentInstallmentValue: "",
   equipmentCommercialText: "",
   accountType: "postpaid",
+  isUpselling: false,
 };

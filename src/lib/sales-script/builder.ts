@@ -32,6 +32,13 @@ export function buildSalesScript(input: {
       saleTypeLabel: ctx.vars.tipo_venta,
       planName: ctx.vars.plan,
       totalMonthlyLabel: ctx.vars.total_mensual,
+      advisorSummary: {
+        currentOperator: ctx.vars.operador_actual || "—",
+        deliveryLabel: ctx.vars.tipo_entrega || "—",
+        deliveryDate: ctx.vars.fecha_entrega || "—",
+        lineCount: ctx.lineCount,
+        planValueLabel: ctx.vars.valor_plan,
+      },
     },
   });
 }

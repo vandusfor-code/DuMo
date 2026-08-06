@@ -62,6 +62,7 @@ export const leadLineSchema = z.object({
   equipmentInstallmentValue: z.string().trim().optional().default(""),
   equipmentCommercialText: z.string().trim().optional().default(""),
   accountType: lineAccountTypeSchema.optional().default("postpaid"),
+  isUpselling: z.boolean().optional().default(false),
 });
 
 export const saveLeadSchema = z.object({
