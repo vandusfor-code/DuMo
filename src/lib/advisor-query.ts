@@ -16,21 +16,12 @@ export class AdvisorFetchError extends Error {
   }
 }
 
-/** Evita disparar varias redirecciones al login a la vez. */
-let redirectingToLogin = false;
-
 /**
- * Sesión caída: la página no navega sola (solo fallan las peticiones), así que
- * el usuario veía "no se pudo sincronizar" sin entender nada. Se autorrepara
- * mandándolo al login para que vuelva a entrar.
+ * REGLA: la sesión SOLO se cierra cuando el usuario pulsa "Cerrar sesión".
+ * Nunca redirigimos al login desde aquí — un 401/403 puntual (o un fallo
+ * transitorio) no debe sacar a nadie de la aplicación. Se avisa, se reintenta
+ * y se conservan los últimos datos buenos.
  */
-function handleExpiredSession() {
-  if (typeof window === "undefined" || redirectingToLogin) return;
-  redirectingToLogin = true;
-  const next = window.location.pathname + window.location.search;
-  window.location.href = `/login?next=${encodeURIComponent(next)}`;
-}
-
 export async function advisorApiGet<T>(url: string, timeoutMs = 15_000): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -42,14 +33,8 @@ export async function advisorApiGet<T>(url: string, timeoutMs = 15_000): Promise
       cache: "no-store",
     });
     if (!res.ok) {
-      if (res.status === 401 || res.status === 403) {
-        handleExpiredSession();
-        throw new AdvisorFetchError(
-          "Tu sesión expiró. Redirigiendo al inicio de sesión…",
-          res.status,
-        );
-      }
       // El código va en el mensaje: así se sabe de inmediato qué falló.
+      // NUNCA se redirige al login desde aquí.
       throw new AdvisorFetchError(
         `No se pudo cargar (error ${res.status}). Reintentando…`,
         res.status,

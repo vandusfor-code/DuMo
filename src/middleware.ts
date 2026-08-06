@@ -75,26 +75,12 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── Separación por rol ──────────────────────────────────────────────
-  // Sesiones antiguas no llevan rol: se fuerza un re-login para obtener un
-  // token con rol y poder separar correctamente admin / asesora.
+  // REGLA: la sesión solo termina cuando el usuario pulsa "Cerrar sesión".
+  // Si el token no trae rol (sesión emitida por un flujo antiguo), se deja
+  // pasar sin aplicar separación — NUNCA se cierra la sesión por eso.
   const role = payload.role;
   if (!role) {
-    if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "Sesión expirada." }, { status: 401 });
-    }
-    const login = new URL("/login", request.url);
-    const res = NextResponse.redirect(login);
-    res.cookies.set(SESSION_COOKIE, "", {
-      ...sessionCookieOptionsEdge(
-        isSecureRequest(
-          request.headers.get("x-forwarded-proto"),
-          request.nextUrl.protocol,
-        ),
-      ),
-      maxAge: 0,
-      expires: new Date(0),
-    });
-    return res;
+    return refreshSession(request, payload.userId, undefined);
   }
 
   const isAsesora = role === "asesora";
@@ -112,19 +98,29 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(home, request.url));
   }
 
-  // Renueva la cookie solo en navegación de páginas (no en cada API fetch).
-  if (!pathname.startsWith("/api/")) {
-    const secure = isSecureRequest(
-      request.headers.get("x-forwarded-proto"),
-      request.nextUrl.protocol,
-    );
-    const freshToken = await createSessionTokenEdge(payload.userId, role);
-    const res = NextResponse.next();
-    res.cookies.set(SESSION_COOKIE, freshToken, sessionCookieOptionsEdge(secure));
-    return res;
-  }
+  return refreshSession(request, payload.userId, role);
+}
 
-  return NextResponse.next();
+/**
+ * Renueva la cookie de sesión en la navegación de páginas (no en cada fetch de
+ * API) para que la sesión se mantenga viva mientras se usa la aplicación.
+ */
+async function refreshSession(
+  request: NextRequest,
+  userId: string,
+  role: string | undefined,
+): Promise<NextResponse> {
+  if (request.nextUrl.pathname.startsWith("/api/")) {
+    return NextResponse.next();
+  }
+  const secure = isSecureRequest(
+    request.headers.get("x-forwarded-proto"),
+    request.nextUrl.protocol,
+  );
+  const freshToken = await createSessionTokenEdge(userId, role);
+  const res = NextResponse.next();
+  res.cookies.set(SESSION_COOKIE, freshToken, sessionCookieOptionsEdge(secure));
+  return res;
 }
 
 export const config = {

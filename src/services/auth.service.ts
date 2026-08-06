@@ -42,8 +42,10 @@ export const authService = {
     return { user, redirectTo: redirectForRole(user.role) };
   },
 
-  async setSessionCookie(userId: string): Promise<void> {
-    const token = createSessionToken(userId);
+  async setSessionCookie(userId: string, role?: string): Promise<void> {
+    // El rol debe viajar siempre en el token: un token sin rol deja la sesión
+    // sin separación admin/asesora.
+    const token = createSessionToken(userId, role);
     const jar = await cookies();
     jar.set(SESSION_COOKIE, token, sessionCookieOptions());
   },
