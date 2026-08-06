@@ -1,6 +1,8 @@
 import type { CommercialPlan } from "@/types/commercial-config";
+import type { EquipmentCatalogItem } from "@/types/equipment";
 import type { SaveLeadInput } from "@/types/lead";
 import { validateGestionCommercialPlans } from "@/lib/commercial-plans-catalog";
+import { validateGestionEquipment } from "@/lib/equipment-catalog";
 import {
   type DeliveryTeleprompterConfig,
   resolvePickupStore,
@@ -17,6 +19,7 @@ const PICKUP_STORE_REQUIRED_MESSAGE =
 export function getTeleprompterContextError(input: {
   gestion: SaveLeadInput;
   commercialPlans: CommercialPlan[];
+  equipmentCatalog?: EquipmentCatalogItem[];
   deliveryConfig: DeliveryTeleprompterConfig;
 }): string | null {
   const lines = input.gestion.lines;
@@ -26,6 +29,12 @@ export function getTeleprompterContextError(input: {
 
   const planError = validateGestionCommercialPlans(input.gestion, input.commercialPlans);
   if (planError) return planError;
+
+  const equipmentError = validateGestionEquipment(
+    input.gestion,
+    input.equipmentCatalog ?? [],
+  );
+  if (equipmentError) return equipmentError;
 
   const mainLine = lines[0];
   const deliveryType = mainLine.deliveryType;

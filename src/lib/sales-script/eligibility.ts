@@ -1,8 +1,9 @@
 import type { SaveLeadInput } from "@/types/lead";
 import { LEAD_SALE_TYPE_LABELS } from "@/types/lead";
 
-function mainLineEquipmentMode(line: SaveLeadInput["lines"][number]): "none" | "with" {
-  return line.equipmentMode === "with" ? "with" : "none";
+function lineEquipmentLabel(index: number): string {
+  if (index === 0) return "la línea principal";
+  return `la línea adicional ${index + 1}`;
 }
 
 /** Motivo legible cuando no aplica generar script automático. Null = elegible. */
@@ -12,13 +13,18 @@ export function getScriptUnavailableReason(gestion: SaveLeadInput): string | nul
   }
 
   const main = gestion.lines[0];
-  if (mainLineEquipmentMode(main) === "with") {
-    return "Por ahora el script automático solo está disponible para Portabilidad sin equipo. Selecciona «Sin equipo» en la línea principal.";
-  }
 
   if (main.saleType !== "portability") {
     const label = LEAD_SALE_TYPE_LABELS[main.saleType] ?? main.saleType;
-    return `El script automático solo está disponible para Portabilidad sin equipo. Tipo de venta seleccionado: ${label}.`;
+    return `El script automático solo está disponible para Portabilidad (sin equipo o con equipo). Tipo de venta seleccionado: ${label}.`;
+  }
+
+  for (let i = 0; i < gestion.lines.length; i++) {
+    const line = gestion.lines[i];
+    if (line.equipmentMode !== "with") continue;
+    if (!line.equipmentCatalogId?.trim()) {
+      return `La gestión está incompleta: selecciona un equipo del catálogo en ${lineEquipmentLabel(i)} para generar el teleprónter de Portabilidad con Equipo.`;
+    }
   }
 
   return null;

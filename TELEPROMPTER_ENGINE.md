@@ -110,6 +110,28 @@ useSalesScript(conversationId)
 
 ---
 
+## 4b. Portabilidad con Equipo — progreso de bloques
+
+**Flujo:** `portabilidad-con-equipo.flow.ts` → `blocks-con-equipo.ts`  
+**Fuente oficial:** `src/data/scripts/source/portabilidad-con-equipo.raw.txt`
+
+| # | id | sectionLabel | Estado | Archivos |
+|---|-----|--------------|--------|----------|
+| 1 | `bloque-1` | Inicio | Transversal (Sin Equipo v1.0) | `block1-saludo-speech.ts` |
+| 2 | `bloque-2` | Audio | Transversal (Sin Equipo v1.0) | `block2-audio-speech.ts` |
+| 3 | `bloque-3` | Contratación | **✅ v1.0 congelado** | `block3-contratacion-con-equipo-speech.ts`, `block3-contract-summary-con-equipo-speech.ts`, `block3-equipment-financing-speech.ts`, `block3-portability-disclaimer-con-equipo.ts` |
+| 4–12 | — | — | Pendiente | — |
+
+### Bloque 3 congelado (v1.0)
+
+- Fase A: reutiliza `buildContractDataValidationIntro()` (infra compartida, copy Sin Equipo).
+- Fase B: builders propios Con Equipo (resumen, disclaimer `ofrecidos`, multilínea, upselling, párrafo equipo).
+- Párrafo equipo: único builder `buildBlock3EquipmentFinancingSpeech(ctx.mainEquipment)` — datos exclusivamente de `brand`, `model`, `color`, `downPayment`, `installments`, `installmentValue`.
+- Rama condicional: `downPayment > 0` → pago inicial + link 24 h; `downPayment === 0` → sin pago inicial, sin link.
+- **No modificar copy** salvo cambio del script oficial o hallazgo de auditoría.
+
+---
+
 ## 4. Portabilidad Sin Equipo — 12 bloques (v1.0)
 
 | # | id | sectionLabel | Archivo | Ramificación |

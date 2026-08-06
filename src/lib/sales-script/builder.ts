@@ -1,5 +1,6 @@
 import type { SaveLeadInput } from "@/types/lead";
 import type { CommercialPlan } from "@/types/commercial-config";
+import type { EquipmentCatalogItem } from "@/types/equipment";
 import type { GeneratedSalesScript } from "@/types/sales-script";
 import { buildScriptContext, getTeleprompterContextError } from "./context";
 import { assembleGeneratedScript } from "./engine";
@@ -9,6 +10,7 @@ import type { DeliveryTeleprompterConfig } from "@/lib/sales-script/teleprompter
 export function getScriptBuildError(input: {
   gestion: SaveLeadInput;
   commercialPlans: CommercialPlan[];
+  equipmentCatalog?: EquipmentCatalogItem[];
   deliveryConfig: DeliveryTeleprompterConfig;
 }): string | null {
   const eligibilityReason = getScriptUnavailableReason(input.gestion);
@@ -17,6 +19,7 @@ export function getScriptBuildError(input: {
   return getTeleprompterContextError({
     gestion: input.gestion,
     commercialPlans: input.commercialPlans,
+    equipmentCatalog: input.equipmentCatalog,
     deliveryConfig: input.deliveryConfig,
   });
 }
@@ -25,6 +28,7 @@ export function buildSalesScript(input: {
   gestionId: string;
   gestion: SaveLeadInput;
   commercialPlans: CommercialPlan[];
+  equipmentCatalog?: EquipmentCatalogItem[];
   advisor?: { name: string; email: string };
   deliveryConfig: DeliveryTeleprompterConfig;
 }): GeneratedSalesScript | null {
@@ -33,6 +37,7 @@ export function buildSalesScript(input: {
   const ctx = buildScriptContext({
     gestion: input.gestion,
     commercialPlans: input.commercialPlans,
+    equipmentCatalog: input.equipmentCatalog,
     advisor: input.advisor,
     deliveryConfig: input.deliveryConfig,
   });

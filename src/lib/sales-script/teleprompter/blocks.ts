@@ -9,6 +9,8 @@ import {
   buildContractSummarySpeech,
 } from "@/lib/sales-script/contract-resumen";
 import { buildMultilineBenefitsSpeech } from "@/lib/sales-script/teleprompter/speech-builders";
+import { buildBlock1SaludoSpeech } from "@/lib/sales-script/teleprompter/block1-saludo-speech";
+import { buildBlock2AudioSpeech } from "@/lib/sales-script/teleprompter/block2-audio-speech";
 import { buildBlock5DeliverySpeech } from "@/lib/sales-script/teleprompter/block5-delivery-speech";
 import { buildBlock6PortabilitySpeech } from "@/lib/sales-script/teleprompter/block6-portability-speech";
 import { buildBlock7GiftSpeech } from "@/lib/sales-script/teleprompter/block7-gift-speech";
@@ -25,50 +27,6 @@ function v(ctx: ScriptBuildContext, key: string): string {
 
 function n(ctx: ScriptBuildContext): string {
   return v(ctx, "cliente_primer_nombre") || v(ctx, "nombre_cliente");
-}
-
-function clientDisplayName(ctx: ScriptBuildContext): string {
-  const first = v(ctx, "cliente_primer_nombre").trim();
-  if (first) return first;
-  const full = v(ctx, "nombre_cliente").trim();
-  if (!full) return "estimado cliente";
-  return full.split(/\s+/)[0] ?? full;
-}
-
-/** Bloque 1 — Saludo ✅ Aprobado v1.0 (congelado). */
-function buildBlock1Saludo(ctx: ScriptBuildContext): string {
-  const client = clientDisplayName(ctx);
-  const executive = v(ctx, "nombre_ejecutivo") || "tu ejecutivo WOM";
-
-  return [
-    `${v(ctx, "saludo")} Habla ${executive} de WOM.`,
-    "",
-    `¿Tengo el gusto de hablar con ${client}?`,
-    "",
-    `Un gusto, ${client}.`,
-    "",
-    "Para dar continuidad a lo anteriormente conversado, te informaré las condiciones de tu contratación.",
-  ].join("\n");
-}
-
-/** Bloque 2 — Introducción + Audio ✅ Aprobado v1.0 (congelado). */
-function buildBlock2Audio(): { content: string; branch: SalesScriptBranch } {
-  const content = [
-    "Has tomado una gran decisión y como no contamos con letra chica, a continuación escucharás una grabación que dura 30 segundos con las condiciones que respaldan tu contratación,",
-    "",
-    "por lo que te pido que escuches atentamente y no cortes, ya que yo retomaré tu llamado para resolver tus dudas y realizar un breve resumen del producto que te llevas.",
-  ].join("\n");
-
-  return {
-    content,
-    branch: {
-      externalAudio: {
-        postAudioQuestion: "¿Tienes alguna duda con el audio que escuchaste?",
-        advisorNoteOnYes:
-          "El cliente manifestó tener dudas sobre la grabación. Resuelve sus inquietudes y, cuando finalices, continúa con el resumen de la contratación.",
-      },
-    },
-  };
 }
 
 /** Bloque 6 — Proceso de portabilidad ✅ Aprobado v1.0 (congelado). */
@@ -112,7 +70,7 @@ function buildBlock3Contratacion(ctx: ScriptBuildContext): { content: string; br
 
 /** Genera los 12 bloques del teleprompter. */
 export function buildTeleprompterBlocks(ctx: ScriptBuildContext): SalesScriptStep[] {
-  const block2 = buildBlock2Audio();
+  const block2 = buildBlock2AudioSpeech();
   const block3 = buildBlock3Contratacion(ctx);
   const block6 = buildBlock6Portabilidad(ctx);
   const block8 = buildBlock8SurveySpeech({ clientFirstName: n(ctx) });
@@ -125,7 +83,7 @@ export function buildTeleprompterBlocks(ctx: ScriptBuildContext): SalesScriptSte
     {
       id: "bloque-1",
       sectionLabel: "Inicio",
-      content: buildBlock1Saludo(ctx),
+      content: buildBlock1SaludoSpeech(ctx),
     },
     {
       id: "bloque-2",

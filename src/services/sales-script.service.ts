@@ -5,6 +5,7 @@ import { buildSalesScript } from "@/lib/sales-script/builder";
 import { getCommercialConfigurationRepository } from "@/repositories/commercial-configuration.repository";
 import { getDeliveryConfigurationRepository } from "@/repositories/delivery-configuration.repository";
 import { getLeadRepository } from "@/repositories/leads.repository";
+import { equipmentService } from "@/services/equipment.service";
 
 export const salesScriptService = {
   async generateAndSave(input: {
@@ -16,15 +17,17 @@ export const salesScriptService = {
       return null;
     }
 
-    const [commercialConfig, deliveryConfig] = await Promise.all([
+    const [commercialConfig, deliveryConfig, equipmentCatalog] = await Promise.all([
       getCommercialConfigurationRepository().getSnapshot(),
       getDeliveryConfigurationRepository().getConfig(),
+      equipmentService.listAll(),
     ]);
 
     const script = buildSalesScript({
       gestionId: input.gestionId,
       gestion: input.gestion,
       commercialPlans: commercialConfig.plans,
+      equipmentCatalog,
       advisor: input.advisor,
       deliveryConfig,
     });

@@ -2,6 +2,7 @@ import "server-only";
 import { getLeadRepository } from "@/repositories/leads.repository";
 import { salesScriptService } from "@/services/sales-script.service";
 import { getCommercialConfigurationRepository } from "@/repositories/commercial-configuration.repository";
+import { equipmentService } from "@/services/equipment.service";
 import { getScriptUnavailableReason } from "@/lib/sales-script/eligibility";
 import { getScriptBuildError } from "@/lib/sales-script/builder";
 import { getDeliveryConfigurationRepository } from "@/repositories/delivery-configuration.repository";
@@ -26,13 +27,15 @@ export async function saveLeadWithScript(
           advisor,
         });
         if (!script) {
-          const [commercialConfig, deliveryConfig] = await Promise.all([
+          const [commercialConfig, deliveryConfig, equipmentCatalog] = await Promise.all([
             getCommercialConfigurationRepository().getSnapshot(),
             getDeliveryConfigurationRepository().getConfig(),
+            equipmentService.listAll(),
           ]);
           scriptUnavailableReason = getScriptBuildError({
             gestion: input,
             commercialPlans: commercialConfig.plans,
+            equipmentCatalog,
             deliveryConfig,
           });
         }

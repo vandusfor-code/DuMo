@@ -1,4 +1,5 @@
 import type { CommercialPlan } from "@/types/commercial-config";
+import type { EquipmentCatalogItem } from "@/types/equipment";
 import type { SaveLeadInput } from "@/types/lead";
 import {
   CURRENT_OPERATOR_LABELS,
@@ -26,11 +27,28 @@ import { formatFreeBillsLabels } from "@/lib/commercial-plan-offer";
 import { commercialPlansToAdvisorOptions } from "@/lib/commercial-plans-catalog";
 import type { LeadLineValues } from "@/types/lead-form";
 
+export type ScriptEquipmentLine = {
+  equipmentId: string;
+  brand: string;
+  model: string;
+  color: string;
+  memory: string;
+  commercialText: string;
+  downPayment: string;
+  installments: string;
+  installmentValue: string;
+  equipmentValue: string;
+};
+
 export type ScriptBuildContext = {
   vars: Record<string, string>;
   mainLine: SaveLeadInput["lines"][number];
   lines: SaveLeadInput["lines"];
   hasEquipment: boolean;
+  /** Equipo principal de la venta (primera línea con equipo). Null si sin equipo. */
+  mainEquipment: ScriptEquipmentLine | null;
+  /** Todos los equipos asociados a las líneas de la venta, en orden de línea. */
+  equipmentLines: ScriptEquipmentLine[];
   saleType: LeadSaleType;
   planDetail: CommercialPlan | null;
   requiresCapCode: boolean;
@@ -126,18 +144,56 @@ function computeTotalMonthlyFromLines(lineDetails: LineSpeechDetail[]): number {
   return lineDetails.reduce((sum, line) => sum + line.planValue, 0);
 }
 
+function buildEquipmentLine(
+  line: SaveLeadInput["lines"][number],
+  equipmentCatalog: EquipmentCatalogItem[],
+): ScriptEquipmentLine | null {
+  if (line.equipmentMode !== "with") return null;
+
+  const catalogItem = equipmentCatalog.find((item) => item.id === line.equipmentCatalogId);
+  if (!catalogItem) return null;
+
+  return {
+    equipmentId: line.equipmentCatalogId,
+    brand: catalogItem.brand,
+    model: catalogItem.model,
+    color: catalogItem.color ?? "",
+    memory: catalogItem.memory ?? "",
+    commercialText: line.equipmentCommercialText,
+    downPayment: line.equipmentDownPayment,
+    installments: line.equipmentInstallments,
+    installmentValue: line.equipmentInstallmentValue,
+    equipmentValue: line.equipmentValue,
+  };
+}
+
+function buildEquipmentLines(
+  lines: SaveLeadInput["lines"],
+  equipmentCatalog: EquipmentCatalogItem[],
+): ScriptEquipmentLine[] {
+  const result: ScriptEquipmentLine[] = [];
+  for (const line of lines) {
+    const equipmentLine = buildEquipmentLine(line, equipmentCatalog);
+    if (equipmentLine) result.push(equipmentLine);
+  }
+  return result;
+}
+
 export function buildScriptContext(input: {
   gestion: SaveLeadInput;
   commercialPlans: CommercialPlan[];
+  equipmentCatalog?: EquipmentCatalogItem[];
   advisor?: { name: string; email: string };
   deliveryConfig?: DeliveryTeleprompterConfig;
 }): ScriptBuildContext | null {
   const deliveryConfig = input.deliveryConfig ?? DEFAULT_DELIVERY_TELEPROMPTER_CONFIG;
+  const equipmentCatalog = input.equipmentCatalog ?? [];
 
   if (
     getTeleprompterContextError({
       gestion: input.gestion,
       commercialPlans: input.commercialPlans,
+      equipmentCatalog,
       deliveryConfig,
     })
   ) {
@@ -179,6 +235,8 @@ export function buildScriptContext(input: {
   const executiveName = input.advisor?.name?.trim() || "Ejecutivo WOM";
 
   const equipmentLine = lines.find((l) => l.equipmentMode === "with");
+  const equipmentLines = buildEquipmentLines(lines, equipmentCatalog);
+  const mainEquipment = equipmentLines[0] ?? null;
   const pie = equipmentLine?.equipmentDownPayment
     ? formatCurrency(Number(equipmentLine.equipmentDownPayment))
     : "";
@@ -286,6 +344,8 @@ export function buildScriptContext(input: {
     mainLine,
     lines,
     hasEquipment,
+    mainEquipment,
+    equipmentLines,
     saleType,
     planDetail,
     requiresCapCode,
