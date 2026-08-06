@@ -6,6 +6,19 @@ export type SalesScriptStep = {
   content: string;
 };
 
+export type StructuredScriptStep = {
+  id: number;
+  titulo: string;
+  texto: string;
+  variables: string[];
+};
+
+/** Representación estructurada persistida del script (no es un bloque de texto). */
+export type StructuredScriptPayload = {
+  tipo: string;
+  pasos: StructuredScriptStep[];
+};
+
 export type SalesScriptMeta = {
   clientName: string;
   saleTypeLabel: string;
@@ -18,11 +31,11 @@ export type GeneratedSalesScript = {
   id: string;
   gestionId: string;
   conversationId: string;
-  /** Ej: "PORTABILIDAD SIN EQUIPO" */
   flowTitle: string;
   flowKey: string;
   meta: SalesScriptMeta;
   steps: SalesScriptStep[];
+  structured: StructuredScriptPayload;
   createdAt: string;
 };
 

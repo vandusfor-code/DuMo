@@ -3,11 +3,7 @@ import type { CommercialPlan } from "@/types/commercial-config";
 import type { Plan } from "@/types/lead";
 import type { GeneratedSalesScript } from "@/types/sales-script";
 import { buildScriptContext } from "./context";
-import {
-  buildPortabilityNoEquipmentSteps,
-  flowKey,
-  flowTitle,
-} from "./official-blocks";
+import { assembleGeneratedScript } from "./engine";
 
 export function buildSalesScript(input: {
   gestionId: string;
@@ -24,22 +20,25 @@ export function buildSalesScript(input: {
   });
   if (!ctx) return null;
 
-  const steps = buildPortabilityNoEquipmentSteps(ctx);
-  const now = new Date().toISOString();
+  if (ctx.hasEquipment) {
+    // Futuro: PORTABILIDAD_CON_EQUIPO con su documento oficial
+    return null;
+  }
 
-  return {
-    id: `SCRIPT-${Date.now()}`,
+  if (ctx.saleType !== "portability") {
+    // Futuro: otros flujos con documentos oficiales
+    return null;
+  }
+
+  return assembleGeneratedScript({
     gestionId: input.gestionId,
     conversationId: input.gestion.conversationId,
-    flowTitle: flowTitle(ctx),
-    flowKey: flowKey(ctx),
+    ctx,
     meta: {
       clientName: input.gestion.customerName,
       saleTypeLabel: ctx.vars.tipo_venta,
       planName: ctx.vars.plan,
       totalMonthlyLabel: ctx.vars.valor_total,
     },
-    steps,
-    createdAt: now,
-  };
+  });
 }

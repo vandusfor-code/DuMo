@@ -9,7 +9,6 @@ import {
 import { regionName } from "@/data/chile-regions";
 import { computeContractSummary } from "@/lib/lead-contract-summary";
 import { formatCurrency, formatLongDate } from "@/lib/format";
-import { bulletList } from "@/lib/sales-script/render";
 import type { LeadLineValues } from "@/types/lead-form";
 import type { Plan } from "@/types/lead";
 
@@ -25,6 +24,22 @@ export type ScriptBuildContext = {
   deliveryIsStore: boolean;
   lineCount: number;
 };
+
+function formatPhone569(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length >= 9) {
+    const local = digits.slice(-9);
+    return `569-${local.slice(0, 4)}-${local.slice(4)}`;
+  }
+  return phone;
+}
+
+function formatContractDate(date: Date): string {
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const yyyy = date.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
 
 function addBusinessDays(from: Date, days: number): Date {
   const result = new Date(from);
@@ -84,7 +99,27 @@ export function buildScriptContext(input: {
 
   const benefits = planDetail?.benefits ?? [];
   const promotions = planDetail?.promotions ?? [];
-  const benefitsText = planDetail?.commercialText?.trim() || bulletList(benefits) || "Beneficios del plan contratado";
+  /** Beneficios solo desde catálogo — nunca hardcodeados en el script. */
+  const benefitsText =
+    planDetail?.commercialText?.trim() ||
+    (benefits.length > 0 ? benefits.map((b) => `${planName}: ${b}`).join("\n") : "");
+
+  const promocionesBoletas =
+    promotions.length > 0
+      ? `. Promociones: ${promotions.join(", ")}`
+      : "";
+
+  const regionLabel = mainLine.region ? regionName(mainLine.region) : "";
+
+  let bloquePlanesMas = "";
+  if (lines.length > 1) {
+    bloquePlanesMas = `En caso de PLANES MÁS señala la cantidad y si los planes son diferentes deberás señalar uno a uno los beneficios según corresponda.
+PARA PLANES MÁS LÍNEAS ADICIONALES: La línea principal queda con su valor transparente de "${formatCurrency(planValue)}" y la(s) línea(s) adicional(es) queda(n) con un monto a pagar de ${formatCurrency(additionalLineValue)} al mes de forma transparente.`;
+  }
+
+  const direccionCompleta = [mainLine.deliveryAddress, mainLine.comuna, regionLabel]
+    .filter(Boolean)
+    .join(", ");
 
   const hasEquipment = lines.some((l) => l.equipmentMode === "with");
   const deliveryIsHome = mainLine.deliveryType === "home";
@@ -95,7 +130,6 @@ export function buildScriptContext(input: {
     mainLine.currentOperator !== "wom";
 
   const deliveryDate = formatLongDate(addBusinessDays(new Date(), 5).toISOString());
-  const regionLabel = mainLine.region ? regionName(mainLine.region) : "";
 
   const equipmentLine = lines.find((l) => l.equipmentMode === "with");
   const pie = equipmentLine?.equipmentDownPayment
@@ -117,20 +151,24 @@ export function buildScriptContext(input: {
   const vars: Record<string, string> = {
     nombre_cliente: input.gestion.customerName,
     rut: input.gestion.rut,
-    telefono: input.gestion.phone,
+    telefono: formatPhone569(input.gestion.phone),
     correo: mainLine.email || "",
     direccion: mainLine.deliveryAddress || "",
+    direccion_completa: direccionCompleta,
     region: regionLabel,
     comuna: mainLine.comuna || "",
+    fecha_contratacion: formatContractDate(new Date()),
     tipo_venta: LEAD_SALE_TYPE_LABELS[saleType] ?? saleType,
-    numero_portar: mainLine.phone,
+    numero_portar: formatPhone569(mainLine.phone),
     operador_actual: mainLine.currentOperator
       ? CURRENT_OPERATOR_LABELS[mainLine.currentOperator]
       : "",
     plan: planName,
     valor_plan: formatCurrency(planValue),
     beneficios: benefitsText,
-    promociones: promotions.length > 0 ? promotions.join(". ") : "Sin promociones adicionales",
+    promociones: promotions.length > 0 ? promotions.join(". ") : "",
+    promociones_boletas: promocionesBoletas,
+    bloque_planes_mas: bloquePlanesMas,
     lineas: String(lines.length),
     valor_linea_principal: formatCurrency(planValue),
     valor_linea_adicional: formatCurrency(additionalLineValue),
@@ -150,7 +188,7 @@ export function buildScriptContext(input: {
     direccion_sucursal: "Av. Andrés Bello 2425, Providencia, Santiago",
     horario_sucursal: "Lunes a sábado de 10:00 a 20:00 hrs",
     codigo_retiro: "WOM-" + input.gestion.conversationId.slice(-6).toUpperCase(),
-    correo_ejecutivo: input.advisor?.email || "asesor@wom.cl",
+    correo_ejecutivo: input.advisor?.email || "asesor@ventas.wom.cl",
     nombre_ejecutivo: input.advisor?.name || "Ejecutivo WOM",
     observaciones: input.gestion.notes || "",
     condiciones_especiales: planDetail?.specialConditions || "",

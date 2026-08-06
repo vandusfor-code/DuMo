@@ -30,9 +30,9 @@ export function SalesScriptTab({ script }: { script: GeneratedSalesScript | null
       <div className="rounded-2xl border border-line bg-canvas/50 p-4">
         <div className="grid grid-cols-2 gap-3 text-[13px] sm:grid-cols-4">
           <InfoItem label="Cliente" value={script.meta.clientName} />
-          <InfoItem label="Tipo venta" value={script.meta.saleTypeLabel} />
+          <InfoItem label="Tipo" value={script.meta.saleTypeLabel} />
           <InfoItem label="Plan" value={script.meta.planName} />
-          <InfoItem label="Total mensual" value={script.meta.totalMonthlyLabel} highlight />
+          <InfoItem label="Total" value={script.meta.totalMonthlyLabel} highlight />
         </div>
       </div>
 
@@ -56,7 +56,10 @@ export function SalesScriptTab({ script }: { script: GeneratedSalesScript | null
         </div>
 
         <h4 className="mt-5 text-[15px] font-semibold text-ink">{current?.title}</h4>
-        <div className="mt-3 whitespace-pre-wrap text-[14px] leading-relaxed text-ink">
+        <div
+          className="mt-3 select-none whitespace-pre-wrap text-[14px] leading-relaxed text-ink"
+          onCopy={(e) => e.preventDefault()}
+        >
           {current?.content}
         </div>
 

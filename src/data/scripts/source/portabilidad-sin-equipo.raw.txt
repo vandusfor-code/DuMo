@@ -1,0 +1,83 @@
+[1] 
+[2] Hola buenas tardes/dias (según la hora de chile) hablas con (eL NOMBRE DE USUARIO DEL PERFIL QUE TENGA ( Tengo el gusto de hablar con (nombre del cliente) UN GUSTO,  PARA DAR CONTINUIDAD A LO ANTERIORMENTE CONVERSADO  TE INFORMO QUE :
+[3] 
+[4] CIERRE:             Cliente aceptó? Comienza con el cierre indicando lo siguiente:
+[5] Has tomado una gran decisión y como no contamos con letra chica a continuación escucharás una grabación que dura 30 segundos con las condiciones que respaldan tu contratación, por lo que te pido que escuches atentamente y no cortes ya que yo retomaré tu llamado para resolver tus dudas y realizar un breve resumen del producto que te llevas:
+[6] 
+[7] ¿Tienes alguna duda con el audio que escuchaste? Si el cliente presenta dudas resuélvelas, sino continua con lo siguiente:
+[8] Continuamos con un breve resumen de tu contratación:
+[9] Tú Nombre Completo es XXXX, RUT XX.XXX.XXX-X, domiciliado en (Calle, Numeración, Casa o Depto., Comuna, Ciudad y Región), y correo electrónico xxx@xxx.xx, tú número de contacto es el 569-XXXX-XXXX. ¿Son correctos tus datos?
+[10] SI: Continuar NO: Corregir.
+[11] Según las condiciones acordadas, aceptas contratar hoy con fecha DD/MM/AAAA la portabilidad de tu número “569-XXXXXXXX” proveniente de la compañía “X” a WOM con el plan “X” (Menciona el nombre del plan como aparece en sistemas), por el monto mensual de “$X”. Siempre señala el valor transparente del plan y en caso de aplicar boletas a $0 (3ª y 6ª boleta en portabilidad), indícalo claramente indicando los meses en que aplica. Recuerda que si por algún motivo el número no se porta, los beneficios explicados quedarán sin efecto, por eso es importante que cumplas con las condiciones de portabilidad que te explicaré en breve.
+[12] En caso de PLANES MÁS señala la cantidad y si los planes son diferentes deberás señalar uno a uno los beneficios según corresponda.
+[13] PARA PLANES MÁS LÍNEAS ADICIONALES: La línea principal queda con su valor transparente de “$X” y la(s) línea(s) adicional(es) queda(n) con un monto a pagar de $7.990 al mes de forma transparente.
+[14] PARA PLANES MÁS CON HOMOLOGACIÓN (UPSELLING): Aceptas modificar el plan actual para el número 569-XXXXXXXX al nuevo plan “XXX” con un monto a pagar de “$X”. Recuerda que si tenías algún beneficio anterior quedará inválido, pero ganarás los beneficios obtenidos con este nuevo plan.
+[15] Dependiendo del plan que lleve:
+[16] PLAN SIMPLE W 150 GB: Incluye 150 GB para navegar en red 5G, Minutos Libres, Apps Libres y acceso al Club de Beneficios WOM desde el primer día.
+[17] 
+[18] PLAN SIMPLE O 300 GB: Incluye 300 GB para navegar en red 5G, Minutos Libres, Apps Libres, WhatsApp Libre en Roaming Internacional en más de 100 países, Club WOM, Cupón de 10% de descuento en equipos/accesorios cada 24 meses de permanencia y bonificación de la última cuota gratis (cuota 18) en la compra de equipo financiado.
+[19] 
+[20] PLAN SIMPLE M GB LIBRES: Incluye Gigas Libres en red 5G, Minutos Libres, Apps Libres, WhatsApp Libre + 3 GB de navegación libre en Roaming Internacional en más de 100 países, suscripción mensual GRATIS a PedidosYa Plus, Club WOM, Cupón de 10% de descuento en equipos/accesorios cada 12 meses de permanencia y bonificación de las últimas 2 cuotas gratis (cuotas 17 y 18) en la compra de equipo financiado."
+[21] 
+[22] CONDICIONES GENERALES PARA TODOS LOS PLANES: Te enviaremos un mail de bienvenida al correo que nos proporcionaste; es muy importante que lo revises, ya que contiene información relevante sobre tu plan contratado y tu ciclo de facturación. Además, te invitamos a visitar wom.cl o ingresar a nuestra APP WOM para conocer todos los detalles sobre el uso y condiciones de tus beneficios libres o controlados, como minutos, SMS, apps libres ya mencionadas y el servicio de roaming internacional vía WhatsApp en más de 100 países. Recuerda que a través de la App también podrás realizar el seguimiento de tu despacho en tiempo real.
+[23] CIERRE DESPACHO A DOMICILIO:
+[24] Tu producto será despachado a la dirección (Región, Provincia, Comuna, Calle, Número), y tus números de contactos son: 569-XXXXXXXX (2 preferiblemente), registrando la entrega de tus productos para el día XX. (INFORMAR AL CLIENTE LA FECHA EXACTA QUE TE ENTREGA LA CALCULADORA DE FECHAS DE ENTREGA).
+[25] Te enviaremos un correo con el asunto “Tu Compra va en Camino” una vez que iniciemos el despacho de tus productos.
+[26] CONDICION VALIDA SOLO PARA DESPACHO A DOMICILIO RECIBIENDO TITULAR O TERCERO
+[27] Recuerda que tú como titular del servicio puedes recibir el producto, ya que al momento de la entrega debes firmar la solicitud de la portabilidad. Si recibes tu como titular lo puedes hacer con el CÓDIGO OTP o con tu cédula de identidad, si recibe un tercero debe presentar si o si el CÓDIGO OTP que te enviaremos por Whatsapp (RAYO) o SMS (ALAS/SROUTE). Si tu entrega es con despacho Ultra Express (NOMAD 3 horas), el titular o un tercero pueden recibir el producto entregando el código OTP al repartidor enviado solo al whatsapp.
+[28] 
+[29] CIERRE DESPACHO EN TIENDA:
+[30] Tu producto será despachado a nuestra sucursal “Nombre sucursal” ubicada en “Dirección sucursal” y podrás retirar tus productos en el horario de “DÍAS” y “HORAS” (Indica el horario de atención de la sucursal AQUÍ), registrando la entrega de tus productos para el día XX. (INFORMAR AL CLIENTE LA FECHA EXACTA QUE TE ENTREGA LA CALCULADORA DE FECHAS DE ENTREGA).
+[31] 
+[32] Te enviaremos un correo con el asunto “Listo para tu retiro” y adicionalmente un SMS a tu número a portar con un código de verificación de 6 dígitos, a partir de este momento deberás acercarte a la sucursal Wom a retirar tu producto directamente mostrando el código de verificación de 6 dígitos, desde la recepción de este correo podrás realizar el retiro de tus productos hasta un plazo de 7 días continuos. Si tú no puedes retirar tu producto puedes entregar el código de verificación a un tercero para que realice el retiro por ti. El código es válido solo por una vez, por lo tanto si lo entregas es bajo tu responsabilidad.
+[33] 
+[34] COMPATIBILIDAD DE EQUIPOS: Te recuerdo que puedes revisar la compatibilidad de tu equipo en nuestra web https://www.wom.cl/sello-multibandas/
+[35] 
+[36] CONTRATOS Y ANEXOS: Una vez que recibas tus productos te enviaremos un correo llamado "Bienvenido a Wom" con documentos adjuntos como los contratos de servicios, anexos y detalle de líneas, en el cual podrás identificar tu número asociado a la simcard enviada.
+[37] INFORMAR AL CLIENTE PARA TODA PORTABILIDAD (POSTPAGO Y PREPAGO):
+[38] 
+[39] XXX _________ (Nombre Cliente), Te explico un poco como funciona el proceso de portabilidad.
+[40] La portabilidad se realiza de lunes a sábado, sin incluir domingos ni festivos, se ejecuta en la madrugada con la finalidad de no interrumpir el servicio. Cuando recibas tu chip de WOM, NO lo debes colocar en tu celular, ya que como tu número aún no estará portado no tendrás servicio. No Botes el chip de (Entel/Movistar/Claro/Operador) hasta tanto tu portabilidad con WOM no esté 100% realizada. Normalmente la portabilidad demora 1 día hábil en ejecutarse desde que recibas el chip de WOM.
+[41] Cuándo recibas el chip de WOM, espera al dia siguiente, debes quedar sin servicio en tu operador actual, eso significa que ya estás portado a WOM y es en ese momento que debes colocar el nuevo chip de WOM en tu celular y probar todos los servicios, valida que sea tu número portado, que puedas hacer llamadas y navegar por internet. Si no pierdes la señal en tu operador, eso significa que aún no estás portado, te pido que en ese caso me puedas escribir para poder validar que pasó con la portabilidad y poder gestionar una solución en caso de error.
+[42] Recuerda que no debes tener ningún tipo de deuda con (Entel/Movistar/Claro/Operador) es importante que al momento de recibir tu chip WOM estés al día con tus pagos de boletas o presta lucas. Con deuda, no te puedes portar.
+[43] 
+[44] NÚMERO TEMPORAL (PROVISORIO): Mientras tu número no se porte a WOM activaremos el servicio con un número temporal, que es un número distinto al que estás portando, este número será solo temporal hasta tanto podamos portar tu número real, lo importante de esto es que mientras tu número no se porte no perderás el servicio con tu operador, por eso es importante que no cambies el chip hasta que estés portado. Tu primera boleta de cobro será emitida por un proporcional del servicio desde la activación hasta el corte de tu ciclo de facturación, si tu número no se porta igual se te cobrará el servicio activo con el número temporal.
+[45] 
+[46] Para portabilidades de PREPAGO A POSTPAGO:
+[47] Valida con el cliente la recepción del CAP enviado:
+[48] Te envié un SMS al número de teléfono prepago a portar con el código CAP que es un código de 4 dígitos, ¿Puedes validar si lo recibiste? Es necesario este código para poder ejecutar la portabilidad.
+[49] Si el cliente brinda el código CAP en el momento de la llamada:
+[50] Ya completamos el código. De todas formas te comento que el mismo tiene una vigencia de 5 días y en caso que en este plazo no se haya concretado tu portabilidad, volveremos a enviarte un nuevo código CAP vía SMS para continuar con el proceso.
+[51] Si el cliente NO brinda el código en el momento de la llamada:
+[52] El código tiene una vigencia de 5 días, por lo que te pido estar atento ya que te contactaremos para solicitarte éste dato. En caso que en este plazo no se haya concretado tu portabilidad, volveremos a enviarte un nuevo código CAP vía SMS para continuar con el proceso.
+[53] XXX _________ (Nombre Cliente), ¿Alguna duda con el proceso de porta? CLIENTE RESPONDE SÍ: Aclarar dudas. CLIENTE RESPONDE NO: Continuar.
+[54] CHIP PREPAGO DE REGALO: XXX _____ (Nombre Cliente), te regalamos un chip prepago que si lo prefieres podrás usar o regalar a un familiar o amigo. Este chip viene con beneficios como gigas y minutos que podrán disfrutar con solo activar el chip. El empaque del chip te indicará los beneficios y la forma de activarlo y te lo enviaremos con el resto de tus productos.
+[55] 
+[56] ENCUESTA NPS: Recuerda que no puedes fomentar una nota sino sólo señala:
+[57] XXX (Nombre Cliente), ¿Qué te pareció mi atención? (Cliente responde bien): Que bueno que te gusto y en base a eso, te quiero invitar a que puedas responder una encuesta de satisfacción en base a la atención que te ofrecí como ejecutivo, esta encuesta la vas a recibir en tu correo electrónico una vez que recibas tu producto. La encuesta tiene una escala de evaluación del 0 al 10 dónde 0 es la nota mínima y 10 es la nota máxima y la primera pregunta de la encuesta que es “Pensando únicamente en la experiencia de tu compra, qué tan probable es que recomiendes WOM a un familiar o un amigo?, en esa pregunta me evalúas a mi y mi atención, de antemano muchas gracias por responder.
+[58] ACEPTACIÓN FINAL Y PROCESO DE VALIDACIÓN DE IDENTIDAD:
+[59] 
+[60] XX _____ (Nombre cliente)¿te queda alguna duda con las condiciones entregadas?
+[61] SI: Aclarar dudas / No: Seguir con la pregunta de aceptación y proceso de VDI.
+[62] 
+[63] Entiendes y en conjunto con iniciar ahora el proceso de Validación de identidad aceptas las condiciones de este contrato, ¿Lo aceptas?
+[64] 
+[65] RESPUESTA CLIENTE : SI, en caso contrario gatilla la respuesta consultando si su respuesta se considera un SI.
+[66] 
+[67] DESHABILITACIÓN PREFIJO 809: Recuerda que si la contratación del cliente es por línea nueva, debes tomar el nuevo número desde la orden de ZS una vez que generes el folio de MAT y derivar por formulario. Si la contratación es por portabilidad, podrás ingresar el número a portar directo al formulario.
+[68] 
+[69] XXX___ (Nombre cliente), en base a la normativa vigente de la subsecretaría de telecomunicaciones ¿Te gustaría dejar de recibir llamadas Spam o no deseadas? Se debe tener el SÍ explícito del cliente.
+[70] CLIENTE RESPONDE SÍ (Entregar contexto): Perfecto, con esto procederemos a deshabilitar gratis el prefijo 809 para que dejes de recibir llamadas sin tu consentimiento. Haremos la deshabilitación una vez que tu línea esté activa con nosotros.
+[71] CLIENTE RESPONDE NO (Entregar contexto): Al deshabilitar el prefijo 809 evitarás recibir llamadas molestas que tu no solicitaste, es una buena opción para controlar tus registros de llamadas, ¿Te interesa deshabilitarlo?
+[72] NO: Entiendo, de igual forma si más adelante lo deseas hacer, lo puedes autogestionar por la APP WOM.
+[73] CLIENTE CONSULTA MÁS SOBRE ESTE PROCESO (Entregar contexto): Existe una norma por la subsecretaría de telecomunicaciones que te permite a ti como usuario, poder controlar las llamadas que recibes bajo el prefijo 809, que son llamadas masivas que tu no has solicitado, al deshabilitar este prefijo, evitas las llamadas molestas que tu no deseas recibir.
+[74] Si el cliente acepta, debes derivar la solicitud de deshabilitación vía formulario.
+[75] 
+[76] REFERIDO: XX _______ (Nombre cliente), me gustaría saber si conoces a alguien que quiera acceder a todos los beneficios de WOM. (Pedir nombre y teléfono de referido).
+[77] 
+[78] DESPEDIDA: Te invito a tomar nota de mi correo electrónico el cual es XXX@ventas.wom.cl quedando a tu disposición para cualquier consulta adicional que tengas y para el seguimiento de tu venta.
+[79] 
+[80] Te recuerdo que fuiste atendido por (Nombre y apellido ejecutivo).
+[81] Bienvenido a WOM, que tengas un excelente día!
+[82] 
+[83] 
