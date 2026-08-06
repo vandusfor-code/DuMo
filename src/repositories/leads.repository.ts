@@ -11,7 +11,7 @@ import type {
   UpsertLeadNoteInput,
 } from "@/types/admin-lead";
 import type { ChatMessage } from "@/types/conversation";
-import { PLANS_MOCK } from "@/data/mock/leads.mock";
+import { commercialPlansService } from "@/services/commercial-plans.service";
 import {
   buildTimeline,
   getDefaultClientProfile,
@@ -64,8 +64,8 @@ class MockLeadRepository implements LeadRepository {
   private notes: LeadNote[] = [];
   private scriptsByConversation = new Map<string, GeneratedSalesScript>();
 
-  getPlans() {
-    return withLatency(PLANS_MOCK);
+  async getPlans() {
+    return withLatency(await commercialPlansService.getAdvisorPlanOptions());
   }
   saveLead(input: SaveLeadInput) {
     return withLatency(buildLead(`LEAD-${Date.now()}`, input));
@@ -162,11 +162,7 @@ class SheetsLeadRepository implements LeadRepository {
   constructor(private readonly client: GoogleSheetsClient) {}
 
   async getPlans(): Promise<Plan[]> {
-    const rows = await this.client.getRecords("Planes");
-    const plans = rows
-      .filter((r) => r.id || r.nombre)
-      .map<Plan>((r) => ({ id: r.id || r.nombre, name: r.nombre || r.id }));
-    return plans.length > 0 ? plans : PLANS_MOCK;
+    return commercialPlansService.getAdvisorPlanOptions();
   }
 
   async saveLead(input: SaveLeadInput): Promise<Lead> {

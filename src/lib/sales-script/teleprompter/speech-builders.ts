@@ -2,7 +2,6 @@ import type { CommercialPlan } from "@/types/commercial-config";
 import type { SaveLeadInput } from "@/types/lead";
 import { CURRENT_OPERATOR_LABELS } from "@/types/lead";
 import { formatCurrency } from "@/lib/format";
-import type { Plan } from "@/types/lead";
 import {
   buildBlock4BenefitsSpeech,
   buildStructuredBenefitItems,
@@ -39,6 +38,9 @@ export function buildBenefitsSpeech(
   planValueLabel: string,
   plan: CommercialPlan | null,
 ): string {
+  if (!plan) {
+    throw new Error(`No se puede generar el discurso de beneficios: plan "${planName}" sin configuración comercial.`);
+  }
   const line: LineSpeechDetail = {
     index: 0,
     phone: "",
@@ -56,22 +58,22 @@ export function buildBenefitsSpeech(
 export function buildLineDetails(input: {
   lines: SaveLeadInput["lines"];
   commercialPlans: CommercialPlan[];
-  advisorPlans: Plan[];
 }): LineSpeechDetail[] {
   return input.lines.map((line, index) => {
     const planDetail = planById(line.planId, input.commercialPlans);
-    const advisorPlan = input.advisorPlans.find((p) => p.id === line.planId);
-    const planName = planDetail?.name ?? advisorPlan?.name ?? "Plan WOM";
-    const planValue = planDetail?.womValue ?? advisorPlan?.womValue ?? 0;
-    const benefitItems = planDetail ? buildStructuredBenefitItems(planDetail) : [];
+    if (!planDetail) {
+      throw new Error(
+        `El plan "${line.planId}" no existe en el catálogo comercial al construir el discurso.`,
+      );
+    }
     return {
       index,
       phone: formatPhone569(line.phone),
       planId: line.planId,
-      planName,
-      planValue,
-      planValueLabel: formatCurrency(planValue),
-      benefitItems,
+      planName: planDetail.name,
+      planValue: planDetail.womValue,
+      planValueLabel: formatCurrency(planDetail.womValue),
+      benefitItems: buildStructuredBenefitItems(planDetail),
       plan: planDetail,
       isMain: index === 0,
     };

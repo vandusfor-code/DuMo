@@ -1,18 +1,15 @@
 "use client";
 
 import { useFormContext, useWatch } from "react-hook-form";
-import { usePlans } from "@/hooks/use-leads";
 import { computeContractSummary } from "@/lib/lead-contract-summary";
-import { PLANS_MOCK } from "@/data/mock/leads.mock";
+import type { Plan } from "@/types/lead";
 import type { LeadFormValues } from "@/types/lead-form";
 
 /** Resumen automático de la contratación — debajo de Líneas vendidas. */
-export function SaleContractSummary() {
+export function SaleContractSummary({ plans }: { plans: Plan[] }) {
   const { control } = useFormContext<LeadFormValues>();
   const lines = useWatch({ control, name: "lines" }) ?? [];
-  const { data: plans } = usePlans();
-  const planList = plans ?? PLANS_MOCK;
-  const summary = computeContractSummary(lines, planList);
+  const summary = computeContractSummary(lines, plans);
 
   return (
     <div className="mt-4 rounded-2xl border border-line bg-canvas/50 p-4">

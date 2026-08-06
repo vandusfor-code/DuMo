@@ -1,6 +1,6 @@
 import "server-only";
 import { getAdminLeadsRepository } from "@/repositories/admin-leads.repository";
-import { getLeadRepository } from "@/repositories/leads.repository";
+import { commercialPlansService } from "@/services/commercial-plans.service";
 import type {
   AdminAdvisor,
   AdminConversation,
@@ -50,7 +50,7 @@ export const adminLeadsService = {
     return getAdminLeadsRepository().getDetail(conversationId).then((d) => d.client);
   },
   getPlans(): Promise<Plan[]> {
-    return getLeadRepository().getPlans();
+    return commercialPlansService.getAdvisorPlanOptions();
   },
   saveLead(input: SaveLeadInput, advisor?: { name: string; email: string }): Promise<SaveLeadResult> {
     return saveLeadWithScript(input, advisor);

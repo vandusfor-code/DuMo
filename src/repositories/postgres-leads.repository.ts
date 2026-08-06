@@ -12,7 +12,7 @@ import type {
 } from "@/types/admin-lead";
 import type { ChatMessage } from "@/types/conversation";
 import { getAdminLeadsRepository } from "@/repositories/admin-leads.repository";
-import { getCommercialConfigurationRepository } from "@/repositories/commercial-configuration.repository";
+import { commercialPlansService } from "@/services/commercial-plans.service";
 import { businessDateISO } from "@/lib/date";
 import { getDefaultClientProfile } from "@/data/mock/admin-leads.mock";
 import { ensureSchema, getSql, withDbRetry } from "@/server/db/client";
@@ -35,11 +35,7 @@ function buildLead(id: string, input: SaveLeadInput, advisorId: string): Lead {
 
 export class PostgresLeadRepository {
   async getPlans(): Promise<Plan[]> {
-    const config = await getCommercialConfigurationRepository().getSnapshot();
-    const plans = config.plans
-      .filter((p) => p.status === "active")
-      .map((p) => ({ id: p.id, name: p.name, womValue: p.womValue }));
-    return plans.length > 0 ? plans : [{ id: "default", name: "Plan estándar" }];
+    return commercialPlansService.getAdvisorPlanOptions();
   }
 
   async saveLead(input: SaveLeadInput): Promise<Lead> {

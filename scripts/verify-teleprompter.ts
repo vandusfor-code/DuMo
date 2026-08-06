@@ -18,13 +18,6 @@ import type { SaveLeadInput } from "../src/types/lead";
 
 const PLANS = COMMERCIAL_PLANS_MOCK.filter((p) => ["plan-w", "plan-o", "plan-m"].includes(p.id));
 
-const advisorPlans = PLANS.map((p) => ({
-  id: p.id,
-  name: p.name,
-  womValue: p.womValue,
-  dumoValue: p.dumoValue,
-}));
-
 function baseGestion(overrides: Partial<SaveLeadInput> & { lines: SaveLeadInput["lines"] }): SaveLeadInput {
   return {
     conversationId: "conv-test-001",
@@ -123,6 +116,11 @@ const SCENARIOS: { name: string; gestion: SaveLeadInput; expectNull?: boolean }[
     gestion: baseGestion({ lines: [line(0, "plan-w"), line(1, "plan-w")] }),
     expectNull: true,
   },
+  {
+    name: "PlanId inexistente — inválido",
+    gestion: baseGestion({ lines: [line(0, "xs")] }),
+    expectNull: true,
+  },
 ];
 
 let failed = 0;
@@ -135,7 +133,6 @@ for (const scenario of SCENARIOS) {
   const ctx = buildScriptContext({
     gestion: scenario.gestion,
     commercialPlans: PLANS,
-    advisorPlans,
     advisor: { name: "María Asesora", email: "maria@wom.cl" },
   });
 
@@ -143,7 +140,6 @@ for (const scenario of SCENARIOS) {
     const error = getTeleprompterContextError({
       gestion: scenario.gestion,
       commercialPlans: PLANS,
-      advisorPlans,
       deliveryConfig: DEFAULT_DELIVERY_TELEPROMPTER_CONFIG,
     });
     console.log(ctx ? "❌ Se esperaba contexto nulo" : "✅ Contexto rechazado correctamente");

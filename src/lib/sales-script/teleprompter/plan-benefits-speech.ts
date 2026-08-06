@@ -152,12 +152,6 @@ function buildSegmentsSpeech(
 ): string {
   const parts: string[] = [];
 
-  if (segments.core.length > 0) {
-    parts.push(`${subject} ${joinNaturalList(segments.core)}.`);
-  } else {
-    parts.push(`${subject} los beneficios de servicio contratados con WOM.`);
-  }
-
   const supplementary: string[] = [];
 
   if (segments.hasClubWom) {
@@ -173,6 +167,16 @@ function buildSegmentsSpeech(
   const installments = buildFreeInstallmentsBody(plan);
   if (installments) supplementary.push(installments);
 
+  if (segments.core.length > 0) {
+    parts.push(`${subject} ${joinNaturalList(segments.core)}.`);
+  } else if (supplementary.length === 0) {
+    throw new Error(
+      `El plan "${plan.name}" (${plan.id}) no tiene beneficios configurados para el Bloque 4.`,
+    );
+  } else {
+    parts.push(`${subject.replace(/, incluye$/, "")}.`);
+  }
+
   parts.push(...applySpeechConnectors(supplementary));
 
   return parts.join("\n\n");
@@ -182,12 +186,8 @@ function buildSinglePlanSpeech(
   clientName: string,
   planName: string,
   planValueLabel: string,
-  plan: CommercialPlan | null,
+  plan: CommercialPlan,
 ): string {
-  const name = clientName.trim() || "estimado cliente";
-  if (!plan) {
-    return `${name}, a continuación te detallo los beneficios incluidos en el plan que acabas de contratar con WOM.`;
-  }
   const segments = extractPlanServiceBenefitSegments(plan);
   const subject = buildPlanIntroSubject(clientName, planName, planValueLabel);
   return buildSegmentsSpeech(segments, subject, plan);
@@ -195,8 +195,9 @@ function buildSinglePlanSpeech(
 
 function buildHeterogeneousPlanSpeech(line: LineSpeechDetail): string {
   if (!line.plan) {
-    const role = line.isMain ? "tu línea principal" : `tu línea adicional ${line.index}`;
-    return `En ${role}, los beneficios incluidos en tu plan se detallan según la contratación realizada con WOM.`;
+    throw new Error(
+      `El plan "${line.planId}" de ${line.isMain ? "la línea principal" : `la línea adicional ${line.index + 1}`} no tiene configuración comercial para el Bloque 4.`,
+    );
   }
 
   const segments = extractPlanServiceBenefitSegments(line.plan);
@@ -209,17 +210,24 @@ export function buildBlock4BenefitsSpeech(
   clientName: string,
   lineDetails: LineSpeechDetail[],
 ): string {
-  if (lineDetails.length === 0) return "";
+  if (lineDetails.length === 0) {
+    throw new Error("No hay líneas de venta para generar el Bloque 4 de beneficios.");
+  }
 
   const uniquePlanIds = new Set(lineDetails.map((l) => l.planId));
 
   if (uniquePlanIds.size === 1) {
     const main = lineDetails.find((l) => l.isMain) ?? lineDetails[0];
+    if (!main.plan) {
+      throw new Error(
+        `El plan "${main.planId}" no tiene configuración comercial para el Bloque 4.`,
+      );
+    }
     const speech = buildSinglePlanSpeech(
       clientName,
       main.planName,
       main.planValueLabel,
-      main.plan ?? null,
+      main.plan,
     );
     if (lineDetails.length > 1) {
       return `${speech}\n\n${MULTILINE_SAME_PLAN_CLOSING}`;
@@ -243,7 +251,7 @@ export function buildConversationalBenefitsSpeech(
   clientName: string,
   planName: string,
   planValueLabel: string,
-  plan: CommercialPlan | null,
+  plan: CommercialPlan,
 ): string {
   return buildSinglePlanSpeech(clientName, planName, planValueLabel, plan);
 }
@@ -253,7 +261,7 @@ export function buildPlanBenefitsSpeech(
   clientName: string,
   planName: string,
   planValueLabel: string,
-  plan: CommercialPlan | null,
+  plan: CommercialPlan,
 ): string {
   return buildConversationalBenefitsSpeech(clientName, planName, planValueLabel, plan);
 }

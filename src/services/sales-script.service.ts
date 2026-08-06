@@ -16,9 +16,8 @@ export const salesScriptService = {
       return null;
     }
 
-    const [commercialConfig, advisorPlans, deliveryConfig] = await Promise.all([
+    const [commercialConfig, deliveryConfig] = await Promise.all([
       getCommercialConfigurationRepository().getSnapshot(),
-      getLeadRepository().getPlans(),
       getDeliveryConfigurationRepository().getConfig(),
     ]);
 
@@ -26,7 +25,6 @@ export const salesScriptService = {
       gestionId: input.gestionId,
       gestion: input.gestion,
       commercialPlans: commercialConfig.plans,
-      advisorPlans,
       advisor: input.advisor,
       deliveryConfig,
     });

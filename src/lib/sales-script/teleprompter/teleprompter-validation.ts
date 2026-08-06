@@ -1,6 +1,6 @@
 import type { CommercialPlan } from "@/types/commercial-config";
 import type { SaveLeadInput } from "@/types/lead";
-import type { Plan } from "@/types/lead";
+import { validateGestionCommercialPlans } from "@/lib/commercial-plans-catalog";
 import {
   type DeliveryTeleprompterConfig,
   resolvePickupStore,
@@ -17,13 +17,15 @@ const PICKUP_STORE_REQUIRED_MESSAGE =
 export function getTeleprompterContextError(input: {
   gestion: SaveLeadInput;
   commercialPlans: CommercialPlan[];
-  advisorPlans: Plan[];
   deliveryConfig: DeliveryTeleprompterConfig;
 }): string | null {
   const lines = input.gestion.lines;
   if (lines.length === 0) {
     return "La gestión está incompleta: agrega al menos una línea de venta para generar el teleprompter.";
   }
+
+  const planError = validateGestionCommercialPlans(input.gestion, input.commercialPlans);
+  if (planError) return planError;
 
   const mainLine = lines[0];
   const deliveryType = mainLine.deliveryType;
@@ -40,7 +42,6 @@ export function getTeleprompterContextError(input: {
   const lineDetails = buildLineDetails({
     lines: input.gestion.lines,
     commercialPlans: input.commercialPlans,
-    advisorPlans: input.advisorPlans,
   });
 
   const mainPlan = input.commercialPlans.find((plan) => plan.id === mainLine.planId) ?? null;

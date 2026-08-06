@@ -23,8 +23,8 @@ import {
 import { getTeleprompterContextError } from "@/lib/sales-script/teleprompter/teleprompter-validation";
 import { joinNaturalList } from "@/lib/sales-script/teleprompter/speech-utils";
 import { formatFreeBillsLabels } from "@/lib/commercial-plan-offer";
+import { commercialPlansToAdvisorOptions } from "@/lib/commercial-plans-catalog";
 import type { LeadLineValues } from "@/types/lead-form";
-import type { Plan } from "@/types/lead";
 
 export type ScriptBuildContext = {
   vars: Record<string, string>;
@@ -129,7 +129,6 @@ function computeTotalMonthlyFromLines(lineDetails: LineSpeechDetail[]): number {
 export function buildScriptContext(input: {
   gestion: SaveLeadInput;
   commercialPlans: CommercialPlan[];
-  advisorPlans: Plan[];
   advisor?: { name: string; email: string };
   deliveryConfig?: DeliveryTeleprompterConfig;
 }): ScriptBuildContext | null {
@@ -139,7 +138,6 @@ export function buildScriptContext(input: {
     getTeleprompterContextError({
       gestion: input.gestion,
       commercialPlans: input.commercialPlans,
-      advisorPlans: input.advisorPlans,
       deliveryConfig,
     })
   ) {
@@ -152,11 +150,13 @@ export function buildScriptContext(input: {
   const mainLine = lines[0];
   const saleType = mainLine.saleType;
   const planDetail = planById(mainLine.planId, input.commercialPlans);
-  const advisorPlan = input.advisorPlans.find((p) => p.id === mainLine.planId);
-  const planName = planDetail?.name ?? advisorPlan?.name ?? "Plan WOM";
-  const planValue = planDetail?.womValue ?? advisorPlan?.womValue ?? 0;
-  const additionalLineValue = planDetail?.additionalLineValue ?? 7_990;
-  const summary = computeContractSummary(lines.map(mapLineToFormLine), input.advisorPlans);
+  if (!planDetail) return null;
+
+  const planName = planDetail.name;
+  const planValue = planDetail.womValue;
+  const additionalLineValue = planDetail.additionalLineValue ?? 7_990;
+  const advisorPlanOptions = commercialPlansToAdvisorOptions(input.commercialPlans);
+  const summary = computeContractSummary(lines.map(mapLineToFormLine), advisorPlanOptions);
 
   const regionLabel = mainLine.region ? regionName(mainLine.region) : "";
   const direccionCompleta = [mainLine.deliveryAddress, mainLine.comuna, regionLabel]
@@ -193,7 +193,6 @@ export function buildScriptContext(input: {
   const lineDetails = buildLineDetails({
     lines: input.gestion.lines,
     commercialPlans: input.commercialPlans,
-    advisorPlans: input.advisorPlans,
   });
 
   const totalMonthly =

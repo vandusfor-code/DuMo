@@ -1,5 +1,5 @@
 import "server-only";
-import { getLeadRepository } from "@/repositories/leads.repository";
+import { commercialPlansService } from "@/services/commercial-plans.service";
 import {
   getConversationRepository,
   type ConnectedNumber,
@@ -30,7 +30,7 @@ export const leadsService = {
     return getConversationRepository().markRead(conversationId);
   },
   getPlans(): Promise<Plan[]> {
-    return getLeadRepository().getPlans();
+    return commercialPlansService.getAdvisorPlanOptions();
   },
   saveLead(input: SaveLeadInput, advisor?: { name: string; email: string }): Promise<SaveLeadResult> {
     return saveLeadWithScript(input, advisor);

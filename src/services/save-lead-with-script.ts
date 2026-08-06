@@ -26,15 +26,13 @@ export async function saveLeadWithScript(
           advisor,
         });
         if (!script) {
-          const [commercialConfig, advisorPlans, deliveryConfig] = await Promise.all([
+          const [commercialConfig, deliveryConfig] = await Promise.all([
             getCommercialConfigurationRepository().getSnapshot(),
-            getLeadRepository().getPlans(),
             getDeliveryConfigurationRepository().getConfig(),
           ]);
           scriptUnavailableReason = getScriptBuildError({
             gestion: input,
             commercialPlans: commercialConfig.plans,
-            advisorPlans,
             deliveryConfig,
           });
         }
