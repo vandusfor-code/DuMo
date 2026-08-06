@@ -1,52 +1,30 @@
-import {
-  PORTABILIDAD_SIN_EQUIPO_OFFICIAL,
-  SCRIPT_TIPO,
-  type OfficialStepTemplate,
-} from "@/data/scripts/portabilidad-sin-equipo.official";
 import type { ScriptBuildContext } from "./context";
-import { renderTemplate } from "./render";
-import type { GeneratedSalesScript, SalesScriptStep, StructuredScriptPayload } from "@/types/sales-script";
-
-function buildStructuredPayload(
-  templates: OfficialStepTemplate[],
-  ctx: ScriptBuildContext,
-): StructuredScriptPayload {
-  return {
-    tipo: SCRIPT_TIPO,
-    pasos: templates.map((t) => ({
-      id: t.id,
-      titulo: t.titulo,
-      texto: renderTemplate(t.texto, ctx.vars),
-      variables: t.variables,
-    })),
-  };
-}
-
-export function buildOfficialSteps(
-  templates: OfficialStepTemplate[],
-  ctx: ScriptBuildContext,
-): { steps: SalesScriptStep[]; templates: OfficialStepTemplate[]; structured: StructuredScriptPayload } {
-  const active = templates.filter((t) => !t.when || t.when(ctx));
-  const steps = active.map((t) => ({
-    id: String(t.id),
-    title: t.titulo,
-    content: renderTemplate(t.texto, ctx.vars),
-  }));
-  const structured = buildStructuredPayload(active, ctx);
-  return { steps, templates: active, structured };
-}
+import {
+  buildPortabilidadSinEquipoFlow,
+  SCRIPT_TIPO,
+} from "./flows/portabilidad-sin-equipo.flow";
+import type { GeneratedSalesScript, StructuredScriptPayload } from "@/types/sales-script";
 
 export function buildPortabilityNoEquipmentScript(ctx: ScriptBuildContext): {
-  steps: SalesScriptStep[];
+  steps: GeneratedSalesScript["steps"];
   structured: StructuredScriptPayload;
   flowTitle: string;
   flowKey: string;
 } {
-  const { steps, structured } = buildOfficialSteps(PORTABILIDAD_SIN_EQUIPO_OFFICIAL, ctx);
+  const steps = buildPortabilidadSinEquipoFlow(ctx);
+  const structured: StructuredScriptPayload = {
+    tipo: SCRIPT_TIPO,
+    pasos: steps.map((s, i) => ({
+      id: i + 1,
+      titulo: s.title,
+      texto: s.content,
+      variables: [],
+    })),
+  };
   return {
     steps,
     structured,
-    flowTitle: "PORTABILIDAD SIN EQUIPO",
+    flowTitle: "Portabilidad sin equipo",
     flowKey: SCRIPT_TIPO,
   };
 }

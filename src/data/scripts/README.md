@@ -1,33 +1,20 @@
-# Scripts oficiales de venta
+# Scripts de venta WOM
 
-## Fuente
+## Documento oficial (referencia interna)
 
-Documento Word en `source/portabilidad-sin-equipo.docx`  
-Texto extraído en `source/portabilidad-sin-equipo.raw.txt`
+- Word: `source/portabilidad-sin-equipo.docx`
+- Texto extraído: `source/portabilidad-sin-equipo.raw.txt`
+- Copia legacy: `portabilidad-sin-equipo.official.ts` (solo referencia — **no se muestra en pantalla**)
 
-## Plantilla estructurada
+## Motor conversacional (teleprompter)
 
-La redacción oficial vive en `portabilidad-sin-equipo.official.ts`.  
-Cada sección del documento es un paso con variables `{{nombre_cliente}}`, `{{plan}}`, etc.
+El discurso que lee la asesora se genera en:
 
-## Regenerar texto desde Word
+`src/lib/sales-script/flows/portabilidad-sin-equipo.flow.ts`
 
-```bash
-python scripts/extract-official-script.py
-```
+Reglas:
 
-Luego revisar/actualizar `portabilidad-sin-equipo.official.ts` si el documento cambió.
-
-## Motor
-
-- `src/lib/sales-script/engine.ts` — construye pasos y payload `{ tipo, pasos[] }`
-- `src/lib/sales-script/context.ts` — variables desde Gestión, Cliente, catálogos
-- Beneficios/promociones/precios **nunca** en código: solo catálogo comercial
-
-## Futuros flujos
-
-Mismo motor, distinto archivo oficial:
-
-- `PORTABILIDAD_CON_EQUIPO`
-- `LINEA_NUEVA`
-- `RENOVACION`
+- El documento oficial es fuente de contenido, nunca se muestra literalmente.
+- Beneficios y precios salen del catálogo comercial (`commercialText`, `promotions`, `specs`).
+- Variables se resuelven en `src/lib/sales-script/context.ts`.
+- Pasos con bifurcación Sí/No se resuelven en la UI (`sales-script-tab.tsx`).

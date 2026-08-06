@@ -9,6 +9,8 @@ import {
 import { regionName } from "@/data/chile-regions";
 import { computeContractSummary } from "@/lib/lead-contract-summary";
 import { formatCurrency, formatLongDate } from "@/lib/format";
+import { chileGreetingWithComma } from "@/lib/sales-script/chile-time";
+import { buildMultilineContractSpeech } from "@/lib/sales-script/multiline-contract";
 import type { LeadLineValues } from "@/types/lead-form";
 import type { Plan } from "@/types/lead";
 
@@ -23,6 +25,7 @@ export type ScriptBuildContext = {
   deliveryIsHome: boolean;
   deliveryIsStore: boolean;
   lineCount: number;
+  totalMonthly: number;
 };
 
 function formatPhone569(phone: string): string {
@@ -79,6 +82,18 @@ function mapLineToFormLine(line: SaveLeadInput["lines"][number]): LeadLineValues
   };
 }
 
+function buildPromotionsSpeech(promotions: string[]): string {
+  if (promotions.length === 0) return "";
+  const list = promotions.join(" y ");
+  return `Además, cuentas con las promociones ${list}, aplicables en los meses correspondientes de tu facturación.`;
+}
+
+function firstName(fullName: string): string {
+  const trimmed = fullName.trim();
+  if (!trimmed) return "";
+  return trimmed.split(/\s+/)[0] ?? trimmed;
+}
+
 export function buildScriptContext(input: {
   gestion: SaveLeadInput;
   commercialPlans: CommercialPlan[];
@@ -94,42 +109,39 @@ export function buildScriptContext(input: {
   const advisorPlan = input.advisorPlans.find((p) => p.id === mainLine.planId);
   const planName = planDetail?.name ?? advisorPlan?.name ?? "Plan WOM";
   const planValue = planDetail?.womValue ?? advisorPlan?.womValue ?? 0;
-  const additionalLineValue = planDetail?.additionalLineValue ?? planValue;
+  const additionalLineValue = planDetail?.additionalLineValue ?? 7_990;
   const summary = computeContractSummary(lines.map(mapLineToFormLine), input.advisorPlans);
 
-  const benefits = planDetail?.benefits ?? [];
+  const specs = planDetail?.specs;
   const promotions = planDetail?.promotions ?? [];
-  /** Beneficios solo desde catálogo — nunca hardcodeados en el script. */
-  const benefitsText =
-    planDetail?.commercialText?.trim() ||
-    (benefits.length > 0 ? benefits.map((b) => `${planName}: ${b}`).join("\n") : "");
-
-  const promocionesBoletas =
-    promotions.length > 0
-      ? `. Promociones: ${promotions.join(", ")}`
-      : "";
+  /** Beneficios solo desde catálogo comercial — nunca hardcodeados en el flujo. */
+  const benefitsText = planDetail?.commercialText?.trim() ?? "";
+  const promotionsSpeech = buildPromotionsSpeech(promotions);
 
   const regionLabel = mainLine.region ? regionName(mainLine.region) : "";
-
-  let bloquePlanesMas = "";
-  if (lines.length > 1) {
-    bloquePlanesMas = `En caso de PLANES MÁS señala la cantidad y si los planes son diferentes deberás señalar uno a uno los beneficios según corresponda.
-PARA PLANES MÁS LÍNEAS ADICIONALES: La línea principal queda con su valor transparente de "${formatCurrency(planValue)}" y la(s) línea(s) adicional(es) queda(n) con un monto a pagar de ${formatCurrency(additionalLineValue)} al mes de forma transparente.`;
-  }
-
   const direccionCompleta = [mainLine.deliveryAddress, mainLine.comuna, regionLabel]
     .filter(Boolean)
     .join(", ");
 
+  const multilineSpeech = buildMultilineContractSpeech({
+    lineCount: lines.length,
+    planName,
+    mainValue: planValue,
+    additionalLineValue,
+    totalMonthly: summary.totalMonthly || planValue + additionalLineValue * Math.max(0, lines.length - 1),
+  });
+
   const hasEquipment = lines.some((l) => l.equipmentMode === "with");
   const deliveryIsHome = mainLine.deliveryType === "home";
   const deliveryIsStore = mainLine.deliveryType === "store";
+  const accountType = mainLine.accountType ?? "postpaid";
   const requiresCapCode =
-    saleType === "portability" &&
-    Boolean(mainLine.currentOperator) &&
-    mainLine.currentOperator !== "wom";
+    saleType === "portability" && accountType === "prepaid" && mainLine.currentOperator !== "wom";
 
   const deliveryDate = formatLongDate(addBusinessDays(new Date(), 5).toISOString());
+  const clientName = input.gestion.customerName.trim();
+  const clientFirst = firstName(clientName);
+  const executiveName = input.advisor?.name?.trim() || "Ejecutivo WOM";
 
   const equipmentLine = lines.find((l) => l.equipmentMode === "with");
   const pie = equipmentLine?.equipmentDownPayment
@@ -143,13 +155,13 @@ PARA PLANES MÁS LÍNEAS ADICIONALES: La línea principal queda con su valor tra
     ? formatCurrency(Number(equipmentLine.equipmentValue))
     : "";
 
-  const additionalSummary =
-    summary.additionalCount > 0
-      ? `${summary.additionalCount} línea(s) adicional(es) a ${formatCurrency(additionalLineValue)} c/u`
-      : "Sin líneas adicionales";
+  const totalMonthly = summary.totalMonthly || planValue;
 
   const vars: Record<string, string> = {
-    nombre_cliente: input.gestion.customerName,
+    saludo: chileGreetingWithComma(),
+    nombre_cliente: clientName,
+    cliente_nombre: clientName,
+    cliente_primer_nombre: clientFirst,
     rut: input.gestion.rut,
     telefono: formatPhone569(input.gestion.phone),
     correo: mainLine.email || "",
@@ -158,27 +170,40 @@ PARA PLANES MÁS LÍNEAS ADICIONALES: La línea principal queda con su valor tra
     region: regionLabel,
     comuna: mainLine.comuna || "",
     fecha_contratacion: formatContractDate(new Date()),
+    fecha_venta: formatContractDate(new Date()),
+    fecha: formatContractDate(new Date()),
     tipo_venta: LEAD_SALE_TYPE_LABELS[saleType] ?? saleType,
     numero_portar: formatPhone569(mainLine.phone),
+    linea_principal: formatPhone569(mainLine.phone),
     operador_actual: mainLine.currentOperator
       ? CURRENT_OPERATOR_LABELS[mainLine.currentOperator]
       : "",
     plan: planName,
     valor_plan: formatCurrency(planValue),
     beneficios: benefitsText,
-    promociones: promotions.length > 0 ? promotions.join(". ") : "",
-    promociones_boletas: promocionesBoletas,
-    bloque_planes_mas: bloquePlanesMas,
+    promociones: promotionsSpeech,
+    promociones_lista: promotions.join(", "),
+    resumen_multilinea: multilineSpeech,
     lineas: String(lines.length),
+    cantidad_lineas: String(lines.length),
+    cantidad_lineas_adicionales: String(Math.max(0, lines.length - 1)),
     valor_linea_principal: formatCurrency(planValue),
     valor_linea_adicional: formatCurrency(additionalLineValue),
-    valor_total: summary.totalMonthlyLabel,
-    resumen_lineas_adicionales: additionalSummary,
+    valor_total: formatCurrency(totalMonthly),
+    total_mensual: formatCurrency(totalMonthly),
+    gb: specs?.gb ?? "",
+    roaming: specs?.roaming ?? "",
+    apps_libres: specs?.appsLibres ?? "",
+    club_wom: specs?.clubWom ?? "",
+    pedidosya: specs?.pedidosYa ?? "",
+    cupon_equipos: specs?.cuponEquipos ?? "",
+    cuotas_gratis: specs?.cuotasGratis ?? "",
     equipo: equipmentLine?.equipment || equipmentLine?.equipmentModel || "",
     pie,
     cuotas,
     valor_cuota: valorCuota,
     valor_equipo_total: valorEquipo,
+    valor_total_equipo: valorEquipo,
     caracteristicas_equipo: equipmentLine?.equipmentCommercialText || "",
     fecha_entrega: deliveryDate,
     tipo_entrega: mainLine.deliveryType
@@ -189,7 +214,8 @@ PARA PLANES MÁS LÍNEAS ADICIONALES: La línea principal queda con su valor tra
     horario_sucursal: "Lunes a sábado de 10:00 a 20:00 hrs",
     codigo_retiro: "WOM-" + input.gestion.conversationId.slice(-6).toUpperCase(),
     correo_ejecutivo: input.advisor?.email || "asesor@ventas.wom.cl",
-    nombre_ejecutivo: input.advisor?.name || "Ejecutivo WOM",
+    nombre_ejecutivo: executiveName,
+    ejecutivo: executiveName,
     observaciones: input.gestion.notes || "",
     condiciones_especiales: planDetail?.specialConditions || "",
   };
@@ -205,5 +231,6 @@ PARA PLANES MÁS LÍNEAS ADICIONALES: La línea principal queda con su valor tra
     deliveryIsHome,
     deliveryIsStore,
     lineCount: lines.length,
+    totalMonthly,
   };
 }

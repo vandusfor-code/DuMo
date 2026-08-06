@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronLeft, ChevronRight, ScrollText } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Check, ChevronLeft, ChevronRight, ScrollText, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { GeneratedSalesScript } from "@/types/sales-script";
+import type { GeneratedSalesScript, SalesScriptStep } from "@/types/sales-script";
 import { cn } from "@/lib/utils";
 
 export function SalesScriptTab({
@@ -16,6 +16,10 @@ export function SalesScriptTab({
   gestionSaved?: boolean;
 }) {
   const [stepIndex, setStepIndex] = useState(0);
+
+  useEffect(() => {
+    setStepIndex(0);
+  }, [script?.id]);
 
   if (!script) {
     return (
@@ -38,6 +42,16 @@ export function SalesScriptTab({
   const steps = script.steps;
   const current = steps[stepIndex];
   const progress = steps.length > 0 ? ((stepIndex + 1) / steps.length) * 100 : 0;
+
+  function goToStepId(id: string) {
+    const idx = steps.findIndex((s) => s.id === id);
+    if (idx >= 0) setStepIndex(idx);
+  }
+
+  function handleBranch(choice: "yes" | "no") {
+    if (!current?.branch) return;
+    goToStepId(choice === "yes" ? current.branch.yesNextId : current.branch.noNextId);
+  }
 
   return (
     <div className="space-y-4">
@@ -70,35 +84,66 @@ export function SalesScriptTab({
         </div>
 
         <h4 className="mt-5 text-[15px] font-semibold text-ink">{current?.title}</h4>
-        <div
-          className="mt-3 select-none whitespace-pre-wrap text-[14px] leading-relaxed text-ink"
-          onCopy={(e) => e.preventDefault()}
-        >
-          {current?.content}
-        </div>
+        <ScriptContent step={current} />
 
-        <div className="mt-6 flex items-center justify-between gap-3">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={stepIndex === 0}
-            onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
-          >
-            <ChevronLeft className="size-4" />
-            Anterior
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            disabled={stepIndex >= steps.length - 1}
-            onClick={() => setStepIndex((i) => Math.min(steps.length - 1, i + 1))}
-          >
-            Siguiente
-            <ChevronRight className="size-4" />
-          </Button>
-        </div>
+        {current?.branch ? (
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <Button
+              type="button"
+              size="sm"
+              className="flex-1 gap-2"
+              onClick={() => handleBranch("yes")}
+            >
+              <Check className="size-4" />
+              Sí
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="flex-1 gap-2"
+              onClick={() => handleBranch("no")}
+            >
+              <X className="size-4" />
+              No
+            </Button>
+          </div>
+        ) : (
+          <div className="mt-6 flex items-center justify-between gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={stepIndex === 0}
+              onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
+            >
+              <ChevronLeft className="size-4" />
+              Anterior
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={stepIndex >= steps.length - 1}
+              onClick={() => setStepIndex((i) => Math.min(steps.length - 1, i + 1))}
+            >
+              Siguiente
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+function ScriptContent({ step }: { step: SalesScriptStep | undefined }) {
+  if (!step) return null;
+  return (
+    <div
+      className="mt-3 select-none whitespace-pre-wrap text-[14px] leading-relaxed text-ink"
+      onCopy={(e) => e.preventDefault()}
+    >
+      {step.content}
     </div>
   );
 }

@@ -33,15 +33,30 @@ export interface CommercialPlan {
   /** Lo que WOM paga a DuMo — base de contabilidad admin. */
   dumoValue: number;
   advisorCommission: number;
-  /** Beneficios incluidos (para Script de Venta). */
+  /** Beneficios incluidos (etiquetas cortas para admin). */
   benefits: string[];
   /** Promociones activas (ej. 3° boleta $0). */
   promotions: string[];
-  /** Texto comercial oficial del plan. */
+  /** Texto comercial oficial que lee la asesora en el script. */
   commercialText: string;
   /** Condiciones especiales del plan. */
   specialConditions: string;
+  /** Especificaciones técnicas para variables del motor de scripts. */
+  specs?: CommercialPlanSpecs;
   status: CommercialPlanStatus;
+}
+
+export interface CommercialPlanSpecs {
+  gb: string;
+  sms: string;
+  minutes: string;
+  appsLibres: string;
+  roaming: string;
+  clubWom: string;
+  pedidosYa: string;
+  cuponEquipos: string;
+  cuotasGratis: string;
+  maxAdditionalLines: number;
 }
 
 export interface CommercialGlobalSettings {
@@ -73,6 +88,7 @@ export interface UpsertCommercialPlanInput {
   promotions: string[];
   commercialText: string;
   specialConditions: string;
+  specs?: CommercialPlanSpecs;
   status: CommercialPlanStatus;
 }
 

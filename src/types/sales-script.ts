@@ -2,8 +2,13 @@
 export type SalesScriptStep = {
   id: string;
   title: string;
-  /** Texto final con variables ya reemplazadas. Solo lectura para la asesora. */
+  /** Texto final listo para leer en voz alta. Sin instrucciones internas. */
   content: string;
+  /** Si existe, la asesora debe elegir Sí/No antes de avanzar. */
+  branch?: {
+    yesNextId: string;
+    noNextId: string;
+  };
 };
 
 export type StructuredScriptStep = {

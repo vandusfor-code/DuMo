@@ -31,7 +31,7 @@ export function buildSalesScript(input: {
       clientName: input.gestion.customerName,
       saleTypeLabel: ctx.vars.tipo_venta,
       planName: ctx.vars.plan,
-      totalMonthlyLabel: ctx.vars.valor_total,
+      totalMonthlyLabel: ctx.vars.total_mensual,
     },
   });
 }

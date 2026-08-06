@@ -30,6 +30,7 @@ export function normalizeCommercialPlan(raw: StoredCommercialPlan): CommercialPl
     promotions: raw.promotions ?? [],
     commercialText: raw.commercialText ?? "",
     specialConditions: raw.specialConditions ?? "",
+    specs: raw.specs,
     status: raw.status,
   };
 }
@@ -52,6 +53,7 @@ export function toPlanInput(plan: Omit<CommercialPlan, "id">): UpsertCommercialP
     promotions: plan.promotions,
     commercialText: plan.commercialText,
     specialConditions: plan.specialConditions,
+    specs: plan.specs,
     status: plan.status,
   };
 }

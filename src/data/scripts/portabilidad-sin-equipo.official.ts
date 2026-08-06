@@ -1,7 +1,7 @@
 /**
- * Script oficial: Portabilidad sin Equipo.
+ * Referencia interna — NO se muestra en pantalla.
  * Fuente: SCRIPT CIERRE 31 JULIO Portabilidad sin Equipo dumo (1).docx
- * Redacción íntegra del documento — solo se reemplazan variables {{...}}.
+ * El discurso conversacional vive en src/lib/sales-script/flows/portabilidad-sin-equipo.flow.ts
  */
 
 import type { ScriptBuildContext } from "@/lib/sales-script/context";

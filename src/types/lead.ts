@@ -33,6 +33,8 @@ export const LEAD_SALE_TYPE_LABELS: Record<LeadSaleType, string> = {
 /** Tipos de venta en los que el campo "Equipo" aplica (se muestra). */
 export const EQUIPMENT_LEAD_TYPES: LeadSaleType[] = ["portability", "renewal"];
 
+export type LineAccountType = "prepaid" | "postpaid";
+
 export type EquipmentMode = "none" | "with";
 
 export type CurrentOperator =
@@ -140,5 +142,7 @@ export interface SaveLeadInput {
     equipmentInstallments: string;
     equipmentInstallmentValue: string;
     equipmentCommercialText: string;
+    /** Prepago → postpago: activa paso CAP en portabilidad. */
+    accountType?: LineAccountType;
   }[];
 }

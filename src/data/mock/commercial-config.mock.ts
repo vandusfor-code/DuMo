@@ -8,21 +8,70 @@ export const COMMERCIAL_SETTINGS_MOCK: CommercialGlobalSettings = {
   monthlyBudget: 3_000_000,
 };
 
+const PLAN_W_COMMERCIAL = `Tu plan incluye:
+
+• 150 GB para navegar en red 5G.
+• Minutos libres.
+• SMS libres.
+• Apps Libres.
+• Acceso al Club WOM con beneficios exclusivos.
+
+Todo por un valor mensual transparente de $10.990.`;
+
+const PLAN_O_COMMERCIAL = `Tu plan incluye:
+
+• 300 GB para navegar en red 5G.
+• Minutos libres.
+• SMS libres.
+• Apps Libres.
+• WhatsApp Libre en Roaming Internacional.
+• Club WOM.
+• Cupón de 10% de descuento en equipos y accesorios con tope de $100.000 cada 24 meses.
+• Última cuota gratis al financiar un equipo.
+
+Todo por un valor mensual de $13.990.`;
+
+const PLAN_M_COMMERCIAL = `Tu plan incluye:
+
+• Gigas Libres para navegar en red 5G.
+• Minutos libres.
+• SMS libres.
+• Apps Libres.
+• WhatsApp Libre más 3 GB para Roaming Internacional.
+• Suscripción incluida a PedidosYa Plus.
+• Club WOM.
+• Cupón de 10% en equipos y accesorios con tope de $100.000 cada 12 meses.
+• Las cuotas 17 y 18 gratis al financiar un equipo.
+
+Todo por un valor mensual de $18.990.`;
+
 const RAW_PLANS: CommercialPlan[] = [
   {
     id: "plan-w",
     name: "Plan W",
     operator: "WOM",
     saleType: "portabilidad",
-    womValue: 18_990,
+    womValue: 10_990,
     additionalLineValue: 7_990,
     maxLines: 5,
-    dumoValue: 13_000,
-    advisorCommission: 12_000,
-    benefits: ["300 GB", "Minutos libres", "Apps libres", "Club WOM", "WhatsApp libre", "Cupón 10%", "Última cuota gratis"],
+    dumoValue: 8_000,
+    advisorCommission: 10_000,
+    benefits: ["150 GB", "Minutos libres", "SMS libres", "Apps Libres", "Club WOM"],
     promotions: ["3° boleta $0", "6° boleta $0"],
-    commercialText: "Plan W con 300 GB, minutos libres, apps libres, Club WOM, WhatsApp libre, cupón 10% y última cuota gratis.",
+    commercialText: PLAN_W_COMMERCIAL,
     specialConditions: "",
+    specs: {
+      gb: "150 GB",
+      sms: "SMS Libres",
+      minutes: "Minutos Libres",
+      appsLibres: "Sí",
+      roaming: "No aplica",
+      clubWom: "Incluido",
+      pedidosYa: "No",
+      cuponEquipos: "No",
+      cuotasGratis: "No",
+      maxAdditionalLines: 4,
+    },
     status: "active",
   },
   {
@@ -31,14 +80,26 @@ const RAW_PLANS: CommercialPlan[] = [
     operator: "WOM",
     saleType: "portabilidad",
     womValue: 13_990,
-    additionalLineValue: 5_990,
+    additionalLineValue: 7_990,
     maxLines: 5,
     dumoValue: 9_500,
-    advisorCommission: 10_000,
-    benefits: ["150 GB", "Minutos libres", "Apps libres", "Club WOM", "WhatsApp libre"],
-    promotions: ["3° boleta $0"],
-    commercialText: "Plan O con 150 GB, minutos libres, apps libres, Club WOM y WhatsApp libre.",
+    advisorCommission: 12_000,
+    benefits: ["300 GB", "Minutos libres", "SMS libres", "Apps Libres", "Club WOM", "WhatsApp Roaming", "Cupón 10%"],
+    promotions: ["3° boleta $0", "6° boleta $0"],
+    commercialText: PLAN_O_COMMERCIAL,
     specialConditions: "",
+    specs: {
+      gb: "300 GB",
+      sms: "Libres",
+      minutes: "Libres",
+      appsLibres: "Libres",
+      roaming: "WhatsApp Libre",
+      clubWom: "Sí",
+      pedidosYa: "No",
+      cuponEquipos: "10% tope $100.000 cada 24 meses",
+      cuotasGratis: "1 cuota (18)",
+      maxAdditionalLines: 4,
+    },
     status: "active",
   },
   {
@@ -46,15 +107,27 @@ const RAW_PLANS: CommercialPlan[] = [
     name: "Plan M",
     operator: "WOM",
     saleType: "portabilidad",
-    womValue: 9_990,
-    additionalLineValue: 3_990,
+    womValue: 18_990,
+    additionalLineValue: 7_990,
     maxLines: 5,
-    dumoValue: 7_000,
-    advisorCommission: 8_000,
-    benefits: ["80 GB", "Minutos libres", "WhatsApp libre"],
-    promotions: [],
-    commercialText: "Plan M con 80 GB, minutos libres y WhatsApp libre.",
+    dumoValue: 13_000,
+    advisorCommission: 15_000,
+    benefits: ["GB Libres", "Minutos libres", "SMS libres", "Apps Libres", "PedidosYa Plus", "Club WOM"],
+    promotions: ["3° boleta $0", "6° boleta $0"],
+    commercialText: PLAN_M_COMMERCIAL,
     specialConditions: "",
+    specs: {
+      gb: "GB Libres",
+      sms: "Libres",
+      minutes: "Libres",
+      appsLibres: "Libres",
+      roaming: "WhatsApp Libre + 3 GB",
+      clubWom: "Sí",
+      pedidosYa: "Incluido",
+      cuponEquipos: "10% tope $100.000 cada 12 meses",
+      cuotasGratis: "Cuotas 17 y 18",
+      maxAdditionalLines: 4,
+    },
     status: "active",
   },
   { id: "plan-001", name: "Portabilidad XS", operator: "WOM", saleType: "portabilidad", womValue: 55000, additionalLineValue: 45000, maxLines: 5, dumoValue: 38000, advisorCommission: 12000, benefits: ["50 GB", "Minutos libres"], promotions: [], commercialText: "", specialConditions: "", status: "active" },
