@@ -16,6 +16,7 @@ import { getCommercialConfigurationRepository } from "@/repositories/commercial-
 import { businessDateISO } from "@/lib/date";
 import { getDefaultClientProfile } from "@/data/mock/admin-leads.mock";
 import { ensureSchema, getSql, withDbRetry } from "@/server/db/client";
+import type postgres from "postgres";
 
 function buildLead(id: string, input: SaveLeadInput, advisorId: string): Lead {
   return {
@@ -86,7 +87,7 @@ export class PostgresLeadRepository {
     await withDbRetry(() =>
       sql`
         UPDATE lead_gestiones
-        SET sales_script = ${JSON.stringify(script)}::jsonb
+        SET sales_script = ${sql.json(script as unknown as postgres.JSONValue)}
         WHERE id = ${gestionId}
       `,
     );

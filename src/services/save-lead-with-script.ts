@@ -11,11 +11,15 @@ export async function saveLeadWithScript(
   const lead = await getLeadRepository().saveLead(input);
   let script = null;
   if (input.type === "venta" && input.lines.length > 0) {
-    script = await salesScriptService.generateAndSave({
-      gestionId: lead.id,
-      gestion: input,
-      advisor,
-    });
+    try {
+      script = await salesScriptService.generateAndSave({
+        gestionId: lead.id,
+        gestion: input,
+        advisor,
+      });
+    } catch (error) {
+      console.error("[saveLeadWithScript] script generation failed", error);
+    }
   }
   return { lead, script };
 }

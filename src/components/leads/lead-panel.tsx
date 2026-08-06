@@ -28,6 +28,7 @@ export function LeadPanel({
   conversation,
   isSaving,
   isError,
+  errorMessage,
   isSuccess,
   onCancel,
   savedScript,
@@ -35,6 +36,7 @@ export function LeadPanel({
   conversation: Conversation;
   isSaving: boolean;
   isError: boolean;
+  errorMessage?: string;
   isSuccess: boolean;
   onCancel: () => void;
   savedScript?: GeneratedSalesScript | null;
@@ -46,10 +48,10 @@ export function LeadPanel({
   const script = savedScript ?? fetchedScript ?? null;
 
   useEffect(() => {
-    if (isSuccess && script) {
+    if (isSuccess) {
       setActiveTab("script");
     }
-  }, [isSuccess, script]);
+  }, [isSuccess]);
 
   return (
     <div className="flex h-full flex-col">
@@ -86,15 +88,17 @@ export function LeadPanel({
               placeholder="Escribe aquí cualquier observación relevante sobre la gestión..."
             />
             {isError && (
-              <div className="flex items-center gap-2.5 rounded-xl border border-danger/20 bg-danger-soft px-4 py-3 text-[13px] text-danger-ink">
-                <AlertCircle className="size-[18px]" />
-                No se pudo guardar la gestión. Intenta nuevamente.
+              <div className="flex items-start gap-2.5 rounded-xl border border-danger/20 bg-danger-soft px-4 py-3 text-[13px] text-danger-ink">
+                <AlertCircle className="mt-0.5 size-[18px] shrink-0" />
+                <span>{errorMessage || "No se pudo guardar la gestión. Intenta nuevamente."}</span>
               </div>
             )}
             {isSuccess && (
               <div className="flex items-center gap-2.5 rounded-xl border border-success/20 bg-success-soft px-4 py-3 text-[13px] text-success-ink">
                 <CheckCircle2 className="size-[18px]" />
-                Gestión guardada correctamente. El script de venta ya está disponible.
+                {script
+                  ? "Gestión guardada correctamente. El script de venta ya está disponible."
+                  : "Gestión guardada correctamente."}
               </div>
             )}
             <ActionButtons isSaving={isSaving} onCancel={onCancel} />

@@ -31,8 +31,13 @@ import {
 } from "@/hooks/use-admin-leads";
 import type { AdminConversation, ClientProfile, LeadNote, LeadTimelineEvent } from "@/types/admin-lead";
 import { EMPTY_LEAD_LINE, type LeadFormValues } from "@/types/lead-form";
-import type { LeadSaleType, SaveLeadInput } from "@/types/lead";
+import type { SaveLeadInput } from "@/types/lead";
 import type { GeneratedSalesScript } from "@/types/sales-script";
+import {
+  formatSaveLeadApiError,
+  isCompleteSaleLine,
+  mapSaleLineForSave,
+} from "@/lib/lead-save";
 import { useWatch } from "react-hook-form";
 
 function defaultsFor(c: AdminConversation): LeadFormValues {
@@ -67,6 +72,17 @@ export function AdminLeadFormPanel({
   const type = useWatch({ control: methods.control, name: "type" });
 
   const onSubmit = methods.handleSubmit(async (values) => {
+    if (values.type === "venta") {
+      const completeLines = values.lines.filter(isCompleteSaleLine);
+      if (completeLines.length === 0) {
+        methods.setError("root", {
+          message:
+            "Completa al menos una línea con número, tipo de venta, plan, región y comuna.",
+        });
+        return;
+      }
+    }
+
     const notesParts = [
       values.observations,
       values.internalNotes ? `Notas internas: ${values.internalNotes}` : "",
@@ -81,33 +97,17 @@ export function AdminLeadFormPanel({
       notes: notesParts.join("\n\n"),
       lines:
         values.type === "venta"
-          ? values.lines
-              .filter((l) => l.phone || l.saleType || l.planId)
-              .map((l) => ({
-                phone: l.phone,
-                saleType: l.saleType as LeadSaleType,
-                planId: l.planId,
-                equipment: l.equipment,
-                equipmentMode: l.equipmentMode,
-                currentOperator: l.currentOperator,
-                deliveryType: l.deliveryType,
-                email: l.email,
-                deliveryAddress: l.deliveryAddress,
-                region: l.region,
-                comuna: l.comuna,
-                equipmentCatalogId: l.equipmentCatalogId,
-                equipmentModel: l.equipmentModel,
-                equipmentValue: l.equipmentValue,
-                equipmentDownPayment: l.equipmentDownPayment,
-                equipmentInstallments: l.equipmentInstallments,
-                equipmentInstallmentValue: l.equipmentInstallmentValue,
-                equipmentCommercialText: l.equipmentCommercialText,
-              }))
+          ? values.lines.filter(isCompleteSaleLine).map(mapSaleLineForSave)
           : [],
     };
-    const result = await saveLead.mutateAsync(input);
-    setSavedScript(result.script);
-    if (result.script) setActiveTab("script");
+    try {
+      const result = await saveLead.mutateAsync(input);
+      setSavedScript(result.script);
+      methods.clearErrors("root");
+      setActiveTab("script");
+    } catch (error) {
+      methods.setError("root", { message: formatSaveLeadApiError(error) });
+    }
   });
 
   return (
@@ -147,16 +147,21 @@ export function AdminLeadFormPanel({
                   hint="(opcional)"
                   placeholder="Escribe aquí cualquier observación relevante sobre la gestión..."
                 />
-                {saveLead.isError && (
-                  <div className="flex items-center gap-2.5 rounded-xl border border-danger/20 bg-danger-soft px-4 py-3 text-[13px] text-danger-ink">
-                    <AlertCircle className="size-[18px]" />
-                    No se pudo guardar la gestión. Intenta nuevamente.
+                {(Boolean(methods.formState.errors.root) || saveLead.isError) && (
+                  <div className="flex items-start gap-2.5 rounded-xl border border-danger/20 bg-danger-soft px-4 py-3 text-[13px] text-danger-ink">
+                    <AlertCircle className="mt-0.5 size-[18px] shrink-0" />
+                    <span>
+                      {methods.formState.errors.root?.message ||
+                        "No se pudo guardar la gestión. Intenta nuevamente."}
+                    </span>
                   </div>
                 )}
                 {saveLead.isSuccess && (
                   <div className="flex items-center gap-2.5 rounded-xl border border-success/20 bg-success-soft px-4 py-3 text-[13px] text-success-ink">
                     <CheckCircle2 className="size-[18px]" />
-                    Gestión guardada correctamente. El script de venta ya está disponible.
+                    {script
+                      ? "Gestión guardada correctamente. El script de venta ya está disponible."
+                      : "Gestión guardada correctamente."}
                   </div>
                 )}
                 <ActionButtons

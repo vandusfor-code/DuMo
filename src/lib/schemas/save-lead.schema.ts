@@ -67,7 +67,7 @@ export const saveLeadSchema = z.object({
   customerName: z.string().trim().min(1, "El nombre es obligatorio."),
   rut: z.string().trim().min(1, "El RUT es obligatorio."),
   type: leadTypeSchema,
-  notes: z.string().trim().max(500, "Máximo 500 caracteres.").optional().default(""),
+  notes: z.string().trim().max(4000, "Máximo 4000 caracteres.").optional().default(""),
   lines: z.array(leadLineSchema).optional().default([]),
 });
 

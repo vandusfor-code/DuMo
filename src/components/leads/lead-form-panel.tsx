@@ -6,8 +6,13 @@ import { LeadPanel } from "./lead-panel";
 import { useSaveLead } from "@/hooks/use-leads";
 import type { Conversation } from "@/types/conversation";
 import { EMPTY_LEAD_LINE, type LeadFormValues } from "@/types/lead-form";
-import type { LeadSaleType, SaveLeadInput } from "@/types/lead";
+import type { SaveLeadInput } from "@/types/lead";
 import type { GeneratedSalesScript } from "@/types/sales-script";
+import {
+  formatSaveLeadApiError,
+  isCompleteSaleLine,
+  mapSaleLineForSave,
+} from "@/lib/lead-save";
 
 function defaultsFor(c: Conversation): LeadFormValues {
   return {
@@ -34,6 +39,17 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
   });
 
   const onSubmit = methods.handleSubmit(async (values) => {
+    if (values.type === "venta") {
+      const completeLines = values.lines.filter(isCompleteSaleLine);
+      if (completeLines.length === 0) {
+        methods.setError("root", {
+          message:
+            "Completa al menos una línea con número, tipo de venta, plan, región y comuna.",
+        });
+        return;
+      }
+    }
+
     const notesParts = [
       values.observations,
       values.internalNotes ? `Notas internas: ${values.internalNotes}` : "",
@@ -48,32 +64,16 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
       notes: notesParts.join("\n\n"),
       lines:
         values.type === "venta"
-          ? values.lines
-              .filter((l) => l.phone || l.saleType || l.planId)
-              .map((l) => ({
-                phone: l.phone,
-                saleType: l.saleType as LeadSaleType,
-                planId: l.planId,
-                equipment: l.equipment,
-                equipmentMode: l.equipmentMode,
-                currentOperator: l.currentOperator,
-                deliveryType: l.deliveryType,
-                email: l.email,
-                deliveryAddress: l.deliveryAddress,
-                region: l.region,
-                comuna: l.comuna,
-                equipmentCatalogId: l.equipmentCatalogId,
-                equipmentModel: l.equipmentModel,
-                equipmentValue: l.equipmentValue,
-                equipmentDownPayment: l.equipmentDownPayment,
-                equipmentInstallments: l.equipmentInstallments,
-                equipmentInstallmentValue: l.equipmentInstallmentValue,
-                equipmentCommercialText: l.equipmentCommercialText,
-              }))
+          ? values.lines.filter(isCompleteSaleLine).map(mapSaleLineForSave)
           : [],
     };
-    const result = await saveLead.mutateAsync(input);
-    setSavedScript(result.script);
+    try {
+      const result = await saveLead.mutateAsync(input);
+      setSavedScript(result.script);
+      methods.clearErrors("root");
+    } catch (error) {
+      methods.setError("root", { message: formatSaveLeadApiError(error) });
+    }
   });
 
   return (
@@ -82,7 +82,8 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
         <LeadPanel
           conversation={conversation}
           isSaving={saveLead.isPending}
-          isError={saveLead.isError}
+          isError={Boolean(methods.formState.errors.root) || saveLead.isError}
+          errorMessage={methods.formState.errors.root?.message}
           isSuccess={saveLead.isSuccess}
           savedScript={savedScript}
           onCancel={() => methods.reset(defaultsFor(conversation))}
