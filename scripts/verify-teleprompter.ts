@@ -253,7 +253,7 @@ for (const scenario of SCENARIOS) {
     ["B8 discurso oficial", (block8?.branch?.npsSurvey?.postQuestionSpeech ?? "").includes("Que bueno que te gusto")],
     ["B8 escala NPS", (block8?.branch?.npsSurvey?.postQuestionSpeech ?? "").includes("escala de evaluación del 0 al 10")],
     ["B8 pregunta NPS", (block8?.branch?.npsSurvey?.postQuestionSpeech ?? "").includes("Pensando únicamente en la experiencia de tu compra")],
-    ["B8 correo ejecutivo dinámico", (block8?.branch?.npsSurvey?.postQuestionSpeech ?? "").includes("maria@wom.cl")],
+    ["B8 sin despedida", !(block8?.branch?.npsSurvey?.postQuestionSpeech ?? "").includes("Bienvenido a WOM")],
     ["B11 referido generado", blocks.some((b) => b.id === "bloque-11")],
     ["B12 despedida generada", blocks.some((b) => b.id === "bloque-12")],
     ["B9 aceptación condiciones", aceptacion.includes("¿te queda alguna duda con las condiciones entregadas?")],

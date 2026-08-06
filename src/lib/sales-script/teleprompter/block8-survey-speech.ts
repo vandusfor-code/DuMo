@@ -1,14 +1,12 @@
 /**
  * Bloque 8 — Encuesta NPS (dos fases).
- * Fuente: portabilidad-sin-equipo.raw.txt (líneas 56–57) + cierre oficial.
+ * Fuente: portabilidad-sin-equipo.raw.txt (líneas 56–57).
  */
 
 import type { SalesScriptBranch } from "@/types/sales-script";
 
 export type Block8SurveySpeechInput = {
   clientFirstName: string;
-  executiveEmail: string;
-  executiveName: string;
 };
 
 const NPS_ADVISOR_NOTE =
@@ -26,12 +24,6 @@ export function buildBlock8SurveySpeech(input: Block8SurveySpeechInput): {
     '"Pensando únicamente en la experiencia de tu compra, ¿qué tan probable es que recomiendes WOM a un familiar o un amigo?"',
     "",
     "En esa pregunta me evalúas a mí y mi atención, de antemano muchas gracias por responder.",
-    "",
-    `Te invito a tomar nota de mi correo electrónico el cual es ${input.executiveEmail}, quedando a tu disposición para cualquier consulta adicional que tengas y para el seguimiento de tu venta.`,
-    "",
-    `Te recuerdo que fuiste atendido por ${input.executiveName}.`,
-    "",
-    "Bienvenido a WOM, que tengas un excelente día.",
   ].join("\n");
 
   return {
