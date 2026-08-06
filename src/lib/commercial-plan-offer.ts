@@ -128,6 +128,32 @@ const OFFER_BY_PLAN_NAME: Record<string, PlanOffer> = {
   "plan m": PLAN_M_OFFER,
 };
 
+function normalizePlanNameKey(name?: string): string {
+  return name?.trim().toLowerCase().replace(/\s+/g, " ") ?? "";
+}
+
+function resolveOfferByPlanName(name?: string): PlanOffer | null {
+  const normalized = normalizePlanNameKey(name);
+  if (!normalized) return null;
+
+  const direct = OFFER_BY_PLAN_NAME[normalized];
+  if (direct) return { ...direct };
+
+  const compact = normalized.replace(/\s/g, "");
+  const compactOffers: Record<string, PlanOffer> = {
+    planw: PLAN_W_OFFER,
+    plano: PLAN_O_OFFER,
+    planm: PLAN_M_OFFER,
+  };
+  if (compactOffers[compact]) return { ...compactOffers[compact]! };
+
+  for (const [key, offer] of Object.entries(OFFER_BY_PLAN_NAME)) {
+    if (normalized.includes(key)) return { ...offer };
+  }
+
+  return null;
+}
+
 /** Oferta con al menos un beneficio o condición comercial relevante. */
 export function isOfferConfigured(offer: PlanOffer): boolean {
   return Boolean(
@@ -169,8 +195,8 @@ export function resolvePlanOffer(raw: {
   if (raw.offer && isOfferConfigured(raw.offer)) return raw.offer;
   if (OFFER_BY_PLAN_ID[raw.id]) return { ...OFFER_BY_PLAN_ID[raw.id] };
 
-  const nameKey = raw.name?.trim().toLowerCase();
-  if (nameKey && OFFER_BY_PLAN_NAME[nameKey]) return { ...OFFER_BY_PLAN_NAME[nameKey] };
+  const byName = resolveOfferByPlanName(raw.name);
+  if (byName) return byName;
 
   const specs = raw.specs;
   if (!specs) return { ...EMPTY_PLAN_OFFER };
