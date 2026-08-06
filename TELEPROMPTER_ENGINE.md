@@ -123,7 +123,12 @@ useSalesScript(conversationId)
 | 4 | `bloque-4` | Plan | **✅ v1.0 congelado** | `block4-plan-benefits-con-equipo-speech.ts` |
 | 5 | `bloque-5` | Entrega | **✅ v1.0 congelado** | `block5-condiciones-entrega-con-equipo-speech.ts` |
 | 6 | `bloque-6` | Portabilidad | **✅ Bloque transversal v1.0 (congelado)** | `block6-portability-speech.ts` |
-| 7–12 | — | — | Pendiente | — |
+| 7 | `bloque-7` | Regalo | **✅ Bloque transversal v1.0 (congelado)** | `block7-gift-speech.ts` |
+| 8 | `bloque-8` | Encuesta | **✅ Bloque transversal v1.0 (congelado)** | `block8-survey-speech.ts` |
+| 9 | `bloque-9` | Aceptación | **Propio Con Equipo** (VDI dos contratos) | `block9-acceptance-con-equipo-speech.ts` |
+| 10 | `bloque-10` | Prefijo 809 | **✅ Bloque transversal v1.0 (congelado)** | `block10-prefijo809-speech.ts` |
+| 11 | `bloque-11` | Referido | **✅ Bloque transversal v1.0 (congelado)** | `block11-referral-speech.ts` |
+| 12 | `bloque-12` | Cierre | **✅ Bloque transversal v1.0 (congelado)** | `block12-farewell-speech.ts` |
 
 ### Bloque 3 congelado (v1.0)
 
@@ -157,6 +162,48 @@ useSalesScript(conversationId)
 - **No modificar** el builder; cambios solo vía nueva versión aprobada en ambos flujos.
 - Ramas: `cap` (prepago → postpago) + `portabilityProcess` (dudas).
 - Mismo comportamiento UI que Portabilidad Sin Equipo.
+
+### Bloque 7 — transversal v1.0 (congelado)
+
+- Reutiliza `buildBlock7GiftSpeech()` — builder único compartido con Portabilidad Sin Equipo (congelado v1.0).
+- **No modificar** el builder; cambios solo vía nueva versión aprobada en ambos flujos.
+- Sin ramas UI; solo variable `clientFirstName`.
+- Mismo comportamiento UI que Portabilidad Sin Equipo.
+
+### Bloque 8 — transversal v1.0 (congelado)
+
+- Reutiliza `buildBlock8SurveySpeech()` — builder único compartido con Portabilidad Sin Equipo (congelado v1.0).
+- **No modificar** el builder; cambios solo vía nueva versión aprobada en ambos flujos.
+- Rama `npsSurvey` (2 fases) + nota asesora interna.
+- Mismo comportamiento UI que Portabilidad Sin Equipo.
+
+### Bloque 9 — propio Con Equipo (VDI dos contratos)
+
+- Builder: `buildBlock9AcceptanceConEquipoSpeech()` en `block9-acceptance-con-equipo-speech.ts`.
+- Fase 1 idéntica a Sin Equipo; fase 2 (VDI) menciona **dos contratos** (servicios móvil + compraventa equipo financiado).
+- Ramas: `condicionesDudas` + `acceptance` — misma estructura UI que Sin Equipo.
+- **No modificar** `block9-acceptance-speech.ts` (Sin Equipo congelado).
+
+### Bloque 10 — transversal v1.0 (congelado)
+
+- Reutiliza `buildBlock10Prefijo809Speech()` — builder único compartido con Portabilidad Sin Equipo (congelado v1.0).
+- **No modificar** el builder; cambios solo vía nueva versión aprobada en ambos flujos.
+- Rama `prefijo809` (Sí / No / follow-up / consulta) + notas asesora internas.
+- Mismo comportamiento UI que Portabilidad Sin Equipo.
+
+### Bloque 11 — transversal v1.0 (congelado)
+
+- Reutiliza `buildBlock11ReferralSpeech()` — builder único compartido con Portabilidad Sin Equipo (congelado v1.0).
+- **No modificar** el builder; cambios solo vía nueva versión aprobada en ambos flujos.
+- Rama `referral.advisorNote` (nota interna) + navegación Continuar.
+- Mismo comportamiento UI que Portabilidad Sin Equipo.
+
+### Bloque 12 — transversal v1.0 (congelado)
+
+- Reutiliza `buildBlock12FarewellSpeech()` — builder único compartido con Portabilidad Sin Equipo (congelado v1.0).
+- **No modificar** el builder; cambios solo vía nueva versión aprobada en ambos flujos.
+- Variables: `correo_ejecutivo`, `nombre_ejecutivo`.
+- Bloque final sin ramas UI.
 
 ---
 
