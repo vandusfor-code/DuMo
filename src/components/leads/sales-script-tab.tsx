@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import type { GeneratedSalesScript, SalesScriptStep } from "@/types/sales-script";
 import { cn } from "@/lib/utils";
 
+const ADVISOR_NOTE_CLASS = "mt-2 text-[11px] leading-snug text-muted/75 italic";
+
 type BranchPhase = "idle" | "answered" | "cap-done" | "809-followup" | "809-done";
 
 export function SalesScriptTab({
@@ -200,12 +202,6 @@ export function SalesScriptTab({
           </p>
         ) : null}
 
-        {advisorNote809Start ? (
-          <div className="mt-4 rounded-lg border border-dashed border-line bg-canvas/80 px-4 py-3 text-[13px] leading-relaxed text-muted italic">
-            {advisorNote809Start}
-          </div>
-        ) : null}
-
         <div
           className="mt-3 select-none whitespace-pre-wrap text-[15px] leading-[1.75] text-ink"
           onCopy={(e) => e.preventDefault()}
@@ -213,34 +209,46 @@ export function SalesScriptTab({
           {displayContent}
         </div>
 
+        {advisorNote809Start ? (
+          <p className={ADVISOR_NOTE_CLASS}>
+            <span className="font-normal not-italic text-muted/65">Nota para la asesora: </span>
+            {advisorNote809Start}
+          </p>
+        ) : null}
+
         {advisorNoteNps && awaitingNpsResponse ? (
-          <div className="mt-4 rounded-lg border border-dashed border-line bg-canvas/80 px-4 py-3 text-[13px] leading-relaxed text-muted italic">
+          <p className={ADVISOR_NOTE_CLASS}>
+            <span className="font-normal not-italic text-muted/65">Nota para la asesora: </span>
             {advisorNoteNps}
-          </div>
+          </p>
         ) : null}
 
         {advisorNoteReferral ? (
-          <div className="mt-4 rounded-lg border border-dashed border-line bg-canvas/80 px-4 py-3 text-[13px] leading-relaxed text-muted italic">
+          <p className={ADVISOR_NOTE_CLASS}>
+            <span className="font-normal not-italic text-muted/65">Nota para la asesora: </span>
             {advisorNoteReferral}
-          </div>
+          </p>
         ) : null}
 
         {advisorNoteOnYes && (choice === "yes" || condicionesChoice === "yes") ? (
-          <div className="mt-4 rounded-lg border border-dashed border-line bg-canvas/80 px-4 py-3 text-[13px] leading-relaxed text-muted italic">
+          <p className={ADVISOR_NOTE_CLASS}>
+            <span className="font-normal not-italic text-muted/65">Nota para la asesora: </span>
             {advisorNoteOnYes}
-          </div>
+          </p>
         ) : null}
 
         {advisorNoteOnNo && (awaitingDataCorrection || acceptanceChoice === "no") ? (
-          <div className="mt-4 rounded-lg border border-dashed border-line bg-canvas/80 px-4 py-3 text-[13px] leading-relaxed text-muted italic">
+          <p className={ADVISOR_NOTE_CLASS}>
+            <span className="font-normal not-italic text-muted/65">Nota para la asesora: </span>
             {advisorNoteOnNo}
-          </div>
+          </p>
         ) : null}
 
         {advisorNote809OnAccept ? (
-          <div className="mt-4 rounded-lg border border-dashed border-line bg-canvas/80 px-4 py-3 text-[13px] leading-relaxed text-muted italic">
+          <p className={ADVISOR_NOTE_CLASS}>
+            <span className="font-normal not-italic text-muted/65">Nota para la asesora: </span>
             {advisorNote809OnAccept}
-          </div>
+          </p>
         ) : null}
 
         {show809ConsultaButton ? (
@@ -336,6 +344,7 @@ export function SalesScriptTab({
         !show809Buttons &&
         !show809FollowUp &&
         showNav &&
+        !(Boolean(current?.branch?.npsSurvey) && npsQuestionAcknowledged) &&
         !(Boolean(current?.branch?.externalAudio) && externalAudioAcknowledged && choice !== null) &&
         !(Boolean(current?.branch?.dataValidation) && contractSummaryRevealed) &&
         !awaitingNpsResponse ? (
@@ -381,15 +390,6 @@ export function SalesScriptTab({
           </div>
         ) : null}
 
-        {awaitingNpsResponse ? (
-          <div className="mt-6 flex justify-end">
-            <Button type="button" size="sm" onClick={() => setNpsQuestionAcknowledged(true)}>
-              Continuar
-              <ChevronRight className="size-4" />
-            </Button>
-          </div>
-        ) : null}
-
         {show809FollowUp ? (
           <BranchButtons
             onYes={() => {
@@ -410,14 +410,25 @@ export function SalesScriptTab({
           showSimpleButtons ||
           show809Buttons ||
           show809FollowUp ||
+          awaitingNpsResponse ||
           (Boolean(current?.branch?.externalAudio) &&
             externalAudioAcknowledged &&
             choice !== null) ||
           (Boolean(current?.branch?.dataValidation) && contractSummaryRevealed) ||
           (Boolean(current?.branch?.npsSurvey) && npsQuestionAcknowledged)) &&
-        canContinue ? (
+        (canContinue || awaitingNpsResponse) ? (
           <div className="mt-4 flex justify-end">
-            <Button type="button" size="sm" onClick={() => setBlockIndex((i) => i + 1)}>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                if (awaitingNpsResponse) {
+                  setNpsQuestionAcknowledged(true);
+                  return;
+                }
+                setBlockIndex((i) => i + 1);
+              }}
+            >
               Continuar
               <ChevronRight className="size-4" />
             </Button>

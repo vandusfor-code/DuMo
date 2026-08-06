@@ -221,7 +221,7 @@ for (const scenario of SCENARIOS) {
     ["Resumen no incluido en intro", !intro.includes("Según las condiciones acordadas")],
     [
       "Monto mensual oficial",
-      contratacion.includes("por el monto mensual de") || contratacion.includes("monto a pagar de"),
+      contratacion.includes("por un valor mensual de") || contratacion.includes("monto a pagar de"),
     ],
     ["Bloque 3 con rama dataValidation", Boolean(block3?.branch?.dataValidation)],
     ["Total mensual coherente", ctx.totalMonthly === expectedTotal && totalInSpeech],
@@ -243,14 +243,16 @@ for (const scenario of SCENARIOS) {
     ["B6 operador dinámico", portabilidad.includes("Movistar")],
     ["B6 pregunta oficial porta", portabilidad.includes("¿Alguna duda con el proceso de porta?")],
     ["B6 sin portabilidad en pregunta", !portabilidad.includes("¿Alguna duda con el proceso de portabilidad?")],
-    ["B6 número temporal oficial", portabilidad.includes("NÚMERO TEMPORAL (PROVISORIO)")],
+    ["B6 número temporal integrado", portabilidad.includes("número temporal") && !portabilidad.includes("NÚMERO TEMPORAL (PROVISORIO)")],
     ["B6 rama dudas nota asesora", Boolean(block6?.branch?.portabilityProcess?.advisorNoteOnYes)],
     ["B6 sin yesSpeech inventado", !block6?.branch?.yesSpeech],
     ["B7 chip regalo oficial", regalo.includes("te regalamos un chip prepago")],
     ["B7 sin encuesta mezclada", !regalo.includes("¿Qué te pareció mi atención?")],
     ["B8 encuesta fase 1", encuesta.includes("¿Qué te pareció mi atención?")],
     ["B8 encuesta dos fases", Boolean(block8?.branch?.npsSurvey?.postQuestionSpeech)],
-    ["B8 NPS literal", block8?.branch?.npsSurvey?.postQuestionSpeech.includes("Que bueno que te gusto") ?? false],
+    ["B8 invitación exacta", (block8?.branch?.npsSurvey?.postQuestionSpeech ?? "").includes("Recibirás una encuesta de satisfacción en tu correo electrónico una vez recibas tu producto")],
+    ["B8 sin escala NPS en llamada", !(block8?.branch?.npsSurvey?.postQuestionSpeech ?? "").includes("escala de evaluación")],
+    ["B8 sin encuesta en vivo", !(block8?.branch?.npsSurvey?.postQuestionSpeech ?? "").includes("Pensando únicamente")],
     ["B9 aceptación condiciones", aceptacion.includes("¿te queda alguna duda con las condiciones entregadas?")],
     ["B9 nota dudas asesora", Boolean(block9?.branch?.condicionesDudas?.advisorNoteOnYes)],
     ["B9 VDI separado", Boolean(block9?.branch?.acceptance?.postCondicionesSpeech)],
@@ -324,7 +326,7 @@ for (const scenario of SCENARIOS) {
     checks.push(["B4 PedidosYa condiciones catálogo", beneficios.includes("Incluido sin costo adicional por 12 meses")]);
     checks.push(["B4 cupón equipos", beneficios.includes("cupón de descuento para la compra de equipos y accesorios")]);
     checks.push(["B4 cuotas gratis dinámicas", beneficios.includes("las dos últimas cuotas serán completamente gratis")]);
-    checks.push(["B4 conectores variados", beneficios.includes("También,") && beneficios.includes("Por otra parte,")]);
+    checks.push(["B4 conectores variados", beneficios.includes("También ") && beneficios.includes("Por otra parte,")]);
   }
 
   if (scenario.name.includes("O + M")) {

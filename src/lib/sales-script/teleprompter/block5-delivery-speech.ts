@@ -43,7 +43,7 @@ function buildGeneralConditionsSpeech(): string {
 
 function buildHomeOtpParagraph(isUltraExpress: boolean): string {
   const base =
-    "Recuerda que tú como titular del servicio puedes recibir el producto, ya que al momento de la entrega debes firmar la solicitud de la portabilidad. Si recibes tu como titular lo puedes hacer con el CÓDIGO OTP o con tu cédula de identidad, si recibe un tercero debe presentar si o si el CÓDIGO OTP que te enviaremos por Whatsapp (RAYO) o SMS (ALAS/SROUTE).";
+    "Recuerda que tú como titular del servicio puedes recibir el producto, ya que al momento de la entrega debes firmar la solicitud de la portabilidad. Si recibes tu como titular lo puedes hacer con el código OTP o con tu cédula de identidad, si recibe un tercero debe presentar si o si el código OTP que te enviaremos por Whatsapp (RAYO) o SMS (ALAS/SROUTE).";
   if (!isUltraExpress) return base;
   return `${base} ${ULTRA_EXPRESS_OTP_ADDENDUM}`;
 }
@@ -53,7 +53,7 @@ function buildHomeDeliverySpeech(input: Block5DeliverySpeechInput): string {
   const phones = formatContactPhones(input.contactPhones);
 
   return [
-    `Tu producto será despachado a la dirección ${address}, y tus números de contactos son: ${phones}, registrando la entrega de tus productos para el día ${input.fechaEntrega}.`,
+    `Tu producto será despachado a la dirección ${address}, y tus números de contacto son: ${phones}, registrando la entrega de tus productos para el día ${input.fechaEntrega}.`,
     "",
     'Te enviaremos un correo con el asunto "Tu Compra va en Camino" una vez que iniciemos el despacho de tus productos.',
     "",

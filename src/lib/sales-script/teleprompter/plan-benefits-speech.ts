@@ -62,6 +62,9 @@ function prefixWithConnector(connector: string, body: string): string {
   const trimmed = body.trim();
   const normalized = trimmed.charAt(0).toLowerCase() + trimmed.slice(1);
   const withPeriod = normalized.endsWith(".") ? normalized : `${normalized}.`;
+  if (connector === "También") {
+    return `${connector} ${withPeriod}`;
+  }
   return `${connector}, ${withPeriod}`;
 }
 
@@ -87,7 +90,7 @@ function applySpeechConnectors(bodies: string[]): string[] {
 
 function buildClubWomBody(partners: string[]): string {
   if (partners.length > 0) {
-    return `tendrás acceso al Club WOM desde el primer día, donde podrás disfrutar de descuentos y beneficios exclusivos en comercios asociados como ${partners.join(", ")} y otros`;
+    return `tendrás acceso al Club WOM desde el primer día, donde podrás disfrutar de descuentos y beneficios exclusivos en comercios asociados como ${partners.join(", ")} y otros comercios asociados`;
   }
   return "tendrás acceso al Club WOM desde el primer día, donde podrás disfrutar de descuentos y beneficios exclusivos en comercios asociados";
 }

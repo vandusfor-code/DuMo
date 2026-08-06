@@ -32,12 +32,12 @@ function hasDistinctPlansPerLine(lineDetails: LineSpeechDetail[]): boolean {
 export function buildContractDataValidationIntro(ctx: ScriptBuildContext): string {
   const v = ctx.vars;
   const parts: string[] = [
-    `Tú Nombre Completo es ${speechValue(v.nombre_cliente, "el titular del servicio")}`,
+    `Tu nombre completo es ${speechValue(v.nombre_cliente, "el titular del servicio")}`,
   ];
 
   if (v.rut?.trim()) parts.push(`RUT ${v.rut}`);
 
-  const domicilio = optionalClause("domiciliado en {value}", v.direccion_completa);
+  const domicilio = optionalClause("con domicilio en {value}", v.direccion_completa);
   if (domicilio) parts.push(domicilio);
 
   if (v.correo?.trim()) parts.push(`y correo electrónico ${v.correo}`);
@@ -90,7 +90,7 @@ function buildHeterogeneousMultilineBody(
   const v = ctx.vars;
   const linePhrases = lineDetails.map((line) => {
     const role = line.isMain ? "tu línea principal" : `tu línea adicional ${line.index}`;
-    return `${role} al plan ${line.planName} por el monto mensual de ${line.planValueLabel}`;
+    return `${role} al plan ${line.planName} por un valor mensual de ${line.planValueLabel}`;
   });
 
   return [
@@ -107,7 +107,7 @@ function buildSingleLineBody(ctx: ScriptBuildContext, promoSuffix: string): stri
   const promo = promoSuffix ? `${promoSuffix}.` : "";
 
   return [
-    `Según las condiciones acordadas, aceptas contratar hoy con fecha ${speechValue(v.fecha_contratacion, "hoy")} la portabilidad de tu número ${speechValue(v.numero_portar, "tu número a portar")} proveniente de la compañía ${speechValue(v.operador_actual, "tu operador actual")} a WOM con el plan ${planName}, por el monto mensual de ${planValue}${promo}`,
+    `Según las condiciones acordadas, aceptas contratar hoy con fecha ${speechValue(v.fecha_contratacion, "hoy")} la portabilidad de tu número ${speechValue(v.numero_portar, "tu número a portar")} proveniente de la compañía ${speechValue(v.operador_actual, "tu operador actual")} a WOM con el plan ${planName}, por un valor mensual de ${planValue}${promo}`,
     PORTABILITY_DISCLAIMER,
   ].join("\n\n");
 }
