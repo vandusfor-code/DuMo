@@ -115,7 +115,11 @@ export function buildTeleprompterBlocks(ctx: ScriptBuildContext): SalesScriptSte
   const block2 = buildBlock2Audio();
   const block3 = buildBlock3Contratacion(ctx);
   const block6 = buildBlock6Portabilidad(ctx);
-  const block8 = buildBlock8SurveySpeech({ clientFirstName: n(ctx) });
+  const block8 = buildBlock8SurveySpeech({
+    clientFirstName: n(ctx),
+    executiveEmail: v(ctx, "correo_ejecutivo"),
+    executiveName: v(ctx, "nombre_ejecutivo"),
+  });
   const block9 = buildBlock9AcceptanceSpeech({ clientFirstName: n(ctx) });
   const block10 = buildBlock10Prefijo809Speech({ clientFirstName: n(ctx) });
   const block11 = buildBlock11ReferralSpeech({ clientFirstName: n(ctx) });

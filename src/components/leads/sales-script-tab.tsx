@@ -528,6 +528,8 @@ function canAdvanceBlock(
   const b = step.branch;
   if (!b) return true;
 
+  if (b.referral) return true;
+
   if (b.externalAudio) {
     if (!externalAudioAcknowledged) return true;
     return choice !== null;
