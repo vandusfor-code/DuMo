@@ -18,11 +18,41 @@ export const leadSaleTypeSchema = z.enum([
   "new_line",
 ]);
 
+export const equipmentModeSchema = z.enum(["none", "with"]);
+
+export const currentOperatorSchema = z.enum([
+  "claro",
+  "movistar",
+  "entel",
+  "wom",
+  "virgin",
+  "vtr",
+  "gtd",
+  "other",
+]);
+
+export const deliveryTypeSchema = z.enum(["home", "store"]);
+
 export const leadLineSchema = z.object({
   phone: z.string().trim().min(1, "El número de línea es obligatorio."),
   saleType: leadSaleTypeSchema,
   planId: z.string().trim().min(1, "Selecciona un plan."),
   equipment: z.string().trim().optional().default(""),
+  equipmentMode: z.union([equipmentModeSchema, z.literal("")]).optional().default(""),
+  currentOperator: z.union([currentOperatorSchema, z.literal("")]).optional().default(""),
+  deliveryType: z.union([deliveryTypeSchema, z.literal("")]).optional().default(""),
+  email: z
+    .string()
+    .trim()
+    .optional()
+    .default("")
+    .refine((v) => !v || z.string().email().safeParse(v).success, {
+      message: "Correo electrónico inválido.",
+    }),
+  equipmentModel: z.string().trim().optional().default(""),
+  equipmentValue: z.string().trim().optional().default(""),
+  equipmentDownPayment: z.string().trim().optional().default(""),
+  equipmentInstallments: z.string().trim().optional().default(""),
 });
 
 export const saveLeadSchema = z.object({

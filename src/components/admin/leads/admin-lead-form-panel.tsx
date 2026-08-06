@@ -80,6 +80,14 @@ export function AdminLeadFormPanel({
                 saleType: l.saleType as LeadSaleType,
                 planId: l.planId,
                 equipment: l.equipment,
+                equipmentMode: l.equipmentMode,
+                currentOperator: l.currentOperator,
+                deliveryType: l.deliveryType,
+                email: l.email,
+                equipmentModel: l.equipmentModel,
+                equipmentValue: l.equipmentValue,
+                equipmentDownPayment: l.equipmentDownPayment,
+                equipmentInstallments: l.equipmentInstallments,
               }))
           : [],
     };

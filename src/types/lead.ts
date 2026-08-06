@@ -33,6 +33,41 @@ export const LEAD_SALE_TYPE_LABELS: Record<LeadSaleType, string> = {
 /** Tipos de venta en los que el campo "Equipo" aplica (se muestra). */
 export const EQUIPMENT_LEAD_TYPES: LeadSaleType[] = ["portability", "renewal"];
 
+export type EquipmentMode = "none" | "with";
+
+export type CurrentOperator =
+  | "claro"
+  | "movistar"
+  | "entel"
+  | "wom"
+  | "virgin"
+  | "vtr"
+  | "gtd"
+  | "other";
+
+export type DeliveryType = "home" | "store";
+
+export const EQUIPMENT_MODE_LABELS: Record<EquipmentMode, string> = {
+  none: "Sin equipo",
+  with: "Con equipo",
+};
+
+export const CURRENT_OPERATOR_LABELS: Record<CurrentOperator, string> = {
+  claro: "Claro",
+  movistar: "Movistar",
+  entel: "Entel",
+  wom: "WOM",
+  virgin: "Virgin",
+  vtr: "VTR",
+  gtd: "GTD",
+  other: "Otro",
+};
+
+export const DELIVERY_TYPE_LABELS: Record<DeliveryType, string> = {
+  home: "Despacho a domicilio",
+  store: "Retiro en tienda",
+};
+
 /** Plan comercial visible para asesoras (sin Valor DuMo). */
 export interface Plan {
   id: string;
@@ -48,6 +83,14 @@ export interface LeadSaleLine {
   saleType: LeadSaleType;
   planId: string;
   equipment: string;
+  equipmentMode?: EquipmentMode | "";
+  currentOperator?: CurrentOperator | "";
+  deliveryType?: DeliveryType | "";
+  email?: string;
+  equipmentModel?: string;
+  equipmentValue?: string;
+  equipmentDownPayment?: string;
+  equipmentInstallments?: string;
 }
 
 /** Registro de gestión guardado. */
@@ -77,5 +120,13 @@ export interface SaveLeadInput {
     saleType: LeadSaleType;
     planId: string;
     equipment: string;
+    equipmentMode: EquipmentMode | "";
+    currentOperator: CurrentOperator | "";
+    deliveryType: DeliveryType | "";
+    email: string;
+    equipmentModel: string;
+    equipmentValue: string;
+    equipmentDownPayment: string;
+    equipmentInstallments: string;
   }[];
 }
