@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Mic, Paperclip, Send, Smile } from "lucide-react";
+import { AlertTriangle, Mic, Paperclip, RefreshCw, Send, Smile } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChatHeader } from "@/components/leads/chat-header";
 import { ChatBubble } from "@/components/leads/chat-bubble";
@@ -12,6 +12,9 @@ export function AdminChatPanel({
   conversation,
   messages,
   isLoading,
+  isError = false,
+  errorMessage,
+  onRetry,
   onSend,
   isSending,
   sendError,
@@ -19,6 +22,10 @@ export function AdminChatPanel({
   conversation: AdminConversation;
   messages: ChatMessage[];
   isLoading: boolean;
+  /** Falló la carga: se avisa en vez de dejar el chat en gris para siempre. */
+  isError?: boolean;
+  errorMessage?: string;
+  onRetry?: () => void;
   onSend: (text: string) => Promise<void>;
   isSending?: boolean;
   sendError?: string | null;
@@ -63,7 +70,26 @@ export function AdminChatPanel({
           </span>
         </div>
 
-        {isLoading ? (
+        {isError && (
+          <div className="flex justify-center">
+            <div className="inline-flex items-center gap-2 rounded-full border border-danger/20 bg-danger-soft px-3 py-1.5 text-[12px] font-medium text-danger-ink">
+              <AlertTriangle className="size-3.5" />
+              {errorMessage ?? "No se pudieron cargar los mensajes."}
+              {onRetry && (
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  className="inline-flex items-center gap-1 underline underline-offset-2"
+                >
+                  <RefreshCw className="size-3" />
+                  Reintentar
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {isLoading && messages.length === 0 && !isError ? (
           <div className="space-y-3">
             <Skeleton className="h-10 w-48 rounded-2xl" />
             <Skeleton className="ml-auto h-10 w-56 rounded-2xl" />

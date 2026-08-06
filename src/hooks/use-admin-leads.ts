@@ -42,8 +42,11 @@ export function useAdminMessages(conversationId: string | null) {
     queryKey: ["admin", "leads", "messages", conversationId],
     queryFn: () => apiGet<ChatMessage[]>(`/api/admin/leads?conversationId=${conversationId}&messages=1`),
     enabled: !!conversationId,
-    refetchInterval: 2000,
-    refetchIntervalInBackground: true,
+    refetchInterval: 3000,
+    // Sin reintentos infinitos: si falla, se muestra el error de inmediato en
+    // vez de quedarse cargando (el polling vuelve a intentarlo igual).
+    retry: 1,
+    retryDelay: 1000,
   });
 }
 

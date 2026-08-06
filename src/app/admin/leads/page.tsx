@@ -104,6 +104,11 @@ export default function AdminLeadsPage() {
                 conversation={selected}
                 messages={messages.data ?? []}
                 isLoading={messages.isLoading}
+                isError={messages.isError}
+                errorMessage={
+                  messages.error instanceof Error ? messages.error.message : undefined
+                }
+                onRetry={() => messages.refetch()}
                 isSending={sendMessage.isPending}
                 sendError={sendMessage.error instanceof Error ? sendMessage.error.message : null}
                 onSend={async (text) => {
