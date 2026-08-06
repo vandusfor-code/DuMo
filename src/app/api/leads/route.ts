@@ -1,4 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { authService } from "@/services/auth.service";
+import { advisorScopeFromUser } from "@/lib/advisor-scope";
 import { leadsService } from "@/services/leads.service";
 import { saveLeadSchema } from "@/lib/schemas/save-lead.schema";
 
@@ -22,8 +24,16 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const lead = await leadsService.saveLead(parsed.data);
-    return NextResponse.json(lead, { status: 201 });
+    const user = await authService.getSessionUser();
+    const scope = advisorScopeFromUser(user);
+    const advisor = scope
+      ? { name: scope.name, email: user?.email ?? "" }
+      : user
+        ? { name: user.name, email: user.email }
+        : undefined;
+
+    const result = await leadsService.saveLead(parsed.data, advisor);
+    return NextResponse.json(result, { status: 201 });
   } catch (error) {
     console.error("[POST /api/leads]", error);
     return NextResponse.json(

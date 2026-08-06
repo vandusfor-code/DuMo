@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import {
   AlertCircle,
@@ -8,6 +9,7 @@ import {
   Clock,
   MessageSquare,
   Plus,
+  ScrollText,
   User,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,8 +18,11 @@ import { SaleDetails } from "./sale-details";
 import { ObservationField } from "./observation-field";
 import { ActionButtons } from "./action-buttons";
 import { ClientCard } from "./client-card";
+import { SalesScriptTab } from "./sales-script-tab";
+import { useSalesScript } from "@/hooks/use-sales-script";
 import type { Conversation } from "@/types/conversation";
 import type { LeadFormValues } from "@/types/lead-form";
+import type { GeneratedSalesScript } from "@/types/sales-script";
 
 export function LeadPanel({
   conversation,
@@ -25,15 +30,26 @@ export function LeadPanel({
   isError,
   isSuccess,
   onCancel,
+  savedScript,
 }: {
   conversation: Conversation;
   isSaving: boolean;
   isError: boolean;
   isSuccess: boolean;
   onCancel: () => void;
+  savedScript?: GeneratedSalesScript | null;
 }) {
   const { control } = useFormContext<LeadFormValues>();
   const type = useWatch({ control, name: "type" });
+  const [activeTab, setActiveTab] = useState("gestion");
+  const { data: fetchedScript } = useSalesScript(conversation.id);
+  const script = savedScript ?? fetchedScript ?? null;
+
+  useEffect(() => {
+    if (isSuccess && script) {
+      setActiveTab("script");
+    }
+  }, [isSuccess, script]);
 
   return (
     <div className="flex h-full flex-col">
@@ -48,11 +64,12 @@ export function LeadPanel({
         </button>
       </div>
 
-      <Tabs defaultValue="gestion" className="flex min-h-0 flex-1 flex-col">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-h-0 flex-1 flex-col">
         <div className="border-b border-line px-4 pt-3">
           <TabsList className="w-full justify-start bg-transparent p-0">
             <PanelTab value="gestion" icon={<ClipboardList className="size-4" />} label="Gestión" />
             <PanelTab value="cliente" icon={<User className="size-4" />} label="Cliente" />
+            <PanelTab value="script" icon={<ScrollText className="size-4" />} label="Script" />
             <PanelTab value="notas" icon={<MessageSquare className="size-4" />} label="Notas" />
             <PanelTab value="historial" icon={<Clock className="size-4" />} label="Historial" />
           </TabsList>
@@ -77,7 +94,7 @@ export function LeadPanel({
             {isSuccess && (
               <div className="flex items-center gap-2.5 rounded-xl border border-success/20 bg-success-soft px-4 py-3 text-[13px] text-success-ink">
                 <CheckCircle2 className="size-[18px]" />
-                Gestión guardada correctamente.
+                Gestión guardada correctamente. El script de venta ya está disponible.
               </div>
             )}
             <ActionButtons isSaving={isSaving} onCancel={onCancel} />
@@ -85,6 +102,10 @@ export function LeadPanel({
 
           <TabsContent value="cliente" className="outline-none">
             <ClientCard />
+          </TabsContent>
+
+          <TabsContent value="script" className="outline-none">
+            <SalesScriptTab script={script} />
           </TabsContent>
 
           <TabsContent value="notas" className="outline-none">

@@ -3,8 +3,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiPost } from "@/lib/api-client";
 import { advisorApiGet } from "@/lib/advisor-query";
+import { salesScriptKeys } from "@/hooks/use-sales-script";
 import type { ChatMessage, Conversation } from "@/types/conversation";
-import type { Lead, Plan, SaveLeadInput } from "@/types/lead";
+import type { Plan, SaveLeadInput } from "@/types/lead";
+import type { SaveLeadResult } from "@/types/sales-script";
 
 export const leadKeys = {
   conversations: ["leads", "conversations"] as const,
@@ -58,9 +60,17 @@ export function usePlans() {
   });
 }
 
-export function useSaveLead() {
+export function useSaveLead(conversationId?: string) {
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: SaveLeadInput) => apiPost<Lead>("/api/leads", input),
+    mutationFn: (input: SaveLeadInput) => apiPost<SaveLeadResult>("/api/leads", input),
+    onSuccess: (result) => {
+      if (result.script && conversationId) {
+        queryClient.setQueryData(salesScriptKeys.byConversation(conversationId), result.script);
+      } else if (conversationId) {
+        queryClient.invalidateQueries({ queryKey: salesScriptKeys.byConversation(conversationId) });
+      }
+    },
   });
 }
 

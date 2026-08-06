@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { LeadPanel } from "./lead-panel";
 import { useSaveLead } from "@/hooks/use-leads";
 import type { Conversation } from "@/types/conversation";
 import { EMPTY_LEAD_LINE, type LeadFormValues } from "@/types/lead-form";
 import type { LeadSaleType, SaveLeadInput } from "@/types/lead";
+import type { GeneratedSalesScript } from "@/types/sales-script";
 
 function defaultsFor(c: Conversation): LeadFormValues {
   return {
@@ -25,7 +27,8 @@ function defaultsFor(c: Conversation): LeadFormValues {
  * field-array keys (avoids duplicated line cards).
  */
 export function LeadFormPanel({ conversation }: { conversation: Conversation }) {
-  const saveLead = useSaveLead();
+  const saveLead = useSaveLead(conversation.id);
+  const [savedScript, setSavedScript] = useState<GeneratedSalesScript | null>(null);
   const methods = useForm<LeadFormValues>({
     defaultValues: defaultsFor(conversation),
   });
@@ -69,7 +72,8 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
               }))
           : [],
     };
-    await saveLead.mutateAsync(input);
+    const result = await saveLead.mutateAsync(input);
+    setSavedScript(result.script);
   });
 
   return (
@@ -80,6 +84,7 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
           isSaving={saveLead.isPending}
           isError={saveLead.isError}
           isSuccess={saveLead.isSuccess}
+          savedScript={savedScript}
           onCancel={() => methods.reset(defaultsFor(conversation))}
         />
       </form>

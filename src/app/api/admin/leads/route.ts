@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { withAdminFallback } from "@/lib/admin-api-fallbacks";
 import { requireAdminSession } from "@/lib/require-admin";
+import { authService } from "@/services/auth.service";
 import { adminLeadsService } from "@/services/admin-leads.service";
 
 export const runtime = "nodejs";
@@ -105,7 +106,11 @@ export async function POST(request: NextRequest) {
       const settings = await adminLeadsService.setAutoAssignEnabled(Boolean(body.enabled));
       return NextResponse.json(settings);
     }
-    const lead = await adminLeadsService.saveLead(body);
+    const session = await authService.getSessionUser();
+    const lead = await adminLeadsService.saveLead(body, {
+      name: session?.name ?? "Administrador",
+      email: session?.email ?? "",
+    });
     return NextResponse.json(lead);
   } catch (error) {
     console.error("[POST /api/admin/leads]", error);

@@ -291,9 +291,11 @@ async function runMigrations(sql: Sql) {
         advisor_id text,
         advisor_name text NOT NULL DEFAULT '',
         lines jsonb NOT NULL DEFAULT '[]',
+        sales_script jsonb,
         created_at timestamptz NOT NULL DEFAULT now()
       )
     `;
+    await tx`ALTER TABLE lead_gestiones ADD COLUMN IF NOT EXISTS sales_script jsonb`;
 
     await tx`
       INSERT INTO app_config (key, value)

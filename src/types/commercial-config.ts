@@ -26,9 +26,21 @@ export interface CommercialPlan {
   saleType: CommercialSaleType;
   /** Precio al cliente final (WOM) — visible para asesoras. */
   womValue: number;
+  /** Valor mensual por línea adicional. */
+  additionalLineValue: number;
+  /** Cantidad máxima de líneas permitidas. */
+  maxLines: number;
   /** Lo que WOM paga a DuMo — base de contabilidad admin. */
   dumoValue: number;
   advisorCommission: number;
+  /** Beneficios incluidos (para Script de Venta). */
+  benefits: string[];
+  /** Promociones activas (ej. 3° boleta $0). */
+  promotions: string[];
+  /** Texto comercial oficial del plan. */
+  commercialText: string;
+  /** Condiciones especiales del plan. */
+  specialConditions: string;
   status: CommercialPlanStatus;
 }
 
@@ -53,8 +65,14 @@ export interface UpsertCommercialPlanInput {
   operator: string;
   saleType: CommercialSaleType;
   womValue: number;
+  additionalLineValue: number;
+  maxLines: number;
   dumoValue: number;
   advisorCommission: number;
+  benefits: string[];
+  promotions: string[];
+  commercialText: string;
+  specialConditions: string;
   status: CommercialPlanStatus;
 }
 

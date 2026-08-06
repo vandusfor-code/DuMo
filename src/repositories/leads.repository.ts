@@ -1,5 +1,6 @@
 import "server-only";
 import type { Lead, Plan, SaveLeadInput } from "@/types/lead";
+import type { GeneratedSalesScript } from "@/types/sales-script";
 import type {
   AdminAdvisor,
   AdminConversation,
@@ -24,6 +25,8 @@ import { getSheetsClient, type GoogleSheetsClient } from "@/server/google/sheets
 export interface LeadRepository {
   getPlans(): Promise<Plan[]>;
   saveLead(input: SaveLeadInput): Promise<Lead>;
+  saveSalesScript(gestionId: string, script: GeneratedSalesScript): Promise<void>;
+  getLatestSalesScript(conversationId: string): Promise<GeneratedSalesScript | null>;
   /** Admin CRM */
   listAdminConversations(): Promise<AdminConversation[]>;
   getAdminDetail(conversationId: string): Promise<AdminLeadDetail>;
@@ -59,12 +62,22 @@ function buildLead(id: string, input: SaveLeadInput): Lead {
 class MockLeadRepository implements LeadRepository {
   private conversations: AdminConversation[] = [];
   private notes: LeadNote[] = [];
+  private scriptsByConversation = new Map<string, GeneratedSalesScript>();
 
   getPlans() {
     return withLatency(PLANS_MOCK);
   }
   saveLead(input: SaveLeadInput) {
     return withLatency(buildLead(`LEAD-${Date.now()}`, input));
+  }
+
+  saveSalesScript(_gestionId: string, script: GeneratedSalesScript) {
+    this.scriptsByConversation.set(script.conversationId, script);
+    return withLatency(undefined);
+  }
+
+  getLatestSalesScript(conversationId: string) {
+    return withLatency(this.scriptsByConversation.get(conversationId) ?? null);
   }
 
   listAdminConversations() {
@@ -234,6 +247,14 @@ class SheetsLeadRepository implements LeadRepository {
 
   getClientProfile(conversationId: string) {
     return withLatency(getDefaultClientProfile(conversationId));
+  }
+
+  saveSalesScript() {
+    return withLatency(undefined);
+  }
+
+  getLatestSalesScript() {
+    return withLatency(null);
   }
 }
 

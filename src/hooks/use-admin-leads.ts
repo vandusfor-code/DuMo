@@ -10,7 +10,8 @@ import type {
   UpsertLeadNoteInput,
 } from "@/types/admin-lead";
 import type { ChatMessage } from "@/types/conversation";
-import type { Lead, SaveLeadInput } from "@/types/lead";
+import type { SaveLeadInput } from "@/types/lead";
+import type { SaveLeadResult } from "@/types/sales-script";
 
 export function useAdminConversations() {
   return useQuery({
@@ -61,11 +62,16 @@ export function useAssignAdvisor() {
   });
 }
 
-export function useSaveAdminLead() {
+export function useSaveAdminLead(conversationId?: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: SaveLeadInput) => apiPost<Lead>("/api/admin/leads", input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "leads"] }),
+    mutationFn: (input: SaveLeadInput) => apiPost<SaveLeadResult>("/api/admin/leads", input),
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ["admin", "leads"] });
+      if (result.script && conversationId) {
+        qc.setQueryData(["leads", "script", conversationId], result.script);
+      }
+    },
   });
 }
 

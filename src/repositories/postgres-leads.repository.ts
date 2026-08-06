@@ -1,5 +1,6 @@
 import "server-only";
 import type { Lead, Plan, SaveLeadInput } from "@/types/lead";
+import type { GeneratedSalesScript } from "@/types/sales-script";
 import type {
   AdminAdvisor,
   AdminConversation,
@@ -76,6 +77,36 @@ export class PostgresLeadRepository {
     }
 
     return buildLead(id, input, advisorId || "unknown");
+  }
+
+  async saveSalesScript(gestionId: string, script: GeneratedSalesScript): Promise<void> {
+    await ensureSchema();
+    const sql = getSql();
+    if (!sql) return;
+    await withDbRetry(() =>
+      sql`
+        UPDATE lead_gestiones
+        SET sales_script = ${JSON.stringify(script)}::jsonb
+        WHERE id = ${gestionId}
+      `,
+    );
+  }
+
+  async getLatestSalesScript(conversationId: string): Promise<GeneratedSalesScript | null> {
+    await ensureSchema();
+    const sql = getSql();
+    if (!sql) return null;
+    const rows = await withDbRetry(() =>
+      sql<{ sales_script: GeneratedSalesScript | null }[]>`
+        SELECT sales_script
+        FROM lead_gestiones
+        WHERE conversation_id = ${conversationId}
+          AND sales_script IS NOT NULL
+        ORDER BY created_at DESC
+        LIMIT 1
+      `,
+    );
+    return rows[0]?.sales_script ?? null;
   }
 
   listAdminConversations(): Promise<AdminConversation[]> {

@@ -1,7 +1,15 @@
 import type { CommercialPlan, UpsertCommercialPlanInput } from "@/types/commercial-config";
 
 /** Plan almacenado con campos legacy (operatorPayment). */
-type StoredCommercialPlan = CommercialPlan & { operatorPayment?: number };
+type StoredCommercialPlan = CommercialPlan & {
+  operatorPayment?: number;
+  additionalLineValue?: number;
+  maxLines?: number;
+  benefits?: string[];
+  promotions?: string[];
+  commercialText?: string;
+  specialConditions?: string;
+};
 
 /** Normaliza planes guardados antes de la migración Valor Wom / Valor DuMo. */
 export function normalizeCommercialPlan(raw: StoredCommercialPlan): CommercialPlan {
@@ -14,8 +22,14 @@ export function normalizeCommercialPlan(raw: StoredCommercialPlan): CommercialPl
     operator: raw.operator,
     saleType: raw.saleType,
     womValue,
+    additionalLineValue: raw.additionalLineValue ?? womValue,
+    maxLines: raw.maxLines ?? 5,
     dumoValue,
     advisorCommission: raw.advisorCommission,
+    benefits: raw.benefits ?? [],
+    promotions: raw.promotions ?? [],
+    commercialText: raw.commercialText ?? "",
+    specialConditions: raw.specialConditions ?? "",
     status: raw.status,
   };
 }
@@ -30,8 +44,14 @@ export function toPlanInput(plan: Omit<CommercialPlan, "id">): UpsertCommercialP
     operator: plan.operator,
     saleType: plan.saleType,
     womValue: plan.womValue,
+    additionalLineValue: plan.additionalLineValue,
+    maxLines: plan.maxLines,
     dumoValue: plan.dumoValue,
     advisorCommission: plan.advisorCommission,
+    benefits: plan.benefits,
+    promotions: plan.promotions,
+    commercialText: plan.commercialText,
+    specialConditions: plan.specialConditions,
     status: plan.status,
   };
 }

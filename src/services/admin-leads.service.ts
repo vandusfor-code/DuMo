@@ -11,7 +11,9 @@ import type {
   UpsertLeadNoteInput,
 } from "@/types/admin-lead";
 import type { ChatMessage } from "@/types/conversation";
-import type { Lead, Plan, SaveLeadInput } from "@/types/lead";
+import type { Plan, SaveLeadInput } from "@/types/lead";
+import type { SaveLeadResult } from "@/types/sales-script";
+import { saveLeadWithScript } from "@/services/save-lead-with-script";
 
 export const adminLeadsService = {
   listConversations(): Promise<AdminConversation[]> {
@@ -50,8 +52,8 @@ export const adminLeadsService = {
   getPlans(): Promise<Plan[]> {
     return getLeadRepository().getPlans();
   },
-  saveLead(input: SaveLeadInput): Promise<Lead> {
-    return getLeadRepository().saveLead(input);
+  saveLead(input: SaveLeadInput, advisor?: { name: string; email: string }): Promise<SaveLeadResult> {
+    return saveLeadWithScript(input, advisor);
   },
   getAutoAssignSettings() {
     return getAdminLeadsRepository().getAutoAssignSettings();

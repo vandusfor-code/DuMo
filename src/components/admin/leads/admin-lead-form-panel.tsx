@@ -11,6 +11,7 @@ import {
   Pencil,
   Plus,
   Trash2,
+  ScrollText,
   User,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,6 +21,8 @@ import { SaleDetails } from "@/components/leads/sale-details";
 import { ObservationField } from "@/components/leads/observation-field";
 import { ActionButtons } from "@/components/leads/action-buttons";
 import { ClientCard } from "@/components/leads/client-card";
+import { SalesScriptTab } from "@/components/leads/sales-script-tab";
+import { useSalesScript } from "@/hooks/use-sales-script";
 import {
   useAddLeadNote,
   useDeleteLeadNote,
@@ -29,6 +32,7 @@ import {
 import type { AdminConversation, ClientProfile, LeadNote, LeadTimelineEvent } from "@/types/admin-lead";
 import { EMPTY_LEAD_LINE, type LeadFormValues } from "@/types/lead-form";
 import type { LeadSaleType, SaveLeadInput } from "@/types/lead";
+import type { GeneratedSalesScript } from "@/types/sales-script";
 import { useWatch } from "react-hook-form";
 
 function defaultsFor(c: AdminConversation): LeadFormValues {
@@ -54,7 +58,11 @@ export function AdminLeadFormPanel({
   notes: LeadNote[];
   timeline: LeadTimelineEvent[];
 }) {
-  const saveLead = useSaveAdminLead();
+  const saveLead = useSaveAdminLead(conversation.id);
+  const [savedScript, setSavedScript] = useState<GeneratedSalesScript | null>(null);
+  const [activeTab, setActiveTab] = useState("gestion");
+  const { data: fetchedScript } = useSalesScript(conversation.id);
+  const script = savedScript ?? fetchedScript ?? null;
   const methods = useForm<LeadFormValues>({ defaultValues: defaultsFor(conversation) });
   const type = useWatch({ control: methods.control, name: "type" });
 
@@ -97,7 +105,9 @@ export function AdminLeadFormPanel({
               }))
           : [],
     };
-    await saveLead.mutateAsync(input);
+    const result = await saveLead.mutateAsync(input);
+    setSavedScript(result.script);
+    if (result.script) setActiveTab("script");
   });
 
   return (
@@ -115,11 +125,12 @@ export function AdminLeadFormPanel({
             </button>
           </div>
 
-          <Tabs defaultValue="gestion" className="flex min-h-0 flex-1 flex-col">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-h-0 flex-1 flex-col">
             <div className="border-b border-line px-4 pt-3">
               <TabsList className="w-full justify-start bg-transparent p-0">
                 <PanelTab value="gestion" icon={<ClipboardList className="size-4" />} label="Gestión" />
                 <PanelTab value="cliente" icon={<User className="size-4" />} label="Cliente" />
+                <PanelTab value="script" icon={<ScrollText className="size-4" />} label="Script" />
                 <PanelTab value="notas" icon={<MessageSquare className="size-4" />} label="Notas" />
                 <PanelTab value="historial" icon={<Clock className="size-4" />} label="Historial" />
               </TabsList>
@@ -145,7 +156,7 @@ export function AdminLeadFormPanel({
                 {saveLead.isSuccess && (
                   <div className="flex items-center gap-2.5 rounded-xl border border-success/20 bg-success-soft px-4 py-3 text-[13px] text-success-ink">
                     <CheckCircle2 className="size-[18px]" />
-                    Gestión guardada correctamente.
+                    Gestión guardada correctamente. El script de venta ya está disponible.
                   </div>
                 )}
                 <ActionButtons
@@ -156,6 +167,10 @@ export function AdminLeadFormPanel({
 
               <TabsContent value="cliente" className="outline-none">
                 <ClientHistoryCard client={client} />
+              </TabsContent>
+
+              <TabsContent value="script" className="outline-none">
+                <SalesScriptTab script={script} />
               </TabsContent>
 
               <TabsContent value="notas" className="outline-none">

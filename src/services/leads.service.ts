@@ -6,7 +6,9 @@ import {
   type IncomingMessage,
 } from "@/repositories/conversation.repository";
 import type { ChatMessage, Conversation } from "@/types/conversation";
-import type { Lead, Plan, SaveLeadInput } from "@/types/lead";
+import type { Plan, SaveLeadInput } from "@/types/lead";
+import type { SaveLeadResult } from "@/types/sales-script";
+import { saveLeadWithScript } from "@/services/save-lead-with-script";
 import { graphVersion, resolveSendCredentials } from "@/server/whatsapp/credentials";
 
 const GRAPH = "https://graph.facebook.com";
@@ -30,8 +32,8 @@ export const leadsService = {
   getPlans(): Promise<Plan[]> {
     return getLeadRepository().getPlans();
   },
-  saveLead(input: SaveLeadInput): Promise<Lead> {
-    return getLeadRepository().saveLead(input);
+  saveLead(input: SaveLeadInput, advisor?: { name: string; email: string }): Promise<SaveLeadResult> {
+    return saveLeadWithScript(input, advisor);
   },
 
   /** Persiste un mensaje entrante recibido por el webhook. */

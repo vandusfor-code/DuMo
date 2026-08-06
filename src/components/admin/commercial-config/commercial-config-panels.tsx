@@ -210,15 +210,21 @@ export function CommercialPlanDialog({
   const [operator, setOperator] = useState(initial?.operator ?? "");
   const [saleType, setSaleType] = useState(initial?.saleType ?? "portabilidad");
   const [womValue, setWomValue] = useState(initial?.womValue ?? 0);
+  const [additionalLineValue, setAdditionalLineValue] = useState(initial?.additionalLineValue ?? initial?.womValue ?? 0);
+  const [maxLines, setMaxLines] = useState(initial?.maxLines ?? 5);
   const [dumoValue, setDumoValue] = useState(initial?.dumoValue ?? 0);
   const [advisorCommission, setAdvisorCommission] = useState(initial?.advisorCommission ?? 0);
+  const [benefitsText, setBenefitsText] = useState((initial?.benefits ?? []).join("\n"));
+  const [promotionsText, setPromotionsText] = useState((initial?.promotions ?? []).join("\n"));
+  const [commercialText, setCommercialText] = useState(initial?.commercialText ?? "");
+  const [specialConditions, setSpecialConditions] = useState(initial?.specialConditions ?? "");
   const [status, setStatus] = useState<CommercialPlanStatus>(initial?.status ?? "active");
 
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
-      <Card className="w-full max-w-lg p-6">
+      <Card className="max-h-[90vh] w-full max-w-2xl overflow-y-auto p-6">
         <h3 className="text-[17px] font-semibold text-ink">
           {initial ? "Editar plan" : "Crear plan"}
         </h3>
@@ -239,8 +245,32 @@ export function CommercialPlanDialog({
             <input type="number" value={dumoValue} onChange={(e) => setDumoValue(Number(e.target.value))} className="mt-1.5 h-11 w-full rounded-xl border border-line px-4 text-[14px]" />
           </label>
           <label className="block">
+            <span className="text-[13px] text-muted">Valor línea adicional ($)</span>
+            <input type="number" value={additionalLineValue} onChange={(e) => setAdditionalLineValue(Number(e.target.value))} className="mt-1.5 h-11 w-full rounded-xl border border-line px-4 text-[14px]" />
+          </label>
+          <label className="block">
+            <span className="text-[13px] text-muted">Cantidad máxima de líneas</span>
+            <input type="number" value={maxLines} onChange={(e) => setMaxLines(Number(e.target.value))} className="mt-1.5 h-11 w-full rounded-xl border border-line px-4 text-[14px]" />
+          </label>
+          <label className="block">
             <span className="text-[13px] text-muted">Comisión asesora</span>
             <input type="number" value={advisorCommission} onChange={(e) => setAdvisorCommission(Number(e.target.value))} className="mt-1.5 h-11 w-full rounded-xl border border-line px-4 text-[14px]" />
+          </label>
+          <label className="block">
+            <span className="text-[13px] text-muted">Beneficios (uno por línea — Script de Venta)</span>
+            <textarea value={benefitsText} onChange={(e) => setBenefitsText(e.target.value)} className="mt-1.5 min-h-[72px] w-full rounded-xl border border-line px-4 py-3 text-[14px]" />
+          </label>
+          <label className="block">
+            <span className="text-[13px] text-muted">Promociones (una por línea)</span>
+            <textarea value={promotionsText} onChange={(e) => setPromotionsText(e.target.value)} className="mt-1.5 min-h-[60px] w-full rounded-xl border border-line px-4 py-3 text-[14px]" />
+          </label>
+          <label className="block">
+            <span className="text-[13px] text-muted">Texto comercial (Script de Venta)</span>
+            <textarea value={commercialText} onChange={(e) => setCommercialText(e.target.value)} className="mt-1.5 min-h-[60px] w-full rounded-xl border border-line px-4 py-3 text-[14px]" />
+          </label>
+          <label className="block">
+            <span className="text-[13px] text-muted">Condiciones especiales</span>
+            <textarea value={specialConditions} onChange={(e) => setSpecialConditions(e.target.value)} className="mt-1.5 min-h-[48px] w-full rounded-xl border border-line px-4 py-3 text-[14px]" />
           </label>
           <select value={status} onChange={(e) => setStatus(e.target.value as CommercialPlanStatus)} className="h-11 w-full rounded-xl border border-line px-4 text-[14px]">
             <option value="active">Activo</option>
@@ -249,7 +279,24 @@ export function CommercialPlanDialog({
         </div>
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-          <Button onClick={() => { onSave({ name, operator, saleType, womValue, dumoValue, advisorCommission, status }); onClose(); }}>
+          <Button onClick={() => {
+            onSave({
+              name,
+              operator,
+              saleType,
+              womValue,
+              additionalLineValue,
+              maxLines,
+              dumoValue,
+              advisorCommission,
+              benefits: benefitsText.split("\n").map((s) => s.trim()).filter(Boolean),
+              promotions: promotionsText.split("\n").map((s) => s.trim()).filter(Boolean),
+              commercialText,
+              specialConditions,
+              status,
+            });
+            onClose();
+          }}>
             Guardar
           </Button>
         </div>
