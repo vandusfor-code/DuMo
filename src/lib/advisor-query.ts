@@ -6,6 +6,8 @@
  * invisible en la función más crítica del CRM. Ahora lanza el error: React
  * Query conserva los últimos datos buenos y la UI puede avisar y reintentar.
  */
+import { authHeader } from "@/lib/auth/client-token";
+
 export class AdvisorFetchError extends Error {
   constructor(
     message: string,
@@ -28,7 +30,7 @@ export async function advisorApiGet<T>(url: string, timeoutMs = 15_000): Promise
   try {
     const res = await fetch(url, {
       credentials: "include",
-      headers: { Accept: "application/json" },
+      headers: { Accept: "application/json", ...authHeader() },
       signal: controller.signal,
       cache: "no-store",
     });

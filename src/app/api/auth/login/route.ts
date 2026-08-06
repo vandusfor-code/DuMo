@@ -37,6 +37,9 @@ export async function POST(request: NextRequest) {
     const res = NextResponse.json({
       user: authUserToPublicUser(result.user),
       redirectTo: result.redirectTo,
+      // Respaldo para navegadores que no guardan la cookie: el cliente lo
+      // manda como Authorization: Bearer en cada petición.
+      token,
     });
     res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions(secure));
     return res;

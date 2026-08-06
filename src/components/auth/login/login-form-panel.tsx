@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { LoginLogo } from "./login-logo";
 import { ApiError, apiPost } from "@/lib/api-client";
+import { saveClientToken } from "@/lib/auth/client-token";
 
 const container = {
   hidden: { opacity: 0 },
@@ -89,10 +90,12 @@ export function LoginFormPanel() {
     setError(null);
     setLoading(true);
     try {
-      const res = await apiPost<{ redirectTo: string }>("/api/auth/login", {
-        login,
-        password,
-      });
+      const res = await apiPost<{ redirectTo: string; token?: string }>(
+        "/api/auth/login",
+        { login, password },
+      );
+      // Respaldo por si el navegador no guarda la cookie de sesión.
+      saveClientToken(res.token);
       const next = searchParams.get("next");
       // `next` solo se respeta si pertenece al área del rol del usuario; si no,
       // manda el destino por rol (evita que un admin caiga en /dashboard).

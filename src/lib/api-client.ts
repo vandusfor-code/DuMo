@@ -3,6 +3,7 @@
  * server route handlers; the server (routes -> services -> repositories) is the
  * only tier that touches the database, so credentials never reach the client.
  */
+import { authHeader } from "@/lib/auth/client-token";
 
 export class ApiError extends Error {
   constructor(
@@ -39,6 +40,7 @@ async function fetchJson<T>(
     const res = await fetch(url, {
       ...rest,
       credentials: "include",
+      headers: { ...(rest.headers as Record<string, string>), ...authHeader() },
       signal: controller.signal,
     });
     if (!res.ok) await parseError(res);

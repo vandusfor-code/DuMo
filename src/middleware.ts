@@ -40,7 +40,16 @@ export async function middleware(request: NextRequest) {
 
   if (!needsAuth) return NextResponse.next();
 
-  const token = request.cookies.get(SESSION_COOKIE)?.value;
+  // La cookie es el mecanismo principal, pero algunos navegadores/contextos no
+  // la guardan (bloqueo de cookies, extensiones, modos restringidos). Para que
+  // la aplicación funcione igual, se acepta el mismo token firmado por la
+  // cabecera Authorization: Bearer.
+  const cookieToken = request.cookies.get(SESSION_COOKIE)?.value;
+  const headerToken = request.headers
+    .get("authorization")
+    ?.replace(/^Bearer\s+/i, "")
+    .trim();
+  const token = cookieToken || headerToken;
   const payload = token ? await verifySessionTokenEdge(token) : null;
 
   if (!payload) {
