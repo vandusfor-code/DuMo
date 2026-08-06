@@ -3,9 +3,10 @@
  * El formulario, el builder y la Oferta Comercial consumen los mismos IDs y datos.
  */
 
-import type { CommercialPlan, PlanOffer } from "@/types/commercial-config";
+import type { CommercialPlan } from "@/types/commercial-config";
 import type { SaveLeadInput } from "@/types/lead";
 import type { Plan } from "@/types/lead";
+import { isOfferConfigured } from "@/lib/commercial-plan-offer";
 import {
   extractPlanServiceBenefitSegments,
 } from "@/lib/sales-script/teleprompter/plan-benefits-speech";
@@ -23,23 +24,6 @@ export function commercialPlansToAdvisorOptions(plans: CommercialPlan[]): Plan[]
 function lineLabel(index: number, isMain: boolean): string {
   if (isMain) return "la línea principal";
   return `la línea adicional ${index + 1}`;
-}
-
-function isOfferConfigured(offer: PlanOffer): boolean {
-  return Boolean(
-    offer.dataAllowance.trim() ||
-      offer.unlimitedMinutes ||
-      offer.unlimitedSms ||
-      offer.freeApps ||
-      offer.roamingWhatsapp ||
-      offer.clubWom ||
-      offer.handsetCoupon?.enabled ||
-      offer.freeDeviceInstallments?.enabled ||
-      offer.pedidosYaPlus?.enabled ||
-      (offer.additionalLinePrice != null &&
-        offer.additionalLinePrice > 0 &&
-        offer.maxAdditionalLines > 0),
-  );
 }
 
 function planHasBenefitsForSpeech(plan: CommercialPlan): boolean {

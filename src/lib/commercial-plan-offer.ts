@@ -122,9 +122,34 @@ const OFFER_BY_PLAN_ID: Record<string, PlanOffer> = {
   "plan-m": PLAN_M_OFFER,
 };
 
+const OFFER_BY_PLAN_NAME: Record<string, PlanOffer> = {
+  "plan w": PLAN_W_OFFER,
+  "plan o": PLAN_O_OFFER,
+  "plan m": PLAN_M_OFFER,
+};
+
+/** Oferta con al menos un beneficio o condición comercial relevante. */
+export function isOfferConfigured(offer: PlanOffer): boolean {
+  return Boolean(
+    offer.dataAllowance.trim() ||
+      offer.unlimitedMinutes ||
+      offer.unlimitedSms ||
+      offer.freeApps ||
+      offer.roamingWhatsapp ||
+      offer.clubWom ||
+      offer.handsetCoupon?.enabled ||
+      offer.freeDeviceInstallments?.enabled ||
+      offer.pedidosYaPlus?.enabled ||
+      (offer.additionalLinePrice != null &&
+        offer.additionalLinePrice > 0 &&
+        offer.maxAdditionalLines > 0),
+  );
+}
+
 /** Migra datos legacy (specs / promotions / benefits) al modelo estructurado. */
 export function resolvePlanOffer(raw: {
   id: string;
+  name?: string;
   offer?: PlanOffer;
   specs?: {
     gb?: string;
@@ -141,8 +166,11 @@ export function resolvePlanOffer(raw: {
   promotions?: string[];
   additionalLineValue?: number;
 }): PlanOffer {
-  if (raw.offer) return raw.offer;
+  if (raw.offer && isOfferConfigured(raw.offer)) return raw.offer;
   if (OFFER_BY_PLAN_ID[raw.id]) return { ...OFFER_BY_PLAN_ID[raw.id] };
+
+  const nameKey = raw.name?.trim().toLowerCase();
+  if (nameKey && OFFER_BY_PLAN_NAME[nameKey]) return { ...OFFER_BY_PLAN_NAME[nameKey] };
 
   const specs = raw.specs;
   if (!specs) return { ...EMPTY_PLAN_OFFER };
