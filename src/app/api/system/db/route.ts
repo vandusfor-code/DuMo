@@ -90,7 +90,7 @@ export async function GET() {
       WHERE table_schema = 'public'
         AND table_name IN (
           'users', 'lead_conversations', 'lead_messages', 'app_config',
-          'accounting_expenses', 'sales', 'sale_lines', 'commission_payments', 'lead_gestiones'
+          'accounting_expenses', 'sales', 'sale_lines', 'commission_payments', 'lead_gestiones', 'crm_clients'
         )
       ORDER BY table_name
     `;
@@ -113,6 +113,13 @@ export async function GET() {
       autoAssignEnabled = null;
     }
     const msgCount = await sql`SELECT count(*)::int AS n FROM lead_messages`;
+    let crmClientsCount: number | null = null;
+    try {
+      const crmRows = await sql`SELECT count(*)::int AS n FROM crm_clients`;
+      crmClientsCount = crmRows[0]?.n ?? 0;
+    } catch {
+      crmClientsCount = null;
+    }
     // ¿Coinciden los conversation_id de los mensajes con los ids de las conversaciones?
     const orphanMsgs = await sql`
       SELECT count(*)::int AS n FROM lead_messages m
@@ -182,6 +189,7 @@ export async function GET() {
       activeAdvisors: activeAdvisors[0]?.n ?? 0,
       autoAssignEnabled,
       messages: msgCount[0]?.n ?? 0,
+      crmClients: crmClientsCount,
       conversationsWithMessages: convWithMsgs[0]?.n ?? 0,
       orphanMessages: orphanMsgs[0]?.n ?? 0,
     });

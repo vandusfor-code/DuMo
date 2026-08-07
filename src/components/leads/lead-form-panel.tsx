@@ -88,6 +88,8 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
           scriptUnavailableReason={saveLead.data?.scriptUnavailableReason ?? null}
           saleError={saveLead.data?.saleError ?? null}
           saleRegistered={Boolean(saveLead.data?.sale)}
+          clientError={saveLead.data?.clientError ?? null}
+          clientSaved={saveLead.data?.clientSaved ?? false}
           lastSaveAction={saveLead.data?.saveAction ?? null}
           onSaveSale={() => {
             saveModeRef.current = "sale";

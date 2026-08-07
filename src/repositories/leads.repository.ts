@@ -1,4 +1,5 @@
 import "server-only";
+import type { AdvisorScope } from "@/lib/advisor-scope";
 import type { LatestGestionDraft, Lead, Plan, SaveLeadInput } from "@/types/lead";
 import type { GeneratedSalesScript } from "@/types/sales-script";
 import type {
@@ -24,7 +25,7 @@ import { getSheetsClient, type GoogleSheetsClient } from "@/server/google/sheets
 
 export interface LeadRepository {
   getPlans(): Promise<Plan[]>;
-  saveLead(input: SaveLeadInput): Promise<Lead>;
+  saveLead(input: SaveLeadInput, scope?: AdvisorScope | null): Promise<Lead>;
   saveSalesScript(gestionId: string, script: GeneratedSalesScript): Promise<void>;
   getLatestSalesScript(conversationId: string): Promise<GeneratedSalesScript | null>;
   getSalesScriptByGestionId(gestionId: string): Promise<GeneratedSalesScript | null>;
@@ -70,7 +71,7 @@ class MockLeadRepository implements LeadRepository {
   async getPlans() {
     return withLatency(await commercialPlansService.getAdvisorPlanOptions());
   }
-  saveLead(input: SaveLeadInput) {
+  saveLead(input: SaveLeadInput, _scope?: AdvisorScope | null) {
     return withLatency(buildLead(`LEAD-${Date.now()}`, input));
   }
 
@@ -177,7 +178,7 @@ class SheetsLeadRepository implements LeadRepository {
     return commercialPlansService.getAdvisorPlanOptions();
   }
 
-  async saveLead(input: SaveLeadInput): Promise<Lead> {
+  async saveLead(input: SaveLeadInput, _scope?: AdvisorScope | null): Promise<Lead> {
     const id = `LEAD-${Date.now()}`;
     const lead = buildLead(id, input);
 

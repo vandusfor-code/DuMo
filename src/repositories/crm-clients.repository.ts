@@ -47,6 +47,7 @@ export interface CrmClientsRepository {
     advisorName: string;
     hasSale: boolean;
   }): Promise<void>;
+  syncFromGestiones(scope: AdvisorScope): Promise<void>;
   list(scope: AdvisorScope | null, filters?: CrmClientFilters): Promise<CrmClient[]>;
 }
 
@@ -63,7 +64,7 @@ class PostgresCrmClientsRepository implements CrmClientsRepository {
   }): Promise<void> {
     await ensureSchema();
     const sql = getSql();
-    if (!sql) return;
+    if (!sql) throw new Error("Base de datos no configurada");
 
     const id = `CRM-${input.conversationId}-${input.advisorId}`;
     const now = new Date().toISOString();
@@ -90,6 +91,59 @@ class PostgresCrmClientsRepository implements CrmClientsRepository {
     );
   }
 
+  async syncFromGestiones(scope: AdvisorScope): Promise<void> {
+    await ensureSchema();
+    const sql = getSql();
+    if (!sql) return;
+
+    await withDbRetry(() =>
+      sql`
+        INSERT INTO crm_clients (
+          id, conversation_id, customer_name, rut, phone, gestion_type,
+          advisor_id, advisor_name, has_sale, updated_at, created_at
+        )
+        SELECT
+          'CRM-' || g.conversation_id || '-' || ${scope.id},
+          g.conversation_id,
+          g.customer_name,
+          g.rut,
+          g.phone,
+          g.gestion_type,
+          ${scope.id},
+          ${scope.name},
+          (g.gestion_type = 'venta'),
+          g.created_at,
+          g.created_at
+        FROM (
+          SELECT DISTINCT ON (g.conversation_id)
+            g.conversation_id,
+            g.customer_name,
+            g.rut,
+            g.phone,
+            g.gestion_type,
+            g.created_at
+          FROM lead_gestiones g
+          LEFT JOIN lead_conversations c ON c.id = g.conversation_id
+          WHERE g.advisor_id = ${scope.id}
+             OR g.advisor_name = ${scope.name}
+             OR (
+               (g.advisor_id IS NULL OR g.advisor_id = '')
+               AND c.assigned_advisor_id = ${scope.id}
+             )
+          ORDER BY g.conversation_id, g.created_at DESC
+        ) g
+        ON CONFLICT (conversation_id, advisor_id) DO UPDATE SET
+          customer_name = EXCLUDED.customer_name,
+          rut = EXCLUDED.rut,
+          phone = EXCLUDED.phone,
+          gestion_type = EXCLUDED.gestion_type,
+          advisor_name = EXCLUDED.advisor_name,
+          has_sale = crm_clients.has_sale OR EXCLUDED.has_sale,
+          updated_at = GREATEST(crm_clients.updated_at, EXCLUDED.updated_at)
+      `,
+    );
+  }
+
   async list(scope: AdvisorScope | null, filters: CrmClientFilters = {}): Promise<CrmClient[]> {
     await ensureSchema();
     const sql = getSql();
@@ -98,28 +152,98 @@ class PostgresCrmClientsRepository implements CrmClientsRepository {
     const search = filters.search?.trim() ?? "";
     const from = filters.from?.trim() ?? "";
     const to = filters.to?.trim() ?? "";
-    const searchPattern = search ? `%${search}%` : null;
+    const searchLike = search ? `%${search}%` : null;
 
-    const rows = await withDbRetry(() =>
-      scope
-        ? sql<ClientRow[]>`
-            SELECT *
-            FROM crm_clients
-            WHERE advisor_id = ${scope.id}
-              AND (${searchPattern}::text IS NULL OR customer_name ILIKE ${searchPattern} OR rut ILIKE ${searchPattern})
-              AND (${from} = '' OR updated_at::date >= ${from}::date)
-              AND (${to} = '' OR updated_at::date <= ${to}::date)
-            ORDER BY updated_at DESC
-          `
-        : sql<ClientRow[]>`
-            SELECT *
-            FROM crm_clients
-            WHERE (${searchPattern}::text IS NULL OR customer_name ILIKE ${searchPattern} OR rut ILIKE ${searchPattern})
-              AND (${from} = '' OR updated_at::date >= ${from}::date)
-              AND (${to} = '' OR updated_at::date <= ${to}::date)
-            ORDER BY updated_at DESC
-          `,
-    );
+    const rows = await withDbRetry(() => {
+      if (scope && searchLike && from && to) {
+        return sql<ClientRow[]>`
+          SELECT * FROM crm_clients
+          WHERE advisor_id = ${scope.id}
+            AND (customer_name ILIKE ${searchLike} OR rut ILIKE ${searchLike})
+            AND updated_at::date >= ${from}::date
+            AND updated_at::date <= ${to}::date
+          ORDER BY updated_at DESC
+        `;
+      }
+      if (scope && searchLike && from) {
+        return sql<ClientRow[]>`
+          SELECT * FROM crm_clients
+          WHERE advisor_id = ${scope.id}
+            AND (customer_name ILIKE ${searchLike} OR rut ILIKE ${searchLike})
+            AND updated_at::date >= ${from}::date
+          ORDER BY updated_at DESC
+        `;
+      }
+      if (scope && searchLike && to) {
+        return sql<ClientRow[]>`
+          SELECT * FROM crm_clients
+          WHERE advisor_id = ${scope.id}
+            AND (customer_name ILIKE ${searchLike} OR rut ILIKE ${searchLike})
+            AND updated_at::date <= ${to}::date
+          ORDER BY updated_at DESC
+        `;
+      }
+      if (scope && searchLike) {
+        return sql<ClientRow[]>`
+          SELECT * FROM crm_clients
+          WHERE advisor_id = ${scope.id}
+            AND (customer_name ILIKE ${searchLike} OR rut ILIKE ${searchLike})
+          ORDER BY updated_at DESC
+        `;
+      }
+      if (scope && from && to) {
+        return sql<ClientRow[]>`
+          SELECT * FROM crm_clients
+          WHERE advisor_id = ${scope.id}
+            AND updated_at::date >= ${from}::date
+            AND updated_at::date <= ${to}::date
+          ORDER BY updated_at DESC
+        `;
+      }
+      if (scope && from) {
+        return sql<ClientRow[]>`
+          SELECT * FROM crm_clients
+          WHERE advisor_id = ${scope.id}
+            AND updated_at::date >= ${from}::date
+          ORDER BY updated_at DESC
+        `;
+      }
+      if (scope && to) {
+        return sql<ClientRow[]>`
+          SELECT * FROM crm_clients
+          WHERE advisor_id = ${scope.id}
+            AND updated_at::date <= ${to}::date
+          ORDER BY updated_at DESC
+        `;
+      }
+      if (scope) {
+        return sql<ClientRow[]>`
+          SELECT * FROM crm_clients
+          WHERE advisor_id = ${scope.id}
+          ORDER BY updated_at DESC
+        `;
+      }
+      if (searchLike && from && to) {
+        return sql<ClientRow[]>`
+          SELECT * FROM crm_clients
+          WHERE (customer_name ILIKE ${searchLike} OR rut ILIKE ${searchLike})
+            AND updated_at::date >= ${from}::date
+            AND updated_at::date <= ${to}::date
+          ORDER BY updated_at DESC
+        `;
+      }
+      if (searchLike) {
+        return sql<ClientRow[]>`
+          SELECT * FROM crm_clients
+          WHERE customer_name ILIKE ${searchLike} OR rut ILIKE ${searchLike}
+          ORDER BY updated_at DESC
+        `;
+      }
+      return sql<ClientRow[]>`
+        SELECT * FROM crm_clients
+        ORDER BY updated_at DESC
+      `;
+    });
 
     return rows.map(rowToClient);
   }
@@ -156,6 +280,10 @@ class MockCrmClientsRepository implements CrmClientsRepository {
     };
     if (idx >= 0) this.store[idx] = row;
     else this.store.unshift(row);
+  }
+
+  async syncFromGestiones(_scope: AdvisorScope): Promise<void> {
+    /* mock: no-op */
   }
 
   list(scope: AdvisorScope | null, filters: CrmClientFilters = {}): Promise<CrmClient[]> {

@@ -18,6 +18,10 @@ export const crmClientsService = {
     return getCrmClientsRepository().upsert(input);
   },
 
+  syncFromGestiones(scope: AdvisorScope) {
+    return getCrmClientsRepository().syncFromGestiones(scope);
+  },
+
   list(scope: AdvisorScope | null, filters?: CrmClientFilters): Promise<CrmClient[]> {
     return getCrmClientsRepository().list(scope, filters);
   },

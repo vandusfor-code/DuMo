@@ -1,4 +1,5 @@
 import "server-only";
+import type { AdvisorScope } from "@/lib/advisor-scope";
 import type { LatestGestionDraft, Lead, LeadType, Plan, SaveLeadInput } from "@/types/lead";
 import type { GeneratedSalesScript } from "@/types/sales-script";
 import type {
@@ -38,7 +39,7 @@ export class PostgresLeadRepository {
     return commercialPlansService.getAdvisorPlanOptions();
   }
 
-  async saveLead(input: SaveLeadInput): Promise<Lead> {
+  async saveLead(input: SaveLeadInput, scope?: AdvisorScope | null): Promise<Lead> {
     await ensureSchema();
     const sql = getSql();
     if (!sql) throw new Error("Base de datos no configurada");
@@ -47,8 +48,10 @@ export class PostgresLeadRepository {
     const now = new Date().toISOString();
     const adminLeads = getAdminLeadsRepository();
     const detail = await adminLeads.getDetail(input.conversationId).catch(() => null);
-    const advisorId = detail?.conversation.assignedAdvisor?.id ?? "";
-    const advisorName = detail?.conversation.assignedAdvisor?.name ?? "";
+    const advisorId =
+      scope?.id ?? detail?.conversation.assignedAdvisor?.id ?? "";
+    const advisorName =
+      scope?.name ?? detail?.conversation.assignedAdvisor?.name ?? "";
 
     await withDbRetry(() =>
       sql`

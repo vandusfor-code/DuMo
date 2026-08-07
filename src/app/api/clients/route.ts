@@ -16,6 +16,12 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = request.nextUrl;
+    try {
+      await crmClientsService.syncFromGestiones(scope);
+    } catch (error) {
+      console.error("[GET /api/clients] syncFromGestiones", error);
+    }
+
     const clients = await crmClientsService.list(scope, {
       search: searchParams.get("search") ?? undefined,
       from: searchParams.get("from") ?? undefined,

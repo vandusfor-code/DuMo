@@ -116,4 +116,7 @@ export type SaveLeadResult = {
   sale?: import("./sale").SaleDetail | null;
   saleError?: string | null;
   saveAction?: import("./crm-client").SaveLeadAction;
+  /** true si el cliente quedó en la cartera CRM (pantalla Clientes). */
+  clientSaved?: boolean;
+  clientError?: string | null;
 };

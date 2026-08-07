@@ -24,12 +24,14 @@ export async function saveLeadWithScript(
   input: SaveLeadInput,
   scope?: AdvisorScope | null,
 ): Promise<SaveLeadResult> {
-  const lead = await getLeadRepository().saveLead(input);
+  const lead = await getLeadRepository().saveLead(input, scope);
   const advisor = scope ? { name: scope.name, email: "" } : undefined;
   let script = null;
   let scriptUnavailableReason: string | null = null;
   let sale = null;
   let saleError: string | null = null;
+  let clientSaved = false;
+  let clientError: string | null = null;
 
   const saveAction: SaveLeadAction =
     input.saveAction ?? (input.registerSale ? "sale" : "script");
@@ -126,9 +128,15 @@ export async function saveLeadWithScript(
         advisorName: scope.name,
         hasSale: Boolean(sale),
       });
+      clientSaved = true;
     } catch (error) {
       console.error("[saveLeadWithScript] crm client upsert failed", error);
+      clientError =
+        "La gestión se guardó, pero no se pudo registrar en Clientes. Revisa la pantalla Clientes en unos segundos.";
     }
+  } else {
+    clientError =
+      "La gestión se guardó, pero no se pudo vincular a tu cartera (sesión sin rol de asesora).";
   }
 
   const result: SaveLeadResult = {
@@ -138,6 +146,8 @@ export async function saveLeadWithScript(
     sale,
     saleError,
     saveAction,
+    clientSaved,
+    clientError,
   };
 
   logScriptSaveCheckpoint("saveLeadWithScript · antes de responder", {

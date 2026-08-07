@@ -45,6 +45,8 @@ export function LeadPanel({
   saleError,
   saleRegistered = false,
   lastSaveAction = null,
+  clientError,
+  clientSaved = false,
   onSaveSale,
   onGenerateScript,
   onTipify,
@@ -64,6 +66,8 @@ export function LeadPanel({
   saleError?: string | null;
   saleRegistered?: boolean;
   lastSaveAction?: SaveLeadAction | null;
+  clientError?: string | null;
+  clientSaved?: boolean;
 }) {
   const { control } = useFormContext<LeadFormValues>();
   const type = useWatch({ control, name: "type" });
@@ -159,17 +163,25 @@ export function LeadPanel({
                 <span>{errorMessage || "No se pudo guardar la gestión. Intenta nuevamente."}</span>
               </div>
             )}
+            {isSuccess && clientError ? (
+              <div className="flex items-start gap-2.5 rounded-card border border-warning/20 bg-warning-soft px-4 py-3 text-[13px] text-warning-ink">
+                <AlertCircle className="mt-0.5 size-[18px] shrink-0" />
+                <span>{clientError}</span>
+              </div>
+            ) : null}
             {isSuccess && saleError ? (
               <div className="flex items-start gap-2.5 rounded-card border border-warning/20 bg-warning-soft px-4 py-3 text-[13px] text-warning-ink">
                 <AlertCircle className="mt-0.5 size-[18px] shrink-0" />
                 <span>{saleError}</span>
               </div>
             ) : null}
-            {isSuccess && (
+            {isSuccess && !clientError && (
               <div className="flex items-center gap-2.5 rounded-card border border-success/20 bg-success-soft px-4 py-3 text-[13px] text-success-ink">
                 <CheckCircle2 className="size-[18px]" />
                 {lastSaveAction === "tipify"
-                  ? "Cliente tipificado correctamente. Ya aparece en Clientes."
+                  ? clientSaved
+                    ? "Cliente tipificado correctamente. Ya aparece en Clientes."
+                    : "Gestión guardada correctamente."
                   : saleRegistered
                     ? script
                       ? "Venta guardada en Mis Ventas. El script de la llamada ya está disponible."
@@ -178,7 +190,9 @@ export function LeadPanel({
                       ? "Gestión guardada. El script de la llamada ya está disponible."
                       : isVenta
                         ? "Gestión guardada correctamente."
-                        : "Cliente tipificado correctamente. Ya aparece en Clientes."}
+                        : clientSaved
+                          ? "Cliente tipificado correctamente. Ya aparece en Clientes."
+                          : "Gestión guardada correctamente."}
               </div>
             )}
             <ActionButtons
