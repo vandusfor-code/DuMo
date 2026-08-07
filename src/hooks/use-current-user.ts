@@ -3,7 +3,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "@/lib/api-client";
 import { saveClientToken } from "@/lib/auth/client-token";
-import { CURRENT_USER } from "@/lib/session";
 import type { User } from "@/types/user";
 
 export const userKeys = {
@@ -29,12 +28,5 @@ export function useCurrentUser() {
     },
     retry: 1,
     staleTime: 60_000,
-    placeholderData: {
-      id: "me",
-      name: CURRENT_USER.name,
-      role: CURRENT_USER.role,
-      avatarUrl: CURRENT_USER.avatarUrl,
-      email: "",
-    } satisfies User,
   });
 }

@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { authUserToPublicUser } from "@/repositories/auth.repository";
 import { authService } from "@/services/auth.service";
@@ -21,12 +22,13 @@ export async function GET(request: NextRequest) {
       request.headers.get("x-forwarded-proto"),
       request.nextUrl.protocol,
     );
-    const res = NextResponse.json({
+    const cookieStore = await cookies();
+    cookieStore.set(SESSION_COOKIE, token, sessionCookieOptions(secure));
+
+    return NextResponse.json({
       ...authUserToPublicUser(user),
       sessionToken: token,
     });
-    res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions(secure));
-    return res;
   } catch (error) {
     console.error("[GET /api/users/me]", error);
     return NextResponse.json({ error: "No autenticado." }, { status: 401 });

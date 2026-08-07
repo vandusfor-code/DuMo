@@ -44,12 +44,8 @@ export async function middleware(request: NextRequest) {
 
   if (!needsAuth) return NextResponse.next();
 
-  const cookieToken = request.cookies.get(SESSION_COOKIE)?.value;
-  const headerToken = request.headers
-    .get("authorization")
-    ?.replace(/^Bearer\s+/i, "")
-    .trim();
-  const token = cookieToken || headerToken;
+  // En recarga (F5) solo viaja la cookie HttpOnly — no el Bearer de fetch.
+  const token = readSessionToken(request);
   const payload = token ? await verifySessionTokenEdge(token) : null;
 
   if (!payload) {
@@ -63,7 +59,7 @@ export async function middleware(request: NextRequest) {
 
   const role = payload.role;
   if (!role) {
-    return refreshSessionCookie(request, payload, token!);
+    return refreshSessionCookie(request, payload);
   }
 
   const isAsesora = role === "asesora";
@@ -79,19 +75,34 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(home, request.url));
   }
 
-  return refreshSessionCookie(request, payload, token!);
+  return refreshSessionCookie(request, payload);
 }
 
-/**
- * Extiende la cookie en cada navegación de página. Renueva el JWT solo cuando
- * está cerca de expirar — la sesión no caduca por inactividad.
- */
+/** Cookie HttpOnly (recargas) con respaldo Bearer en peticiones fetch del cliente. */
+function readSessionToken(request: NextRequest): string | undefined {
+  const cookieToken = request.cookies.get(SESSION_COOKIE)?.value?.trim();
+  if (cookieToken) return cookieToken;
+
+  const headerToken = request.headers
+    .get("authorization")
+    ?.replace(/^Bearer\s+/i, "")
+    .trim();
+  return headerToken || undefined;
+}
+
 async function refreshSessionCookie(
   request: NextRequest,
   payload: EdgeSessionPayload,
-  currentToken: string,
 ): Promise<NextResponse> {
   if (request.nextUrl.pathname.startsWith("/api/")) {
+    return NextResponse.next();
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const shouldRenew = payload.exp - now < SESSION_RENEW_BEFORE_SEC;
+  // No reescribir la cookie en cada navegación: evita condiciones de carrera
+  // al recargar cuando varias peticiones paralelas tocan la misma sesión.
+  if (!shouldRenew) {
     return NextResponse.next();
   }
 
@@ -99,11 +110,7 @@ async function refreshSessionCookie(
     request.headers.get("x-forwarded-proto"),
     request.nextUrl.protocol,
   );
-  const now = Math.floor(Date.now() / 1000);
-  const shouldRenew = payload.exp - now < SESSION_RENEW_BEFORE_SEC;
-  const token = shouldRenew
-    ? await createSessionTokenEdge(payload.userId, payload.role, payload.companyId)
-    : currentToken;
+  const token = await createSessionTokenEdge(payload.userId, payload.role, payload.companyId);
 
   const res = NextResponse.next();
   res.cookies.set(SESSION_COOKIE, token, sessionCookieOptionsEdge(secure));

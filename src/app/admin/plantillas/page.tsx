@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Pin, Plus, Trash2 } from "lucide-react";
+import { Pencil, Pin, Plus, Trash2 } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ErrorState } from "@/components/shared/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,8 +14,9 @@ import {
   useQuickReplyCategories,
   useQuickReplyTemplates,
   useToggleQuickReplyPin,
+  useUpdateQuickReplyTemplate,
 } from "@/hooks/use-quick-replies";
-import type { CreateQuickReplyTemplateInput, QuickReplyTemplate } from "@/types/quick-reply";
+import type { CreateQuickReplyTemplateInput, QuickReplyTemplate, UpdateQuickReplyTemplateInput } from "@/types/quick-reply";
 import { cn } from "@/lib/utils";
 
 export default function AdminPlantillasPage() {
@@ -28,9 +29,11 @@ export default function AdminPlantillasPage() {
   });
   const createCategory = useCreateQuickReplyCategory();
   const createTemplate = useCreateQuickReplyTemplate();
+  const updateTemplate = useUpdateQuickReplyTemplate();
   const deleteTemplate = useDeleteQuickReplyTemplate();
   const togglePin = useToggleQuickReplyPin();
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editing, setEditing] = useState<QuickReplyTemplate | null>(null);
 
   const filtered = useMemo(() => {
     return templates
@@ -92,7 +95,7 @@ export default function AdminPlantillasPage() {
           >
             Nueva categoría
           </Button>
-          <Button onClick={() => setDialogOpen(true)}>
+          <Button onClick={() => setCreateOpen(true)}>
             <Plus className="size-4" />
             Crear plantilla
           </Button>
@@ -113,6 +116,7 @@ export default function AdminPlantillasPage() {
             onTogglePin={() =>
               togglePin.mutate({ id: t.id, favorite: !t.favorite })
             }
+            onEdit={() => setEditing(t)}
             onDelete={() => deleteTemplate.mutate(t.id)}
           />
         ))}
@@ -123,13 +127,25 @@ export default function AdminPlantillasPage() {
         ) : null}
       </div>
 
-      {dialogOpen ? (
-        <QuickCreateDialog
+      {createOpen ? (
+        <TemplateFormDialog
           categories={categories}
-          onClose={() => setDialogOpen(false)}
+          onClose={() => setCreateOpen(false)}
           onSave={async (input) => {
             await createTemplate.mutateAsync(input);
-            setDialogOpen(false);
+            setCreateOpen(false);
+          }}
+        />
+      ) : null}
+
+      {editing ? (
+        <TemplateFormDialog
+          template={editing}
+          categories={categories}
+          onClose={() => setEditing(null)}
+          onSave={async (input) => {
+            await updateTemplate.mutateAsync({ id: editing.id, data: input as UpdateQuickReplyTemplateInput });
+            setEditing(null);
           }}
         />
       ) : null}
@@ -141,11 +157,13 @@ function TemplateRow({
   template,
   pinLoading,
   onTogglePin,
+  onEdit,
   onDelete,
 }: {
   template: QuickReplyTemplate;
   pinLoading: boolean;
   onTogglePin: () => void;
+  onEdit: () => void;
   onDelete: () => void;
 }) {
   const preview =
@@ -197,6 +215,15 @@ function TemplateRow({
         </button>
         <button
           type="button"
+          aria-label="Editar"
+          title="Editar plantilla"
+          onClick={onEdit}
+          className="grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-brand-soft hover:text-brand"
+        >
+          <Pencil className="size-4" />
+        </button>
+        <button
+          type="button"
           aria-label="Eliminar"
           onClick={onDelete}
           className="grid size-9 place-items-center rounded-lg text-danger-ink hover:bg-danger-soft"
@@ -208,26 +235,33 @@ function TemplateRow({
   );
 }
 
-function QuickCreateDialog({
+function TemplateFormDialog({
+  template,
   categories,
   onClose,
   onSave,
 }: {
+  template?: QuickReplyTemplate;
   categories: { id: string; name: string }[];
   onClose: () => void;
   onSave: (input: CreateQuickReplyTemplateInput) => Promise<void>;
 }) {
-  const [name, setName] = useState("");
-  const [shortcut, setShortcut] = useState("");
-  const [categoryId, setCategoryId] = useState(categories[0]?.id ?? "");
-  const [textBody, setTextBody] = useState("");
-  const [pinByDefault, setPinByDefault] = useState(true);
+  const isEdit = Boolean(template);
+  const firstTextItem = template?.activeVersion?.items?.find((i) => i.itemKind === "text");
+
+  const [name, setName] = useState(template?.name ?? "");
+  const [shortcut, setShortcut] = useState(template?.shortcut ?? "");
+  const [categoryId, setCategoryId] = useState(template?.categoryId ?? categories[0]?.id ?? "");
+  const [textBody, setTextBody] = useState(firstTextItem?.textBody ?? "");
+  const [pinInChat, setPinInChat] = useState(template?.favorite ?? true);
   const [saving, setSaving] = useState(false);
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
       <Card className="w-full max-w-lg p-6">
-        <h3 className="text-[17px] font-semibold text-ink">Nueva plantilla de texto</h3>
+        <h3 className="text-[17px] font-semibold text-ink">
+          {isEdit ? "Editar plantilla" : "Nueva plantilla de texto"}
+        </h3>
         <div className="mt-4 space-y-3">
           <input
             value={name}
@@ -261,11 +295,11 @@ function QuickCreateDialog({
           <label className="flex cursor-pointer items-center gap-2 text-[14px] text-ink">
             <input
               type="checkbox"
-              checked={pinByDefault}
-              onChange={(e) => setPinByDefault(e.target.checked)}
+              checked={pinInChat}
+              onChange={(e) => setPinInChat(e.target.checked)}
               className="size-4 accent-brand"
             />
-            Fijar en el chat al crear
+            Fijar en el chat
           </label>
         </div>
         <div className="mt-5 flex justify-end gap-2">
@@ -281,7 +315,7 @@ function QuickCreateDialog({
                   name: name.trim(),
                   shortcut,
                   categoryId,
-                  favorite: pinByDefault,
+                  favorite: pinInChat,
                   items: [{ sortOrder: 1, itemKind: "text", textBody: textBody.trim() }],
                 });
               } finally {
@@ -289,7 +323,7 @@ function QuickCreateDialog({
               }
             }}
           >
-            Guardar
+            {isEdit ? "Guardar cambios" : "Guardar"}
           </Button>
         </div>
       </Card>

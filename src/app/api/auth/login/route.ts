@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { authService } from "@/services/auth.service";
 import { authUserToPublicUser } from "@/repositories/auth.repository";
@@ -34,15 +35,18 @@ export async function POST(request: NextRequest) {
       request.headers.get("x-forwarded-proto"),
       request.nextUrl.protocol,
     );
-    const res = NextResponse.json({
+    // Next.js 15: escribir la cookie vía cookies() garantiza el Set-Cookie
+    // en la respuesta antes de que el cliente redirija tras el login.
+    const cookieStore = await cookies();
+    cookieStore.set(SESSION_COOKIE, token, sessionCookieOptions(secure));
+
+    return NextResponse.json({
       user: authUserToPublicUser(result.user),
       redirectTo: result.redirectTo,
       // Respaldo para navegadores que no guardan la cookie: el cliente lo
       // manda como Authorization: Bearer en cada petición.
       token,
     });
-    res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions(secure));
-    return res;
   } catch (error) {
     console.error("[POST /api/auth/login]", error);
     return NextResponse.json({ error: "No se pudo iniciar sesión." }, { status: 500 });
