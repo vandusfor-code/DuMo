@@ -59,11 +59,28 @@ export async function verifySessionTokenEdge(
   try {
     const payload = JSON.parse(fromBase64Url(body)) as EdgeSessionPayload;
     if (!payload.userId || !payload.exp) return null;
-    if (payload.exp < Math.floor(Date.now() / 1000)) return null;
+    if (isSessionTokenExpired(payload)) return null;
     return payload;
   } catch {
     return null;
   }
+}
+
+/** Decodifica el payload sin verificar firma (solo para decidir expiración en middleware). */
+export function peekSessionTokenPayload(token: string): EdgeSessionPayload | null {
+  const dot = token.lastIndexOf(".");
+  if (dot <= 0) return null;
+  try {
+    const payload = JSON.parse(fromBase64Url(token.slice(0, dot))) as EdgeSessionPayload;
+    if (!payload.userId || !payload.exp) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+export function isSessionTokenExpired(payload: EdgeSessionPayload): boolean {
+  return payload.exp < Math.floor(Date.now() / 1000);
 }
 
 export async function createSessionTokenEdge(
