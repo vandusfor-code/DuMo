@@ -3,8 +3,8 @@ import type { ScriptBlockFieldState, ScriptFlowKey, ScriptOverrideMap } from "@/
 import {
   buildDefaultTemplateForField,
   buildFlowCatalog,
-  getScriptFlowCatalog,
 } from "@/lib/sales-script/cms/default-templates";
+import { SCRIPT_FLOW_DEFINITIONS } from "@/lib/sales-script/cms/flow-registry";
 import { overridesFromRecords } from "@/lib/sales-script/cms/override-applicator";
 import {
   extractTokensFromTemplate,
@@ -19,10 +19,9 @@ import {
 
 export const teleprompterScriptService = {
   listFlows() {
-    return getScriptFlowCatalog().map(({ flowKey, title, blocks }) => ({
+    return SCRIPT_FLOW_DEFINITIONS.map(({ flowKey, title }) => ({
       flowKey,
       title,
-      blockCount: blocks.length,
     }));
   },
 
@@ -44,29 +43,20 @@ export const teleprompterScriptService = {
     }
 
     const defaults = buildDefaultTemplateForField(input);
-    if (!hasTeleprompterScriptDatabase()) {
-      return {
-        flowKey: input.flowKey,
-        blockId: input.blockId,
-        fieldKey: input.fieldKey,
-        label: field.label,
-        defaultTemplate: defaults.defaultTemplate,
-        requiredTokens: defaults.requiredTokens,
-        currentTemplate: defaults.defaultTemplate,
-        isCustom: false,
-        versionNumber: 0,
-        updatedAt: null,
-        updatedBy: null,
-        overrideId: null,
-      };
-    }
 
-    const override = await teleprompterScriptRepository.getOverride(
-      input.companyId,
-      input.flowKey,
-      input.blockId,
-      input.fieldKey,
-    );
+    let override = null;
+    if (hasTeleprompterScriptDatabase()) {
+      try {
+        override = await teleprompterScriptRepository.getOverride(
+          input.companyId,
+          input.flowKey,
+          input.blockId,
+          input.fieldKey,
+        );
+      } catch (error) {
+        console.error("[teleprompterScriptService.getFieldState] DB read failed", error);
+      }
+    }
 
     return {
       flowKey: input.flowKey,

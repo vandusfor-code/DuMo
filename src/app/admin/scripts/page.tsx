@@ -55,7 +55,7 @@ export default function AdminScriptsPage() {
     }
   }, [selectedBlock, fieldKey]);
 
-  const { data: fieldState, isLoading: loadingField } = useScriptField({
+  const { data: fieldState, isLoading: loadingField, isError: fieldError, refetch: refetchField } = useScriptField({
     flowKey,
     blockId,
     fieldKey,
@@ -155,6 +155,11 @@ export default function AdminScriptsPage() {
             <div className="flex flex-1 items-center justify-center text-muted">
               Selecciona un bloque para editar su discurso.
             </div>
+          ) : fieldError ? (
+            <ErrorState
+              title="No se pudo cargar el bloque"
+              onRetry={() => refetchField()}
+            />
           ) : loadingField || !fieldState ? (
             <div className="space-y-4">
               <Skeleton className="h-8 w-64" />

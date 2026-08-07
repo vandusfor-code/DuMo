@@ -10,7 +10,6 @@ import type {
 type FlowSummary = {
   flowKey: ScriptFlowKey;
   title: string;
-  blockCount: number;
 };
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {

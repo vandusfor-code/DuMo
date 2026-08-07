@@ -213,8 +213,19 @@ async function ensureIncrementalMigrations(sql: Sql): Promise<void> {
         WHERE table_schema = 'public' AND table_name = 'offer_simulations'
       ) AS exists
     `;
-    if (rows[0]?.exists) return;
-    await ensureOfferSimulationsTable(sql);
+    if (!rows[0]?.exists) {
+      await ensureOfferSimulationsTable(sql);
+    }
+
+    const teleprompterRows = await sql<{ exists: boolean }[]>`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'teleprompter_script_overrides'
+      ) AS exists
+    `;
+    if (!teleprompterRows[0]?.exists) {
+      await runTeleprompterScriptMigrations(sql);
+    }
   } catch (err) {
     console.error("[ensureIncrementalMigrations]", err);
   }
