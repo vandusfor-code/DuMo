@@ -1,9 +1,9 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import type { NextResponse } from "next/server";
 import { SESSION_COOKIE } from "./constants";
+import { SESSION_MAX_AGE_SEC } from "./session-constants";
 
 export { SESSION_COOKIE };
-const MAX_AGE_SEC = 60 * 60 * 24 * 7; // 7 días
 
 export type SessionPayload = {
   userId: string;
@@ -23,7 +23,7 @@ export function createSessionToken(userId: string, role?: string, companyId?: st
     userId,
     role,
     companyId,
-    exp: Math.floor(Date.now() / 1000) + MAX_AGE_SEC,
+    exp: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SEC,
   };
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
   const sig = createHmac("sha256", secret()).update(body).digest("base64url");
@@ -57,7 +57,7 @@ export function sessionCookieOptions(secure?: boolean) {
     secure: useSecure,
     sameSite: "lax" as const,
     path: "/",
-    maxAge: MAX_AGE_SEC,
+    maxAge: SESSION_MAX_AGE_SEC,
   };
 }
 

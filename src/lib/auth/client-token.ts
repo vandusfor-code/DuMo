@@ -1,9 +1,10 @@
 /**
- * Respaldo de sesión para navegadores que no guardan la cookie.
+ * Respaldo de sesión para peticiones fetch (Authorization: Bearer).
  *
- * La cookie httpOnly sigue siendo el mecanismo principal; esto solo entra en
- * juego cuando el navegador la bloquea (extensiones, bloqueo de cookies,
- * modos restringidos). El token es el mismo que firma el servidor.
+ * La cookie httpOnly es el mecanismo principal en navegación y recargas.
+ * localStorage solo complementa fetch cuando hace falta — NUNCA escribimos
+ * otra cookie `dumo_session` desde JS: chocaba con la httpOnly del servidor
+ * y provocaba cierres de sesión al recargar o cambiar de pantalla.
  */
 const KEY = "dumo_token";
 
@@ -13,14 +14,6 @@ export function saveClientToken(token: string | undefined | null) {
     window.localStorage.setItem(KEY, token);
   } catch {
     /* almacenamiento no disponible */
-  }
-  // También se escribe como cookie desde el navegador: al recargar la página
-  // no se envían cabeceras, así que sin esto una recarga volvería al login.
-  try {
-    const secure = window.location.protocol === "https:" ? "; Secure" : "";
-    document.cookie = `dumo_session=${token}; path=/; max-age=604800; SameSite=Lax${secure}`;
-  } catch {
-    /* cookies bloqueadas: queda el respaldo por cabecera */
   }
 }
 
@@ -39,11 +32,6 @@ export function clearClientToken() {
     window.localStorage.removeItem(KEY);
   } catch {
     /* almacenamiento no disponible */
-  }
-  try {
-    document.cookie = "dumo_session=; path=/; max-age=0";
-  } catch {
-    /* nada que limpiar */
   }
 }
 

@@ -1,8 +1,7 @@
 import { SESSION_COOKIE } from "./constants";
+import { SESSION_MAX_AGE_SEC } from "./session-constants";
 
 export { SESSION_COOKIE };
-
-const MAX_AGE_SEC = 60 * 60 * 24 * 7;
 
 function secret(): string {
   return process.env.AUTH_SECRET ?? "dumo-dev-auth-secret-change-in-production";
@@ -76,7 +75,7 @@ export async function createSessionTokenEdge(
     userId,
     role,
     companyId,
-    exp: Math.floor(Date.now() / 1000) + MAX_AGE_SEC,
+    exp: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SEC,
   };
   const body = toBase64Url(new TextEncoder().encode(JSON.stringify(payload)));
   const sig = await sign(body);
@@ -94,6 +93,6 @@ export function sessionCookieOptionsEdge(secure: boolean) {
     secure,
     sameSite: "lax" as const,
     path: "/",
-    maxAge: MAX_AGE_SEC,
+    maxAge: SESSION_MAX_AGE_SEC,
   };
 }

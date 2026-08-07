@@ -6,12 +6,15 @@ import {
   isSecureRequest,
   sessionCookieOptionsEdge,
   verifySessionTokenEdge,
+  type EdgeSessionPayload,
 } from "@/lib/auth/session-edge";
+import { SESSION_RENEW_BEFORE_SEC } from "@/lib/auth/session-constants";
 
 const PUBLIC_PREFIXES = [
   "/login",
   "/logout",
-  "/api/auth",
+  "/api/auth/login",
+  "/api/auth/logout",
   "/api/whatsapp/webhook",
   "/api/system",
 ];
@@ -41,10 +44,6 @@ export async function middleware(request: NextRequest) {
 
   if (!needsAuth) return NextResponse.next();
 
-  // La cookie es el mecanismo principal, pero algunos navegadores/contextos no
-  // la guardan (bloqueo de cookies, extensiones, modos restringidos). Para que
-  // la aplicación funcione igual, se acepta el mismo token firmado por la
-  // cabecera Authorization: Bearer.
   const cookieToken = request.cookies.get(SESSION_COOKIE)?.value;
   const headerToken = request.headers
     .get("authorization")
@@ -54,24 +53,17 @@ export async function middleware(request: NextRequest) {
   const payload = token ? await verifySessionTokenEdge(token) : null;
 
   if (!payload) {
-    // IMPORTANTE: NO se borra la cookie aquí. Antes, un solo 401 (un fallo
-    // puntual de verificación) destruía la sesión y el usuario quedaba fuera
-    // sin haber pulsado "Cerrar sesión". La cookie solo se borra en /logout.
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "No autenticado." }, { status: 401 });
     }
     const login = new URL("/login", request.url);
-    login.searchParams.set("next", pathname);
+    login.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
     return NextResponse.redirect(login);
   }
 
-  // ── Separación por rol ──────────────────────────────────────────────
-  // REGLA: la sesión solo termina cuando el usuario pulsa "Cerrar sesión".
-  // Si el token no trae rol (sesión emitida por un flujo antiguo), se deja
-  // pasar sin aplicar separación — NUNCA se cierra la sesión por eso.
   const role = payload.role;
   if (!role) {
-    return refreshSession(request, payload.userId, undefined);
+    return refreshSessionCookie(request, payload, token!);
   }
 
   const isAsesora = role === "asesora";
@@ -80,8 +72,6 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/admin") || pathname.startsWith("/api/admin");
   const wantsAdvisorArea = pathname.startsWith("/dashboard");
 
-  // Una asesora no entra al área admin; un admin/supervisor no usa el área de
-  // asesoras: cada quien va a su propio home.
   if ((isAsesora && wantsAdminArea) || (!isAsesora && wantsAdvisorArea)) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "No autorizado." }, { status: 403 });
@@ -89,28 +79,34 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(home, request.url));
   }
 
-  return refreshSession(request, payload.userId, role);
+  return refreshSessionCookie(request, payload, token!);
 }
 
 /**
- * Renueva la cookie de sesión en la navegación de páginas (no en cada fetch de
- * API) para que la sesión se mantenga viva mientras se usa la aplicación.
+ * Extiende la cookie en cada navegación de página. Renueva el JWT solo cuando
+ * está cerca de expirar — la sesión no caduca por inactividad.
  */
-async function refreshSession(
+async function refreshSessionCookie(
   request: NextRequest,
-  userId: string,
-  role: string | undefined,
+  payload: EdgeSessionPayload,
+  currentToken: string,
 ): Promise<NextResponse> {
   if (request.nextUrl.pathname.startsWith("/api/")) {
     return NextResponse.next();
   }
+
   const secure = isSecureRequest(
     request.headers.get("x-forwarded-proto"),
     request.nextUrl.protocol,
   );
-  const freshToken = await createSessionTokenEdge(userId, role);
+  const now = Math.floor(Date.now() / 1000);
+  const shouldRenew = payload.exp - now < SESSION_RENEW_BEFORE_SEC;
+  const token = shouldRenew
+    ? await createSessionTokenEdge(payload.userId, payload.role, payload.companyId)
+    : currentToken;
+
   const res = NextResponse.next();
-  res.cookies.set(SESSION_COOKIE, freshToken, sessionCookieOptionsEdge(secure));
+  res.cookies.set(SESSION_COOKIE, token, sessionCookieOptionsEdge(secure));
   return res;
 }
 
