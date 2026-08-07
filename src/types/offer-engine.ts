@@ -6,77 +6,67 @@ export const OFFER_SALE_TYPE_LABELS: Record<OfferSaleType, string> = {
   new_line: "Línea Nueva",
 };
 
-export type OfferSimulationStatus = "APPROVED" | "OPTIMIZED" | "REJECTED";
+/** Resumen de estado por tarjeta de plan. */
+export type OfferPlanCardStatus = "Aprobada" | "No viable";
 
-export type OfferOptimizationType =
-  | "NONE"
-  | "REMOVE_EQUIPMENT"
-  | "REDUCE_LINES"
-  | "REMOVE_EQUIPMENT_AND_REDUCE_LINES";
-
-export type OfferPlanSnapshot = {
-  planId: string;
-  planName: string;
-  fixedCharge: number;
-};
-
-export type OfferEquipmentSnapshot = {
-  equipmentId: string;
+export type OfferEligibleEquipment = {
+  id: string;
   commercialName: string;
   brand: string;
   model: string;
-  color?: string;
-  totalValue: number;
-  downPayment: number;
-  installmentsCount: number;
   installmentValue: number;
-} | null;
+};
+
+/** Una alternativa comercial evaluada automáticamente por plan. */
+export type OfferPlanAlternative = {
+  planId: string;
+  planName: string;
+  mainLineFixedCharge: number;
+  additionalLinesCount: number;
+  additionalLineUnitPrice: number;
+  additionalLinesTotal: number;
+  totalMonthlyFixed: number;
+  lineCredit: number;
+  consumedCredit: number;
+  remainingCredit: number;
+  viable: boolean;
+  statusLabel: OfferPlanCardStatus;
+  notViableReason?: string;
+  wantsEquipment: boolean;
+  maxEquipmentInstallment: number;
+  equipmentViable: boolean;
+  equipmentOnlyWithoutDevice: boolean;
+  eligibleEquipment: OfferEligibleEquipment[];
+};
 
 export type OfferSimulationRequest = {
   leadId: string;
   saleType: OfferSaleType;
   requestedLines: number;
-  mainPlanId: string;
-  additionalPlans: { planId: string }[];
-  equipmentId: string | null;
   lineCredit: number;
   equipmentCredit: number;
+  wantsEquipment: boolean;
 };
 
-export type OfferRecommendation = {
-  id?: string;
-  approved: boolean;
-  reason: string;
+/** Resultado completo del motor — una tarjeta por plan del catálogo. */
+export type OfferGenerationResult = {
+  saleType: OfferSaleType;
   requestedLines: number;
-  approvedLines: number;
-  requestedEquipment: boolean;
-  approvedEquipment: boolean;
-  requestedMonthlyValue: number;
-  approvedMonthlyValue: number;
   lineCredit: number;
   equipmentCredit: number;
-  remainingCredit: number;
-  removedEquipment: boolean;
-  removedLines: number;
-  status: OfferSimulationStatus;
-  optimizationType: OfferOptimizationType;
-  recommendation: string;
-  requestedPlan: OfferPlanSnapshot & { additionalPlans: OfferPlanSnapshot[] };
-  approvedPlan: OfferPlanSnapshot & { additionalPlans: OfferPlanSnapshot[] };
-  requestedEquipmentDetail: OfferEquipmentSnapshot;
-  approvedEquipmentDetail: OfferEquipmentSnapshot;
-  rejectionReasons: string[];
+  wantsEquipment: boolean;
+  alternatives: OfferPlanAlternative[];
+  viableCount: number;
 };
 
-export type OfferSimulationRecord = OfferRecommendation & {
+export type OfferSimulationRecord = OfferGenerationResult & {
   id: string;
   leadId: string;
   companyId: string;
   createdBy: string;
   createdByName: string;
   createdAt: string;
-  saleType: OfferSaleType;
-  recommendationJson: OfferRecommendation;
+  recommendationJson: OfferGenerationResult;
 };
 
 export type OfferSimulationHistoryItem = {
@@ -85,5 +75,5 @@ export type OfferSimulationHistoryItem = {
   saleType: OfferSaleType;
   requestedSummary: string;
   resultSummary: string;
-  status: OfferSimulationStatus;
+  viableCount: number;
 };

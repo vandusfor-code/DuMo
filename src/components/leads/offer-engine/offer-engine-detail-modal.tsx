@@ -25,7 +25,7 @@ export function OfferEngineDetailModal({
       <div
         role="dialog"
         aria-modal="true"
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl"
+        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-xl"
       >
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <h3 className="text-[17px] font-semibold text-ink">Detalle de simulación</h3>
@@ -50,63 +50,52 @@ export function OfferEngineDetailModal({
               <MetaRow label="Fecha" value={formatDateTime(record.createdAt)} />
               <MetaRow label="Tipo venta" value={OFFER_SALE_TYPE_LABELS[record.saleType]} />
               <MetaRow label="Asesor" value={record.createdByName || record.createdBy} />
+              <MetaRow label="Líneas solicitadas" value={String(record.requestedLines)} />
+              <MetaRow label="Cupo Línea" value={formatCurrency(record.lineCredit)} />
+              <MetaRow label="Cupo Equipo" value={formatCurrency(record.equipmentCredit)} />
+              <MetaRow
+                label="Desea equipo"
+                value={record.wantsEquipment ? "Sí" : "No"}
+              />
 
-              <Section title="Solicitud inicial">
-                <DetailRow label="Líneas" value={String(record.requestedLines)} />
-                <DetailRow label="Plan principal" value={record.requestedPlan.planName} />
-                {record.requestedPlan.additionalPlans.map((p, i) => (
-                  <DetailRow key={i} label={`Adicional ${i + 1}`} value={p.planName} />
+              <div className="space-y-4">
+                {record.alternatives.map((alt) => (
+                  <div
+                    key={alt.planId}
+                    className="rounded-xl border border-line p-4"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-semibold text-ink">{alt.planName}</p>
+                      <span className="text-[12px] font-medium text-muted">{alt.statusLabel}</span>
+                    </div>
+                    {alt.viable ? (
+                      <div className="mt-3 space-y-1 text-[13px]">
+                        <DetailRow
+                          label="Cargo fijo total"
+                          value={formatCurrency(alt.totalMonthlyFixed)}
+                        />
+                        <DetailRow
+                          label="Cupo restante"
+                          value={formatCurrency(alt.remainingCredit)}
+                        />
+                        {alt.wantsEquipment && alt.maxEquipmentInstallment > 0 ? (
+                          <DetailRow
+                            label="Cuota máx. equipo"
+                            value={formatCurrency(alt.maxEquipmentInstallment)}
+                          />
+                        ) : null}
+                        {alt.eligibleEquipment.length > 0 ? (
+                          <p className="pt-1 text-muted">
+                            {alt.eligibleEquipment.length} equipo(s) compatible(s)
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-[13px] text-danger-ink">{alt.notViableReason}</p>
+                    )}
+                  </div>
                 ))}
-                <DetailRow
-                  label="Equipo"
-                  value={
-                    record.requestedEquipmentDetail?.commercialName ?? "Sin equipo"
-                  }
-                />
-                <DetailRow label="Cupo Línea" value={formatCurrency(record.lineCredit)} />
-                <DetailRow label="Cupo Equipo" value={formatCurrency(record.equipmentCredit)} />
-                <DetailRow
-                  label="Total solicitado"
-                  value={formatCurrency(record.requestedMonthlyValue)}
-                />
-              </Section>
-
-              {record.status === "OPTIMIZED" ? (
-                <Section title="Optimización realizada">
-                  {record.removedEquipment ? (
-                    <DetailRow label="Equipo" value="Eliminado" />
-                  ) : null}
-                  {record.removedLines > 0 ? (
-                    <DetailRow
-                      label="Reducción"
-                      value={`${record.requestedLines} → ${record.approvedLines} líneas`}
-                    />
-                  ) : null}
-                </Section>
-              ) : null}
-
-              <Section title="Resultado final">
-                <DetailRow label="Líneas" value={String(record.approvedLines)} />
-                <DetailRow label="Plan principal" value={record.approvedPlan.planName} />
-                {record.approvedPlan.additionalPlans.map((p, i) => (
-                  <DetailRow key={i} label={`Adicional ${i + 1}`} value={p.planName} />
-                ))}
-                <DetailRow
-                  label="Equipo"
-                  value={
-                    record.approvedEquipmentDetail?.commercialName ?? "Sin equipo"
-                  }
-                />
-                <DetailRow
-                  label="Total mensual"
-                  value={formatCurrency(record.approvedMonthlyValue)}
-                />
-                <DetailRow
-                  label="Saldo restante"
-                  value={formatCurrency(record.remainingCredit)}
-                />
-                <p className="mt-2 text-[13px] text-muted">{record.recommendation}</p>
-              </Section>
+              </div>
             </>
           )}
         </div>
@@ -115,18 +104,9 @@ export function OfferEngineDetailModal({
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl border border-line p-4">
-      <p className="text-[13px] font-semibold text-ink">{title}</p>
-      <div className="mt-3 space-y-2">{children}</div>
-    </div>
-  );
-}
-
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between gap-3 text-[13px]">
+    <div className="flex justify-between gap-3">
       <span className="text-muted">{label}</span>
       <span className="font-medium text-ink">{value}</span>
     </div>

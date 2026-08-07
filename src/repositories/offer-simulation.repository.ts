@@ -1,19 +1,18 @@
 import "server-only";
 
 import type {
-  OfferRecommendation,
+  OfferGenerationResult,
   OfferSaleType,
   OfferSimulationHistoryItem,
   OfferSimulationRecord,
   OfferSimulationRequest,
 } from "@/types/offer-engine";
-import { DEFAULT_COMPANY_ID } from "@/types/tenant";
 import { ensureSchema, getSql, hasDatabase, withDbRetry } from "@/server/db/client";
 
 export interface OfferSimulationRepository {
   insert(
     input: OfferSimulationRequest,
-    recommendation: OfferRecommendation,
+    result: OfferGenerationResult,
     meta: { companyId: string; createdBy: string; createdByName: string },
   ): Promise<OfferSimulationRecord>;
   listByLead(leadId: string, companyId: string): Promise<OfferSimulationHistoryItem[]>;
@@ -22,28 +21,19 @@ export interface OfferSimulationRepository {
 
 const mockStore: OfferSimulationRecord[] = [];
 
-function summarizeRequested(rec: OfferSimulationRecord): string {
-  const parts: string[] = [`${rec.requestedLines} línea${rec.requestedLines === 1 ? "" : "s"}`];
-  if (rec.requestedEquipment) parts.push("Equipo");
+function summarizeRequested(input: OfferSimulationRequest): string {
+  const parts = [`${input.requestedLines} línea${input.requestedLines === 1 ? "" : "s"}`];
+  if (input.wantsEquipment) parts.push("Con equipo");
   return parts.join(" + ");
 }
 
-function summarizeResult(rec: OfferSimulationRecord): string {
-  if (rec.status === "APPROVED") return "Aprobada";
-  if (rec.status === "REJECTED") return "Rechazada";
-  const lines =
-    rec.approvedLines !== rec.requestedLines
-      ? `Optimizada a ${rec.approvedLines}`
-      : "Optimizada";
-  if (rec.removedEquipment && rec.removedLines > 0) {
-    return `${lines} (sin equipo)`;
-  }
-  if (rec.removedEquipment) return "Optimizada (sin equipo)";
-  return lines;
+function summarizeResult(result: OfferGenerationResult): string {
+  if (result.viableCount === 0) return "Sin alternativas viables";
+  return `${result.viableCount} plan${result.viableCount === 1 ? "" : "es"} viable${result.viableCount === 1 ? "" : "s"}`;
 }
 
 function rowToRecord(row: Record<string, unknown>): OfferSimulationRecord {
-  const recommendationJson = row.recommendation_json as OfferRecommendation;
+  const recommendationJson = row.recommendation_json as OfferGenerationResult;
   return {
     ...recommendationJson,
     id: String(row.id),
@@ -52,7 +42,6 @@ function rowToRecord(row: Record<string, unknown>): OfferSimulationRecord {
     createdBy: String(row.created_by),
     createdByName: String(row.created_by_name ?? ""),
     createdAt: String(row.created_at),
-    saleType: row.sale_type as OfferSaleType,
     recommendationJson,
   };
 }
@@ -60,20 +49,19 @@ function rowToRecord(row: Record<string, unknown>): OfferSimulationRecord {
 class MockOfferSimulationRepository implements OfferSimulationRepository {
   async insert(
     input: OfferSimulationRequest,
-    recommendation: OfferRecommendation,
+    result: OfferGenerationResult,
     meta: { companyId: string; createdBy: string; createdByName: string },
   ): Promise<OfferSimulationRecord> {
     const id = `sim-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const record: OfferSimulationRecord = {
-      ...recommendation,
+      ...result,
       id,
       leadId: input.leadId,
       companyId: meta.companyId,
       createdBy: meta.createdBy,
       createdByName: meta.createdByName,
       createdAt: new Date().toISOString(),
-      saleType: input.saleType,
-      recommendationJson: recommendation,
+      recommendationJson: result,
     };
     mockStore.unshift(record);
     return record;
@@ -86,9 +74,16 @@ class MockOfferSimulationRepository implements OfferSimulationRepository {
         id: s.id,
         createdAt: s.createdAt,
         saleType: s.saleType,
-        requestedSummary: summarizeRequested(s),
+        requestedSummary: summarizeRequested({
+          leadId: s.leadId,
+          saleType: s.saleType,
+          requestedLines: s.requestedLines,
+          lineCredit: s.lineCredit,
+          equipmentCredit: s.equipmentCredit,
+          wantsEquipment: s.wantsEquipment,
+        }),
         resultSummary: summarizeResult(s),
-        status: s.status,
+        viableCount: s.viableCount,
       }));
   }
 
@@ -100,7 +95,7 @@ class MockOfferSimulationRepository implements OfferSimulationRepository {
 class PostgresOfferSimulationRepository implements OfferSimulationRepository {
   async insert(
     input: OfferSimulationRequest,
-    recommendation: OfferRecommendation,
+    result: OfferGenerationResult,
     meta: { companyId: string; createdBy: string; createdByName: string },
   ): Promise<OfferSimulationRecord> {
     await ensureSchema();
@@ -109,6 +104,7 @@ class PostgresOfferSimulationRepository implements OfferSimulationRepository {
 
     const id = `sim-${Date.now()}`;
     const now = new Date().toISOString();
+    const firstViable = result.alternatives.find((a) => a.viable);
 
     await withDbRetry(() =>
       sql`
@@ -123,29 +119,28 @@ class PostgresOfferSimulationRepository implements OfferSimulationRepository {
         ) VALUES (
           ${id}, ${input.leadId}, ${meta.companyId}, ${meta.createdBy},
           ${meta.createdByName}, ${now},
-          ${input.saleType}, ${input.requestedLines}, ${recommendation.approvedLines},
-          ${recommendation.requestedEquipment}, ${recommendation.approvedEquipment},
-          ${JSON.stringify(recommendation.requestedPlan)}::jsonb,
-          ${JSON.stringify(recommendation.approvedPlan)}::jsonb,
+          ${input.saleType}, ${input.requestedLines}, ${firstViable ? input.requestedLines : 0},
+          ${input.wantsEquipment}, ${Boolean(firstViable?.equipmentViable)},
+          ${JSON.stringify({ requestedLines: input.requestedLines, wantsEquipment: input.wantsEquipment })}::jsonb,
+          ${JSON.stringify(firstViable ?? null)}::jsonb,
           ${input.lineCredit}, ${input.equipmentCredit},
-          ${recommendation.requestedMonthlyValue}, ${recommendation.approvedMonthlyValue},
-          ${recommendation.remainingCredit},
-          ${recommendation.optimizationType}, ${recommendation.status},
-          ${recommendation.recommendation}, ${JSON.stringify(recommendation)}::jsonb
+          ${firstViable?.totalMonthlyFixed ?? 0}, ${firstViable?.totalMonthlyFixed ?? 0},
+          ${firstViable?.remainingCredit ?? 0},
+          ${"NONE"}, ${result.viableCount > 0 ? "APPROVED" : "REJECTED"},
+          ${summarizeResult(result)}, ${JSON.stringify(result)}::jsonb
         )
       `,
     );
 
     return {
-      ...recommendation,
+      ...result,
       id,
       leadId: input.leadId,
       companyId: meta.companyId,
       createdBy: meta.createdBy,
       createdByName: meta.createdByName,
       createdAt: now,
-      saleType: input.saleType,
-      recommendationJson: recommendation,
+      recommendationJson: result,
     };
   }
 
@@ -168,10 +163,17 @@ class PostgresOfferSimulationRepository implements OfferSimulationRepository {
       return {
         id: rec.id,
         createdAt: rec.createdAt,
-        saleType: rec.saleType,
-        requestedSummary: summarizeRequested(rec),
+        saleType: rec.saleType as OfferSaleType,
+        requestedSummary: summarizeRequested({
+          leadId: rec.leadId,
+          saleType: rec.saleType,
+          requestedLines: rec.requestedLines,
+          lineCredit: rec.lineCredit,
+          equipmentCredit: rec.equipmentCredit,
+          wantsEquipment: rec.wantsEquipment,
+        }),
         resultSummary: summarizeResult(rec),
-        status: rec.status,
+        viableCount: rec.viableCount,
       };
     });
   }
@@ -198,5 +200,3 @@ export function getOfferSimulationRepository(): OfferSimulationRepository {
   if (hasDatabase()) return new PostgresOfferSimulationRepository();
   return new MockOfferSimulationRepository();
 }
-
-export { DEFAULT_COMPANY_ID };

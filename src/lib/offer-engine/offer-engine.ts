@@ -1,323 +1,174 @@
 import type { CommercialPlan } from "@/types/commercial-config";
 import type { EquipmentCatalogItem } from "@/types/equipment";
 import type {
-  OfferEquipmentSnapshot,
-  OfferOptimizationType,
-  OfferPlanSnapshot,
-  OfferRecommendation,
+  OfferEligibleEquipment,
+  OfferGenerationResult,
+  OfferPlanAlternative,
   OfferSimulationRequest,
-  OfferSimulationStatus,
 } from "@/types/offer-engine";
+import { getAdditionalLineUnitPrice } from "@/lib/sales-script/teleprompter/contract-pricing";
 
-export type OfferEngineContext = {
-  plans: Map<string, CommercialPlan>;
-  equipment: EquipmentCatalogItem | null;
-};
+const PRIORITY_PLAN_IDS = ["plan-w", "plan-o", "plan-m"];
 
-function planSnapshot(plan: CommercialPlan): OfferPlanSnapshot {
-  return {
-    planId: plan.id,
-    planName: plan.name,
-    fixedCharge: plan.womValue ?? 0,
-  };
-}
-
-function equipmentSnapshot(item: EquipmentCatalogItem): OfferEquipmentSnapshot {
-  return {
-    equipmentId: item.id,
-    commercialName: item.commercialName,
-    brand: item.brand,
-    model: item.model,
-    color: item.color,
-    totalValue: item.totalValue,
-    downPayment: item.downPayment,
-    installmentsCount: item.installmentsCount,
-    installmentValue: item.installmentValue,
-  };
-}
-
-/** Suma cargo fijo principal + adicionales + cuota mensual equipo. */
-export function calculateMonthlyCost(
-  mainPlanId: string,
-  additionalPlanIds: string[],
-  equipmentInstallment: number,
-  plans: Map<string, CommercialPlan>,
-): number {
-  const main = plans.get(mainPlanId);
-  let total = main?.womValue ?? 0;
-  for (const id of additionalPlanIds) {
-    total += plans.get(id)?.womValue ?? 0;
-  }
-  return total + equipmentInstallment;
-}
-
-/** Valida cupo equipo: cuota mensual <= cupo equipo. */
-export function validateEquipment(
-  equipment: EquipmentCatalogItem | null,
-  equipmentCredit: number,
-): { allowed: boolean; installment: number } {
-  if (!equipment) return { allowed: false, installment: 0 };
-  if (equipment.status !== "active") return { allowed: false, installment: 0 };
-  const installment = equipment.installmentValue;
-  if (installment > equipmentCredit) return { allowed: false, installment: 0 };
-  return { allowed: true, installment };
-}
-
-function buildPlanBlock(
-  mainPlanId: string,
-  additionalPlanIds: string[],
-  plans: Map<string, CommercialPlan>,
-): OfferPlanSnapshot & { additionalPlans: OfferPlanSnapshot[] } {
-  const main = plans.get(mainPlanId);
-  return {
-    planId: mainPlanId,
-    planName: main?.name ?? mainPlanId,
-    fixedCharge: main?.womValue ?? 0,
-    additionalPlans: additionalPlanIds.map((id) => {
-      const p = plans.get(id);
-      return {
-        planId: id,
-        planName: p?.name ?? id,
-        fixedCharge: p?.womValue ?? 0,
-      };
-    }),
-  };
-}
-
-function resolveOptimizationType(
-  removedEquipment: boolean,
-  removedLines: number,
-): OfferOptimizationType {
-  if (removedEquipment && removedLines > 0) return "REMOVE_EQUIPMENT_AND_REDUCE_LINES";
-  if (removedEquipment) return "REMOVE_EQUIPMENT";
-  if (removedLines > 0) return "REDUCE_LINES";
-  return "NONE";
-}
-
-function buildRecommendationText(
-  status: OfferSimulationStatus,
-  removedEquipment: boolean,
-  removedLines: number,
-  approvedLines: number,
-  requestedLines: number,
-): string {
-  if (status === "APPROVED") return "Oferta aprobada exactamente como fue solicitada.";
-  if (status === "REJECTED") return "No existe una combinación comercial viable.";
-  if (removedEquipment && removedLines > 0) {
-    return `Se recomienda retirar el equipo y ofrecer únicamente ${approvedLines} línea${approvedLines === 1 ? "" : "s"}.`;
-  }
-  if (removedEquipment) return "Se recomienda retirar el equipo para cumplir el cupo disponible.";
-  if (removedLines > 0) {
-    if (approvedLines < requestedLines) {
-      return `No es posible ofrecer ${requestedLines} líneas. La mejor oferta encontrada es ${approvedLines} línea${approvedLines === 1 ? "" : "s"}.`;
+function sortPlans(plans: CommercialPlan[]): CommercialPlan[] {
+  return [...plans].sort((a, b) => {
+    const ai = PRIORITY_PLAN_IDS.indexOf(a.id);
+    const bi = PRIORITY_PLAN_IDS.indexOf(b.id);
+    if (ai !== -1 || bi !== -1) {
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
     }
-    return `Se recomienda ofrecer únicamente ${approvedLines} línea${approvedLines === 1 ? "" : "s"}.`;
-  }
-  return "Oferta optimizada automáticamente.";
-}
-
-function buildResult(
-  input: OfferSimulationRequest,
-  ctx: OfferEngineContext,
-  opts: {
-    approvedLines: number;
-    approvedAdditionalIds: string[];
-    approvedEquipment: boolean;
-    equipmentInstallment: number;
-    removedEquipment: boolean;
-    removedLines: number;
-    equipmentRemovedByCupo: boolean;
-  },
-): OfferRecommendation {
-  const { plans, equipment } = ctx;
-  const requestedAdditional = input.additionalPlans.map((p) => p.planId);
-  const requestedEquipment = Boolean(input.equipmentId);
-  const requestedMonthly = calculateMonthlyCost(
-    input.mainPlanId,
-    requestedAdditional,
-    requestedEquipment && equipment ? equipment.installmentValue : 0,
-    plans,
-  );
-  const approvedMonthly = calculateMonthlyCost(
-    input.mainPlanId,
-    opts.approvedAdditionalIds,
-    opts.approvedEquipment ? opts.equipmentInstallment : 0,
-    plans,
-  );
-
-  const fits = approvedMonthly <= input.lineCredit;
-  const changed =
-    opts.removedEquipment ||
-    opts.removedLines > 0 ||
-    opts.equipmentRemovedByCupo ||
-    opts.approvedLines !== input.requestedLines ||
-    opts.approvedEquipment !== requestedEquipment;
-
-  let status: OfferSimulationStatus;
-  if (!fits) {
-    status = "REJECTED";
-  } else if (!changed) {
-    status = "APPROVED";
-  } else {
-    status = "OPTIMIZED";
-  }
-
-  const optimizationType = resolveOptimizationType(
-    opts.removedEquipment || opts.equipmentRemovedByCupo,
-    opts.removedLines,
-  );
-
-  const rejectionReasons: string[] = [];
-  if (status === "REJECTED") {
-    if (input.lineCredit <= 0) rejectionReasons.push("El cupo línea es insuficiente.");
-    const oneLineCost = calculateMonthlyCost(input.mainPlanId, [], 0, plans);
-    if (oneLineCost > input.lineCredit) {
-      rejectionReasons.push("Ni una sola línea cumple las reglas comerciales.");
-    } else {
-      rejectionReasons.push("El cupo línea es insuficiente para la combinación solicitada.");
-    }
-    if (requestedEquipment && equipment && equipment.installmentValue > input.equipmentCredit) {
-      rejectionReasons.push("El cupo equipo no alcanza.");
-    }
-  }
-
-  return {
-    approved: fits,
-    reason: status === "REJECTED" ? "Sin capacidad comercial" : "Viable",
-    requestedLines: input.requestedLines,
-    approvedLines: opts.approvedLines,
-    requestedEquipment,
-    approvedEquipment: opts.approvedEquipment,
-    requestedMonthlyValue: requestedMonthly,
-    approvedMonthlyValue: approvedMonthly,
-    lineCredit: input.lineCredit,
-    equipmentCredit: input.equipmentCredit,
-    remainingCredit: fits ? input.lineCredit - approvedMonthly : 0,
-    removedEquipment: opts.removedEquipment || opts.equipmentRemovedByCupo,
-    removedLines: opts.removedLines,
-    status,
-    optimizationType,
-    recommendation: buildRecommendationText(
-      status,
-      opts.removedEquipment || opts.equipmentRemovedByCupo,
-      opts.removedLines,
-      opts.approvedLines,
-      input.requestedLines,
-    ),
-    requestedPlan: buildPlanBlock(input.mainPlanId, requestedAdditional, plans),
-    approvedPlan: buildPlanBlock(input.mainPlanId, opts.approvedAdditionalIds, plans),
-    requestedEquipmentDetail:
-      requestedEquipment && equipment ? equipmentSnapshot(equipment) : null,
-    approvedEquipmentDetail:
-      opts.approvedEquipment && equipment ? equipmentSnapshot(equipment) : null,
-    rejectionReasons,
-  };
-}
-
-/** Motor principal: valida, calcula y optimiza la oferta comercial. */
-export function calculateOffer(
-  input: OfferSimulationRequest,
-  ctx: OfferEngineContext,
-): OfferRecommendation {
-  const { plans, equipment } = ctx;
-  const requestedAdditional = input.additionalPlans.map((p) => p.planId);
-  const requestedEquipment = Boolean(input.equipmentId);
-
-  let equipmentRemovedByCupo = false;
-  let equipmentAllowed = false;
-  let equipmentInstallment = 0;
-
-  if (requestedEquipment && equipment) {
-    const validation = validateEquipment(equipment, input.equipmentCredit);
-    equipmentAllowed = validation.allowed;
-    equipmentInstallment = validation.installment;
-    if (!validation.allowed) equipmentRemovedByCupo = true;
-  }
-
-  let approvedAdditional = [...requestedAdditional];
-  let approvedEquipment = equipmentAllowed;
-  let removedEquipment = equipmentRemovedByCupo;
-  let removedLines = 0;
-
-  let total = calculateMonthlyCost(
-    input.mainPlanId,
-    approvedAdditional,
-    approvedEquipment ? equipmentInstallment : 0,
-    plans,
-  );
-
-  if (total <= input.lineCredit) {
-    return buildResult(input, ctx, {
-      approvedLines: 1 + approvedAdditional.length,
-      approvedAdditionalIds: approvedAdditional,
-      approvedEquipment,
-      equipmentInstallment,
-      removedEquipment,
-      removedLines,
-      equipmentRemovedByCupo,
-    });
-  }
-
-  // Paso 1: quitar equipo si aún está incluido
-  if (approvedEquipment) {
-    approvedEquipment = false;
-    removedEquipment = true;
-    total = calculateMonthlyCost(input.mainPlanId, approvedAdditional, 0, plans);
-    if (total <= input.lineCredit) {
-      return buildResult(input, ctx, {
-        approvedLines: 1 + approvedAdditional.length,
-        approvedAdditionalIds: approvedAdditional,
-        approvedEquipment: false,
-        equipmentInstallment: 0,
-        removedEquipment: true,
-        removedLines: 0,
-        equipmentRemovedByCupo,
-      });
-    }
-  }
-
-  // Paso 2: reducir líneas adicionales
-  while (approvedAdditional.length > 0) {
-    approvedAdditional = approvedAdditional.slice(0, -1);
-    removedLines++;
-    total = calculateMonthlyCost(input.mainPlanId, approvedAdditional, 0, plans);
-    if (total <= input.lineCredit) {
-      return buildResult(input, ctx, {
-        approvedLines: 1 + approvedAdditional.length,
-        approvedAdditionalIds: approvedAdditional,
-        approvedEquipment: false,
-        equipmentInstallment: 0,
-        removedEquipment: removedEquipment || equipmentRemovedByCupo,
-        removedLines,
-        equipmentRemovedByCupo,
-      });
-    }
-  }
-
-  // Paso 3: una sola línea sin equipo — ya evaluado arriba si additional vacío
-  return buildResult(input, ctx, {
-    approvedLines: 1,
-    approvedAdditionalIds: [],
-    approvedEquipment: false,
-    equipmentInstallment: 0,
-    removedEquipment: removedEquipment || equipmentRemovedByCupo,
-    removedLines: Math.max(removedLines, requestedAdditional.length),
-    equipmentRemovedByCupo,
+    return a.name.localeCompare(b.name, "es");
   });
 }
 
-/** Valida que los planes existan y estén activos. */
-export function assertPlansExist(
-  planIds: string[],
-  plans: Map<string, CommercialPlan>,
-): string | null {
-  for (const id of planIds) {
-    const plan = plans.get(id);
-    if (!plan) return `Plan "${id}" no existe en el catálogo.`;
-    if (plan.status !== "active") return `Plan "${plan.name}" no está activo.`;
-    if (!plan.womValue || plan.womValue <= 0) {
-      return `Plan "${plan.name}" no tiene cargo fijo configurado.`;
-    }
+/** Planes activos con cargo fijo configurado. */
+export function getEvaluablePlans(allPlans: CommercialPlan[]): CommercialPlan[] {
+  return sortPlans(
+    allPlans.filter(
+      (p) => p.status === "active" && typeof p.womValue === "number" && p.womValue > 0,
+    ),
+  );
+}
+
+function planLineRules(
+  plan: CommercialPlan,
+  requestedLines: number,
+): { ok: boolean; reason?: string } {
+  if (requestedLines > plan.maxLines) {
+    return { ok: false, reason: `Este plan admite máximo ${plan.maxLines} línea(s).` };
   }
-  return null;
+  if (requestedLines > 1 && plan.id === "plan-w") {
+    return { ok: false, reason: "Plan W no admite líneas adicionales." };
+  }
+  const additionalCount = requestedLines - 1;
+  const maxAdditional = plan.offer.maxAdditionalLines ?? 0;
+  const additionalUnit = getAdditionalLineUnitPrice(plan);
+  if (additionalCount > 0 && (additionalUnit <= 0 || maxAdditional <= 0)) {
+    return { ok: false, reason: "Este plan no admite líneas adicionales." };
+  }
+  if (additionalCount > maxAdditional) {
+    return {
+      ok: false,
+      reason: `Admite como máximo ${maxAdditional} línea(s) adicional(es).`,
+    };
+  }
+  return { ok: true };
+}
+
+/** Cargo fijo mensual: principal + adicionales × precio vigente (sin promos). */
+export function calculatePlanFixedCharge(
+  plan: CommercialPlan,
+  requestedLines: number,
+): {
+  mainLineFixedCharge: number;
+  additionalLinesCount: number;
+  additionalLineUnitPrice: number;
+  additionalLinesTotal: number;
+  totalMonthlyFixed: number;
+} {
+  const mainLineFixedCharge = plan.womValue ?? 0;
+  const additionalLinesCount = Math.max(0, requestedLines - 1);
+  const additionalLineUnitPrice = getAdditionalLineUnitPrice(plan);
+  const additionalLinesTotal = additionalLinesCount * additionalLineUnitPrice;
+  return {
+    mainLineFixedCharge,
+    additionalLinesCount,
+    additionalLineUnitPrice,
+    additionalLinesTotal,
+    totalMonthlyFixed: mainLineFixedCharge + additionalLinesTotal,
+  };
+}
+
+function mapEligibleEquipment(
+  catalog: EquipmentCatalogItem[],
+  maxInstallment: number,
+): OfferEligibleEquipment[] {
+  return catalog
+    .filter(
+      (e) =>
+        e.status === "active" &&
+        e.installmentValue > 0 &&
+        e.installmentValue <= maxInstallment,
+    )
+    .sort((a, b) => a.installmentValue - b.installmentValue)
+    .map((e) => ({
+      id: e.id,
+      commercialName: e.commercialName,
+      brand: e.brand,
+      model: e.model,
+      installmentValue: e.installmentValue,
+    }));
+}
+
+function evaluatePlanAlternative(
+  plan: CommercialPlan,
+  input: OfferSimulationRequest,
+  equipmentCatalog: EquipmentCatalogItem[],
+): OfferPlanAlternative {
+  const pricing = calculatePlanFixedCharge(plan, input.requestedLines);
+  const rules = planLineRules(plan, input.requestedLines);
+  const fitsLineCredit = pricing.totalMonthlyFixed <= input.lineCredit;
+  const viable = rules.ok && fitsLineCredit;
+
+  let notViableReason: string | undefined;
+  if (!rules.ok) notViableReason = rules.reason;
+  else if (!fitsLineCredit) {
+    notViableReason = `El cargo fijo (${pricing.totalMonthlyFixed.toLocaleString("es-CL")}) supera el cupo línea.`;
+  }
+
+  const roomOnLine = input.lineCredit - pricing.totalMonthlyFixed;
+  const maxEquipmentInstallment = input.wantsEquipment
+    ? Math.max(0, Math.min(input.equipmentCredit, roomOnLine))
+    : 0;
+
+  const eligibleEquipment =
+    input.wantsEquipment && viable
+      ? mapEligibleEquipment(equipmentCatalog, maxEquipmentInstallment)
+      : [];
+
+  const equipmentOnlyWithoutDevice =
+    input.wantsEquipment && viable && maxEquipmentInstallment <= 0;
+
+  const equipmentViable =
+    input.wantsEquipment && viable && !equipmentOnlyWithoutDevice && eligibleEquipment.length > 0;
+
+  return {
+    planId: plan.id,
+    planName: plan.name,
+    ...pricing,
+    lineCredit: input.lineCredit,
+    consumedCredit: viable ? pricing.totalMonthlyFixed : 0,
+    remainingCredit: viable ? input.lineCredit - pricing.totalMonthlyFixed : 0,
+    viable,
+    statusLabel: viable ? "Aprobada" : "No viable",
+    notViableReason,
+    wantsEquipment: input.wantsEquipment,
+    maxEquipmentInstallment,
+    equipmentViable,
+    equipmentOnlyWithoutDevice,
+    eligibleEquipment,
+  };
+}
+
+/** Evalúa automáticamente todos los planes del catálogo y devuelve alternativas. */
+export function generateOfferAlternatives(
+  input: OfferSimulationRequest,
+  allPlans: CommercialPlan[],
+  equipmentCatalog: EquipmentCatalogItem[],
+): OfferGenerationResult {
+  const plans = getEvaluablePlans(allPlans);
+  const alternatives = plans.map((plan) =>
+    evaluatePlanAlternative(plan, input, equipmentCatalog),
+  );
+  const viableCount = alternatives.filter((a) => a.viable).length;
+
+  return {
+    saleType: input.saleType,
+    requestedLines: input.requestedLines,
+    lineCredit: input.lineCredit,
+    equipmentCredit: input.equipmentCredit,
+    wantsEquipment: input.wantsEquipment,
+    alternatives,
+    viableCount,
+  };
 }

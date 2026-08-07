@@ -1,12 +1,12 @@
 import "server-only";
 
-import { assertPlansExist, calculateOffer } from "@/lib/offer-engine/offer-engine";
+import { generateOfferAlternatives } from "@/lib/offer-engine/offer-engine";
 import { getOfferSimulationRepository } from "@/repositories/offer-simulation.repository";
 import { getCommercialConfigurationRepository } from "@/repositories/commercial-configuration.repository";
 import { getEquipmentRepository } from "@/repositories/equipment.repository";
 import type { AuthUser } from "@/types/auth";
 import type {
-  OfferRecommendation,
+  OfferGenerationResult,
   OfferSimulationHistoryItem,
   OfferSimulationRecord,
   OfferSimulationRequest,
@@ -22,32 +22,24 @@ export const offerEngineService = {
     input: OfferSimulationRequest,
     user: AuthUser,
   ): Promise<OfferSimulationRecord> {
-    validateRequestShape(input);
+    if (input.requestedLines < 1 || input.requestedLines > 5) {
+      throw new Error("La cantidad de líneas debe estar entre 1 y 5.");
+    }
+    if (input.lineCredit <= 0) {
+      throw new Error("El cupo línea móvil es obligatorio.");
+    }
 
-    const [{ plans: allPlans }, equipmentCatalog] = await Promise.all([
+    const [{ plans }, equipmentCatalog] = await Promise.all([
       getCommercialConfigurationRepository().getSnapshot(),
       getEquipmentRepository().listAll(),
     ]);
 
-    const plans = new Map(allPlans.map((p) => [p.id, p]));
-    const planIds = [
-      input.mainPlanId,
-      ...input.additionalPlans.map((p) => p.planId),
-    ];
-    const planError = assertPlansExist(planIds, plans);
-    if (planError) throw new Error(planError);
-
-    let equipment = null;
-    if (input.equipmentId) {
-      equipment = equipmentCatalog.find((e) => e.id === input.equipmentId) ?? null;
-      if (!equipment) throw new Error("Equipo no encontrado en el catálogo.");
-      if (equipment.status !== "active") {
-        throw new Error("El equipo seleccionado no está disponible.");
-      }
+    const result = generateOfferAlternatives(input, plans, equipmentCatalog);
+    if (result.alternatives.length === 0) {
+      throw new Error("No hay planes activos en el catálogo comercial.");
     }
 
-    const recommendation = calculateOffer(input, { plans, equipment });
-    return getOfferSimulationRepository().insert(input, recommendation, {
+    return getOfferSimulationRepository().insert(input, result, {
       companyId: companyFromUser(user),
       createdBy: user.id,
       createdByName: user.name,
@@ -63,17 +55,4 @@ export const offerEngineService = {
   },
 };
 
-function validateRequestShape(input: OfferSimulationRequest): void {
-  const expectedAdditional = input.requestedLines - 1;
-  if (expectedAdditional < 0 || expectedAdditional > 4) {
-    throw new Error("Cantidad de líneas inválida.");
-  }
-  if (input.additionalPlans.length !== expectedAdditional) {
-    throw new Error("La cantidad de planes adicionales no coincide con las líneas solicitadas.");
-  }
-  if (input.requestedLines < 1) {
-    throw new Error("Debe solicitar al menos una línea.");
-  }
-}
-
-export type { OfferRecommendation };
+export type { OfferGenerationResult };
