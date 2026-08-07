@@ -11,6 +11,7 @@ import {
   MessageSquare,
   Save,
   ScrollText,
+  Sparkles,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LeadTypeSelect } from "./lead-type-select";
@@ -19,6 +20,7 @@ import { ObservationField } from "./observation-field";
 import { ActionButtons } from "./action-buttons";
 import { ClientIdentityFields, ClientPhoneField } from "./client-card";
 import { SalesScriptTab } from "./sales-script-tab";
+import { OfferEngineTab } from "./offer-engine/offer-engine-tab";
 import { useSalesScript } from "@/hooks/use-sales-script";
 import {
   SectionCard,
@@ -122,6 +124,7 @@ export function LeadPanel({
             {isVenta ? (
               <PanelTab value="script" icon={<ScrollText className="size-[18px]" />} label="Script" />
             ) : null}
+            <PanelTab value="oferta" icon={<Sparkles className="size-[18px]" />} label="Motor de Oferta" />
             <PanelTab value="notas" icon={<MessageSquare className="size-[18px]" />} label="Notas" />
             <PanelTab value="historial" icon={<Clock className="size-[18px]" />} label="Historial" />
           </TabsList>
@@ -219,6 +222,10 @@ export function LeadPanel({
               </SectionCard>
             </TabsContent>
           ) : null}
+
+          <TabsContent value="oferta" className="outline-none">
+            <OfferEngineTab conversationId={conversation.id} />
+          </TabsContent>
 
           <TabsContent value="notas" className="outline-none">
             <SectionCard>

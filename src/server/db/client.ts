@@ -149,6 +149,7 @@ const REQUIRED_COLUMNS = [
   "commission_payments.advisor_id",
   "lead_gestiones.conversation_id",
   "crm_clients.conversation_id",
+  "offer_simulations.lead_id",
   ...QUICK_REPLY_REQUIRED_COLUMNS,
 ];
 
@@ -362,6 +363,37 @@ async function runMigrations(sql: Sql) {
     `;
     await tx`
       CREATE INDEX IF NOT EXISTS idx_crm_clients_advisor ON crm_clients (advisor_id, updated_at DESC)
+    `;
+
+    await tx`
+      CREATE TABLE IF NOT EXISTS offer_simulations (
+        id text PRIMARY KEY,
+        lead_id text NOT NULL,
+        company_id text NOT NULL DEFAULT 'company-default',
+        created_by text NOT NULL,
+        created_by_name text NOT NULL DEFAULT '',
+        created_at timestamptz NOT NULL DEFAULT now(),
+        sale_type text NOT NULL,
+        requested_lines integer NOT NULL,
+        approved_lines integer NOT NULL,
+        requested_equipment boolean NOT NULL DEFAULT false,
+        approved_equipment boolean NOT NULL DEFAULT false,
+        requested_plan_json jsonb NOT NULL DEFAULT '{}',
+        approved_plan_json jsonb NOT NULL DEFAULT '{}',
+        line_credit numeric NOT NULL DEFAULT 0,
+        equipment_credit numeric NOT NULL DEFAULT 0,
+        requested_total numeric NOT NULL DEFAULT 0,
+        approved_total numeric NOT NULL DEFAULT 0,
+        remaining_credit numeric NOT NULL DEFAULT 0,
+        optimization_type text NOT NULL DEFAULT 'NONE',
+        status text NOT NULL,
+        recommendation text NOT NULL DEFAULT '',
+        recommendation_json jsonb NOT NULL DEFAULT '{}'
+      )
+    `;
+    await tx`
+      CREATE INDEX IF NOT EXISTS idx_offer_simulations_lead
+      ON offer_simulations (lead_id, created_at DESC)
     `;
 
     await runQuickReplyAndTenantMigrations(tx);

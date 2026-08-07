@@ -12,6 +12,7 @@ import {
   Plus,
   Trash2,
   ScrollText,
+  Sparkles,
   User,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -22,6 +23,7 @@ import { ObservationField } from "@/components/leads/observation-field";
 import { ActionButtons } from "@/components/leads/action-buttons";
 import { ClientCard } from "@/components/leads/client-card";
 import { SalesScriptTab } from "@/components/leads/sales-script-tab";
+import { OfferEngineTab } from "@/components/leads/offer-engine/offer-engine-tab";
 import { useSalesScript } from "@/hooks/use-sales-script";
 import {
   useAddLeadNote,
@@ -128,6 +130,7 @@ export function AdminLeadFormPanel({
                 <PanelTab value="gestion" icon={<ClipboardList className="size-4" />} label="Gestión" />
                 <PanelTab value="cliente" icon={<User className="size-4" />} label="Cliente" />
                 <PanelTab value="script" icon={<ScrollText className="size-4" />} label="Script" />
+                <PanelTab value="oferta" icon={<Sparkles className="size-4" />} label="Motor de Oferta" />
                 <PanelTab value="notas" icon={<MessageSquare className="size-4" />} label="Notas" />
                 <PanelTab value="historial" icon={<Clock className="size-4" />} label="Historial" />
               </TabsList>
@@ -178,6 +181,10 @@ export function AdminLeadFormPanel({
                   gestionSaved={saveLead.isSuccess}
                   unavailableReason={script ? null : saveLead.data?.scriptUnavailableReason}
                 />
+              </TabsContent>
+
+              <TabsContent value="oferta" className="outline-none">
+                <OfferEngineTab conversationId={conversation.id} />
               </TabsContent>
 
               <TabsContent value="notas" className="outline-none">
