@@ -37,9 +37,10 @@ function userFromPayload(payload: SessionPayload): AuthUser | null {
 
 export const authService = {
   async login(login: string, password: string): Promise<LoginResult | null> {
-    const repo = getAuthRepository();
-    await repo.ensureSeedAdmin();
-    const user = await repo.authenticate(login, password);
+    const user = await withQueryTimeout(
+      getAuthRepository().authenticate(login, password),
+      6_000,
+    );
     if (!user) return null;
     return { user, redirectTo: redirectForRole(user.role) };
   },

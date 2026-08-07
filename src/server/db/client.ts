@@ -1,5 +1,7 @@
 import "server-only";
 import postgres, { type Sql } from "postgres";
+import { SEED_ADMIN, seedAdminPasswordHash } from "@/lib/auth/seed-admin";
+import { DEFAULT_COMPANY_ID } from "@/types/tenant";
 import { QUICK_REPLY_REQUIRED_COLUMNS, runQuickReplyAndTenantMigrations } from "@/server/db/migrations/quick-reply-schema";
 
 let sqlSingleton: Sql | null = null;
@@ -49,7 +51,7 @@ export function getSql(): Sql | null {
     // (polling de conversaciones + mensajes + markRead + perfil). Con max:1 se
     // encolaban todas en una sola conexión y bajo latencia de Neon se
     // congestionaban hasta el timeout. Requiere la URI con pooler de Neon.
-    max: Number(process.env.DB_POOL_MAX ?? 10) || 10,
+    max: Number(process.env.DB_POOL_MAX ?? 3) || 3,
     idle_timeout: 20,
     connect_timeout: 15,
     max_lifetime: 60 * 5,
@@ -96,6 +98,31 @@ export async function withQueryTimeout<T>(promise: Promise<T>, ms = 8000): Promi
 
 /** Clave del advisory lock que serializa la migración entre instancias. */
 const MIGRATION_LOCK_KEY = 828171;
+const SCHEMA_COMPLETE_KEY = "schema_complete";
+
+async function isSchemaMarkedComplete(sql: Sql): Promise<boolean> {
+  try {
+    const rows = await sql<{ value: unknown }[]>`
+      SELECT value FROM app_config WHERE key = ${SCHEMA_COMPLETE_KEY} LIMIT 1
+    `;
+    const v = rows[0]?.value;
+    return v === true || v === "true";
+  } catch {
+    return false;
+  }
+}
+
+async function markSchemaComplete(sql: Sql): Promise<void> {
+  try {
+    await sql`
+      INSERT INTO app_config (key, value)
+      VALUES (${SCHEMA_COMPLETE_KEY}, 'true'::jsonb)
+      ON CONFLICT (key) DO UPDATE SET value = 'true'::jsonb, updated_at = now()
+    `;
+  } catch {
+    /* app_config puede no existir aún en BD vacía */
+  }
+}
 
 /**
  * Huella del esquema: columnas que deben existir. Se comprueban con UNA
@@ -154,8 +181,13 @@ async function schemaIsComplete(sql: Sql): Promise<boolean> {
  */
 async function runMigrations(sql: Sql) {
   await sql.begin(async (tx) => {
-    // Serializa: solo una instancia corre el DDL a la vez; las demás esperan.
-    await tx`SELECT pg_advisory_xact_lock(${MIGRATION_LOCK_KEY})`;
+    const [{ locked }] = await tx<{ locked: boolean }[]>`
+      SELECT pg_try_advisory_xact_lock(${MIGRATION_LOCK_KEY}) AS locked
+    `;
+    if (!locked) {
+      console.info("[runMigrations] otra instancia está migrando — se omite en esta");
+      return;
+    }
 
     await tx`
       CREATE TABLE IF NOT EXISTS app_config (
@@ -335,9 +367,31 @@ async function runMigrations(sql: Sql) {
     await runQuickReplyAndTenantMigrations(tx);
 
     await tx`
+      INSERT INTO users (id, username, email, password_hash, name, role, active, avatar_url, company_id)
+      VALUES (
+        ${SEED_ADMIN.id},
+        ${SEED_ADMIN.username},
+        ${SEED_ADMIN.email},
+        ${seedAdminPasswordHash()},
+        ${SEED_ADMIN.name},
+        ${SEED_ADMIN.role},
+        true,
+        ${SEED_ADMIN.avatarUrl},
+        ${DEFAULT_COMPANY_ID}
+      )
+      ON CONFLICT (email) DO NOTHING
+    `;
+
+    await tx`
       INSERT INTO app_config (key, value)
       VALUES ('schema_migrated_at', ${JSON.stringify(new Date().toISOString())}::jsonb)
       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()
+    `;
+
+    await tx`
+      INSERT INTO app_config (key, value)
+      VALUES (${SCHEMA_COMPLETE_KEY}, 'true'::jsonb)
+      ON CONFLICT (key) DO UPDATE SET value = 'true'::jsonb, updated_at = now()
     `;
   });
 }
@@ -347,65 +401,15 @@ export function resetSchemaCache(): void {
   schemaReady = false;
   schemaPromise = null;
   authSchemaReady = false;
-  authSchemaPromise = null;
 }
 
 let authSchemaReady = false;
-let authSchemaPromise: Promise<void> | null = null;
 
-/**
- * Esquema mínimo para login y sesión. No espera migraciones pesadas (plantillas,
- * leads, etc.) que pueden agotar el timeout en cold-start y bloquear el login.
- */
+/** El login no ejecuta DDL — reservado solo por compatibilidad con imports existentes. */
 export function ensureAuthSchema(): Promise<void> {
   if (authSchemaReady) return Promise.resolve();
-  const sql = getSql();
-  if (!sql) return Promise.resolve();
-
-  if (!authSchemaPromise) {
-    authSchemaPromise = withQueryTimeout(
-      withDbRetry(async () => {
-        const [{ exists }] = await sql<{ exists: boolean }[]>`
-          SELECT EXISTS (
-            SELECT 1 FROM information_schema.tables
-            WHERE table_schema = 'public' AND table_name = 'users'
-          ) AS exists
-        `;
-
-        await sql.begin(async (tx) => {
-          if (!exists) {
-            await tx`
-              CREATE TABLE users (
-                id text PRIMARY KEY,
-                username text UNIQUE NOT NULL,
-                email text UNIQUE NOT NULL,
-                password_hash text NOT NULL,
-                name text NOT NULL,
-                role text NOT NULL,
-                active boolean NOT NULL DEFAULT true,
-                avatar_url text NOT NULL DEFAULT '',
-                created_at timestamptz NOT NULL DEFAULT now()
-              )
-            `;
-          }
-          await tx`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at timestamptz`;
-          await tx`ALTER TABLE users ADD COLUMN IF NOT EXISTS company_id text`;
-          await tx`ALTER TABLE users ADD COLUMN IF NOT EXISTS monthly_sales_goal integer`;
-        });
-      }, 2),
-      8_000,
-    )
-      .then(() => {
-        authSchemaReady = true;
-      })
-      .catch((err) => {
-        authSchemaPromise = null;
-        authSchemaReady = false;
-        console.error("[ensureAuthSchema]", err);
-        throw err;
-      });
-  }
-  return authSchemaPromise;
+  authSchemaReady = true;
+  return Promise.resolve();
 }
 
 export function ensureSchema(): Promise<void> {
@@ -416,12 +420,17 @@ export function ensureSchema(): Promise<void> {
   if (!schemaPromise) {
     schemaPromise = withQueryTimeout(
       withDbRetry(async () => {
-        // Cold-start rápido: si el esquema ya está completo, no se ejecuta DDL.
-        // Si falta algo, se migra (autorreparable).
-        if (await schemaIsComplete(sql)) return;
+        if (await isSchemaMarkedComplete(sql)) return;
+        if (await schemaIsComplete(sql)) {
+          await markSchemaComplete(sql);
+          return;
+        }
         await runMigrations(sql);
-      }),
-      30_000,
+        if (await schemaIsComplete(sql)) {
+          await markSchemaComplete(sql);
+        }
+      }, 1),
+      45_000,
     )
       .then(() => {
         schemaReady = true;
@@ -446,11 +455,9 @@ export async function pingDatabase(): Promise<{ ok: boolean; message: string }> 
     };
   }
   try {
-    await withDbRetry(async () => {
-      await ensureAuthSchema();
-      const sql = getSql()!;
-      await sql`SELECT 1 AS ok`;
-    });
+    const sql = getSql();
+    if (!sql) throw new Error("Cliente SQL no disponible.");
+    await withQueryTimeout(withDbRetry(() => sql`SELECT 1 AS ok`, 1), 5_000);
     return { ok: true, message: "Conexión OK." };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Error de conexión.";

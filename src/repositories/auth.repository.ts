@@ -11,7 +11,7 @@ import { AUTH_ROLE_LABELS } from "@/types/auth";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { SEED_ADMIN, seedAdminPasswordHash } from "@/lib/auth/seed-admin";
 import { DEFAULT_COMPANY_ID } from "@/types/tenant";
-import { ensureAuthSchema, getSql, withDbRetry } from "@/server/db/client";
+import { getSql, withDbRetry, withQueryTimeout } from "@/server/db/client";
 
 export interface AuthRepository {
   ensureSeedAdmin(): Promise<void>;
@@ -69,41 +69,47 @@ const touchCache = new Map<string, number>();
 
 class PostgresAuthRepository implements AuthRepository {
   async ensureSeedAdmin(): Promise<void> {
-    await ensureAuthSchema();
-    const sql = requireSql();
+    try {
+      const sql = requireSql();
+      const existing = await sql`
+        SELECT id FROM users WHERE email = ${SEED_ADMIN.email} LIMIT 1
+      `;
+      if (existing.length > 0) return;
 
-    const existing = await sql`
-      SELECT id FROM users WHERE email = ${SEED_ADMIN.email} LIMIT 1
-    `;
-    if (existing.length > 0) return;
-
-    await sql`
-      INSERT INTO users (id, username, email, password_hash, name, role, active, avatar_url, company_id)
-      VALUES (
-        ${SEED_ADMIN.id},
-        ${SEED_ADMIN.username},
-        ${SEED_ADMIN.email},
-        ${seedAdminPasswordHash()},
-        ${SEED_ADMIN.name},
-        ${SEED_ADMIN.role},
-        true,
-        ${SEED_ADMIN.avatarUrl},
-        ${DEFAULT_COMPANY_ID}
-      )
-    `;
+      await sql`
+        INSERT INTO users (id, username, email, password_hash, name, role, active, avatar_url, company_id)
+        VALUES (
+          ${SEED_ADMIN.id},
+          ${SEED_ADMIN.username},
+          ${SEED_ADMIN.email},
+          ${seedAdminPasswordHash()},
+          ${SEED_ADMIN.name},
+          ${SEED_ADMIN.role},
+          true,
+          ${SEED_ADMIN.avatarUrl},
+          ${DEFAULT_COMPANY_ID}
+        )
+        ON CONFLICT (email) DO NOTHING
+      `;
+    } catch (err) {
+      console.error("[ensureSeedAdmin]", err);
+    }
   }
 
+  /** Solo lectura — sin migraciones ni DDL en el camino crítico del login. */
   async authenticate(login: string, password: string): Promise<AuthUser | null> {
-    await this.ensureSeedAdmin();
     const sql = requireSql();
     const q = login.trim().toLowerCase();
-    const rows = await sql`
-      SELECT id, username, email, password_hash, name, role, active, avatar_url, company_id, monthly_sales_goal
-      FROM users
-      WHERE active = true
-        AND (lower(email) = ${q} OR lower(username) = ${q})
-      LIMIT 1
-    `;
+    const rows = await withQueryTimeout(
+      sql`
+        SELECT id, username, email, password_hash, name, role, active, avatar_url, company_id
+        FROM users
+        WHERE active = true
+          AND (lower(email) = ${q} OR lower(username) = ${q})
+        LIMIT 1
+      `,
+      5_000,
+    );
     const row = rows[0] as
       | {
           id: string;
@@ -114,6 +120,7 @@ class PostgresAuthRepository implements AuthRepository {
           role: string;
           active: boolean;
           avatar_url: string;
+          company_id?: string | null;
         }
       | undefined;
     if (!row || !verifyPassword(password, row.password_hash)) return null;
@@ -121,19 +128,20 @@ class PostgresAuthRepository implements AuthRepository {
   }
 
   async findById(id: string): Promise<AuthUser | null> {
-    await ensureAuthSchema();
     const sql = requireSql();
-    const rows = await sql`
-      SELECT id, username, email, name, role, active, avatar_url, company_id, monthly_sales_goal
-      FROM users WHERE id = ${id} LIMIT 1
-    `;
+    const rows = await withQueryTimeout(
+      sql`
+        SELECT id, username, email, name, role, active, avatar_url, company_id, monthly_sales_goal
+        FROM users WHERE id = ${id} LIMIT 1
+      `,
+      5_000,
+    );
     const row = rows[0];
     if (!row) return null;
     return mapRow(row as Parameters<typeof mapRow>[0]);
   }
 
   async listUsers(): Promise<AuthUser[]> {
-    await this.ensureSeedAdmin();
     const sql = requireSql();
     const rows = await withDbRetry(() => sql`
       SELECT id, username, email, name, role, active, avatar_url, company_id, monthly_sales_goal
@@ -165,7 +173,6 @@ class PostgresAuthRepository implements AuthRepository {
   }
 
   async createUser(input: CreateUserInput): Promise<AuthUser> {
-    await this.ensureSeedAdmin();
     const sql = requireSql();
     await this.assertUnique(input.email, input.username);
 
@@ -279,7 +286,6 @@ class PostgresAuthRepository implements AuthRepository {
     if (now - last < 60_000) return;
     touchCache.set(id, now);
     try {
-      await ensureAuthSchema();
       const sql = requireSql();
       await withDbRetry(() => sql`UPDATE users SET last_seen_at = now() WHERE id = ${id}`);
     } catch {
@@ -288,7 +294,6 @@ class PostgresAuthRepository implements AuthRepository {
   }
 
   async setAdvisorSalesGoal(id: string, monthlySalesGoal: number | null): Promise<AuthUser> {
-    await ensureAuthSchema();
     const sql = requireSql();
     const user = await this.findById(id);
     if (!user || user.role !== "asesora") {
