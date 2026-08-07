@@ -64,6 +64,14 @@ export type SalesScriptBranch = {
   referral?: {
     advisorNote: string;
   };
+  /** Bloque 1 — Inicio Línea Nueva (instrucción previa al cierre, raw [1]). */
+  inicio?: {
+    advisorNoteOnBlockStart?: string;
+  };
+  /** Bloque 6 — Despacho Línea Nueva (notas asesora raw [15]). */
+  despacho?: {
+    advisorNoteOnBlockStart?: string;
+  };
 };
 
 export type StructuredScriptStep = {

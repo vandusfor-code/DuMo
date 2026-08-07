@@ -160,6 +160,10 @@ export interface SaveLeadInput {
     equipmentCommercialText: string;
     /** Prepago → postpago: activa bloque CAP en portabilidad. */
     accountType?: LineAccountType;
+    /** Transportista logístico — obligatorio para Bloque 6 domicilio. */
+    deliveryCarrier?: "ALAS" | "SROUTE" | "CHILEPARCEL" | "NOMAD" | "";
+    /** Sucursal WOM para retiro en tienda. */
+    pickupStoreId?: string;
     /** Homologación / upselling (doc oficial línea 14). */
     isUpselling?: boolean;
   }[];

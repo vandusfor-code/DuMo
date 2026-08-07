@@ -23,15 +23,15 @@ export type Block5DeliverySpeechInput = {
   isUltraExpressDelivery: boolean;
 };
 
-function formatHomeDeliveryAddress(region: string, comuna: string, direccion: string): string {
+export function formatHomeDeliveryAddress(region: string, comuna: string, direccion: string): string {
   return [region, comuna, direccion].filter(Boolean).join(", ");
 }
 
-function formatContactPhones(phones: string[]): string {
+export function formatContactPhones(phones: string[]): string {
   return phones.filter(Boolean).join(", ");
 }
 
-function buildGeneralConditionsSpeech(): string {
+export function buildGeneralConditionsSpeech(): string {
   return [
     "Te enviaremos un mail de bienvenida al correo que nos proporcionaste; es muy importante que lo revises, ya que contiene información relevante sobre tu plan contratado y tu ciclo de facturación.",
     "",
@@ -69,12 +69,17 @@ function buildStorePickupSpeech(input: Block5DeliverySpeechInput): string {
   ].join("\n");
 }
 
+function buildContratosAnexosSpeech(): string {
+  return 'Una vez que recibas tus productos te enviaremos un correo llamado "Bienvenido a Wom" con documentos adjuntos como los contratos de servicios, anexos y detalle de líneas, en el cual podrás identificar tu número asociado a la simcard enviada.';
+}
+
+/** Compatibilidad de equipos — raw Portabilidad `[34]` / LN `[19]`. */
+export function buildCompatibilidadEquiposSpeech(): string {
+  return "Te recuerdo que puedes revisar la compatibilidad de tu equipo en nuestra web https://www.wom.cl/sello-multibandas/";
+}
+
 function buildPostDeliveryClosingSpeech(): string {
-  return [
-    "Te recuerdo que puedes revisar la compatibilidad de tu equipo en nuestra web https://www.wom.cl/sello-multibandas/",
-    "",
-    'Una vez que recibas tus productos te enviaremos un correo llamado "Bienvenido a Wom" con documentos adjuntos como los contratos de servicios, anexos y detalle de líneas, en el cual podrás identificar tu número asociado a la simcard enviada.',
-  ].join("\n");
+  return [buildCompatibilidadEquiposSpeech(), "", buildContratosAnexosSpeech()].join("\n");
 }
 
 export function buildBlock5DeliverySpeech(input: Block5DeliverySpeechInput): string {

@@ -17,7 +17,7 @@ export type ScriptFlowDefinition = {
 
 /**
  * Registro central de flujos de script.
- * Cada tipo de venta aporta solo reglas + bloques; el motor (context, UI, builder) es compartido.
+ * Línea Nueva: motor separado en linea-nueva/ — NO registrado hasta documento oficial.
  */
 export const SCRIPT_FLOW_REGISTRY: Record<string, ScriptFlowDefinition> = {
   [PORTABILIDAD_SIN_EQUIPO_KEY]: {
@@ -30,15 +30,13 @@ export const SCRIPT_FLOW_REGISTRY: Record<string, ScriptFlowDefinition> = {
     title: "Portabilidad con equipo",
     buildSteps: buildPortabilidadConEquipoFlow,
   },
-  // LINEA_NUEVA: { ... }
-  // RENOVACION: { ... }
 };
 
 function requireRegisteredFlow(key: string): ScriptFlowDefinition {
   const flow = SCRIPT_FLOW_REGISTRY[key];
   if (!flow) {
     throw new Error(
-      `No hay flujo de teleprónter registrado para la clave "${key}". Verifica SCRIPT_FLOW_REGISTRY.`,
+      `No hay flujo de teleprompter registrado para la clave "${key}". Verifica SCRIPT_FLOW_REGISTRY.`,
     );
   }
   return flow;
@@ -57,6 +55,6 @@ export function resolveScriptFlow(ctx: ScriptBuildContext): ScriptFlowDefinition
   const saleLabel = ctx.saleType;
   const equipmentSuffix = ctx.hasEquipment ? " con equipo" : " sin equipo";
   throw new Error(
-    `No hay flujo de teleprónter registrado para "${saleLabel}"${equipmentSuffix}.`,
+    `No hay flujo de teleprompter registrado para "${saleLabel}"${equipmentSuffix}.`,
   );
 }
