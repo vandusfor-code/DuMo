@@ -36,6 +36,7 @@ const EMPTY: UpsertEquipmentInput = {
   installmentsCount: 18,
   installmentValue: 0,
   commercialText: "",
+  isPieCero: false,
   color: "",
   memory: "",
   promotions: "",
@@ -73,6 +74,7 @@ export function EquipmentCatalogTable({
             <TableHead>Modelo</TableHead>
             <TableHead>Valor total</TableHead>
             <TableHead>Pie</TableHead>
+            <TableHead>Pie cero</TableHead>
             <TableHead>Cuotas</TableHead>
             <TableHead>Valor cuota</TableHead>
             <TableHead>Estado</TableHead>
@@ -87,6 +89,9 @@ export function EquipmentCatalogTable({
               <TableCell>{item.model}</TableCell>
               <TableCell>{money.format(item.totalValue)}</TableCell>
               <TableCell>{money.format(item.downPayment)}</TableCell>
+              <TableCell>
+                <PieCeroBadge enabled={item.isPieCero} />
+              </TableCell>
               <TableCell>{item.installmentsCount}</TableCell>
               <TableCell>{money.format(item.installmentValue)}</TableCell>
               <TableCell>
@@ -121,6 +126,19 @@ export function EquipmentCatalogTable({
         </TableBody>
       </Table>
     </Card>
+  );
+}
+
+function PieCeroBadge({ enabled }: { enabled: boolean }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium",
+        enabled ? "bg-brand-soft text-brand" : "bg-canvas text-muted",
+      )}
+    >
+      {enabled ? "Sí" : "No"}
+    </span>
   );
 }
 
@@ -163,6 +181,7 @@ export function EquipmentDialog({
               installmentsCount: initial.installmentsCount,
               installmentValue: initial.installmentValue,
               commercialText: initial.commercialText,
+              isPieCero: initial.isPieCero,
               color: initial.color ?? "",
               memory: initial.memory ?? "",
               promotions: initial.promotions ?? "",
@@ -217,6 +236,49 @@ export function EquipmentDialog({
           {field("Modelo", "model")}
           {field("Valor total ($)", "totalValue", "number")}
           {field("Valor del pie ($)", "downPayment", "number")}
+          <label className="block sm:col-span-2">
+            <span className="text-[13px] text-muted">¿Equipo con beneficio Pie Cero?</span>
+            <div className="mt-2 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setValues({ ...values, isPieCero: true })}
+                className={cn(
+                  "rounded-xl border px-4 py-2 text-[13px] font-medium transition-colors",
+                  values.isPieCero
+                    ? "border-brand bg-brand-soft text-brand"
+                    : "border-line bg-card text-muted hover:bg-canvas",
+                )}
+              >
+                Sí
+              </button>
+              <button
+                type="button"
+                onClick={() => setValues({ ...values, isPieCero: false })}
+                className={cn(
+                  "rounded-xl border px-4 py-2 text-[13px] font-medium transition-colors",
+                  !values.isPieCero
+                    ? "border-brand bg-brand-soft text-brand"
+                    : "border-line bg-card text-muted hover:bg-canvas",
+                )}
+              >
+                No
+              </button>
+              <span
+                className={cn(
+                  "relative ml-1 inline-flex h-6 w-11 shrink-0 rounded-full transition-colors",
+                  values.isPieCero ? "bg-brand" : "bg-line",
+                )}
+                aria-hidden
+              >
+                <span
+                  className={cn(
+                    "absolute top-0.5 size-5 rounded-full bg-white shadow transition-transform",
+                    values.isPieCero ? "translate-x-5" : "translate-x-0.5",
+                  )}
+                />
+              </span>
+            </div>
+          </label>
           {field("Cantidad de cuotas", "installmentsCount", "number")}
           {field("Valor de cada cuota ($)", "installmentValue", "number")}
           <label className="block sm:col-span-2">

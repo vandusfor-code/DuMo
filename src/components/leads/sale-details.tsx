@@ -7,6 +7,7 @@ import { SaleLine } from "./sale-line";
 import { SaleContractSummary } from "./sale-contract-summary";
 import { usePlans } from "@/hooks/use-leads";
 import { EMPTY_LEAD_LINE, type LeadFormValues } from "@/types/lead-form";
+import { SectionCard, SectionCardBody, SectionCardHeader } from "@/components/leads/premium/section-card";
 import { QueryFatalError } from "@/components/shared/query-state";
 
 /** Detalles de la venta — solo visible cuando Tipo de gestión = Venta. */
@@ -18,9 +19,10 @@ export function SaleDetails() {
   const plansReady = Boolean(plans?.length);
 
   return (
-    <div className="rounded-2xl border border-line bg-card p-5">
-      <h3 className="text-[15px] font-semibold text-ink">Líneas vendidas</h3>
-      <p className="mt-0.5 text-[13px] text-muted">
+    <SectionCard>
+      <SectionCardHeader title="Líneas vendidas" />
+      <SectionCardBody className="space-y-4 pt-0">
+      <p className="text-[13px] text-muted">
         Agrega una o varias líneas asociadas a esta venta.
       </p>
 
@@ -61,6 +63,7 @@ export function SaleDetails() {
           <SaleContractSummary plans={plans!} />
         </>
       )}
-    </div>
+      </SectionCardBody>
+    </SectionCard>
   );
 }

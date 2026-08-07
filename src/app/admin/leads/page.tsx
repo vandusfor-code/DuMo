@@ -17,7 +17,6 @@ import {
   useAdminConversations,
   useAdminLeadDetail,
   useAdminMessages,
-  useAdminSendMessage,
   useAssignAdvisor,
   useAutoAssignSettings,
   useDeleteAllConversations,
@@ -41,7 +40,6 @@ export default function AdminLeadsPage() {
 
   const detail = useAdminLeadDetail(selectedId);
   const messages = useAdminMessages(selectedId);
-  const sendMessage = useAdminSendMessage(selectedId);
 
   // Borrado de chats (solo admin). Ambas acciones piden confirmación.
   const deleteOne = useDeleteConversation();
@@ -109,11 +107,6 @@ export default function AdminLeadsPage() {
                   messages.error instanceof Error ? messages.error.message : undefined
                 }
                 onRetry={() => messages.refetch()}
-                isSending={sendMessage.isPending}
-                sendError={sendMessage.error instanceof Error ? sendMessage.error.message : null}
-                onSend={async (text) => {
-                  await sendMessage.mutateAsync({ to: selected.phone, text });
-                }}
               />
             </Card>
             <Card className="flex min-h-0 flex-col overflow-hidden rounded-none border-y-0 border-r-0 shadow-none">

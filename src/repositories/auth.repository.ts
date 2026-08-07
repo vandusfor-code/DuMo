@@ -10,6 +10,7 @@ import type {
 import { AUTH_ROLE_LABELS } from "@/types/auth";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { SEED_ADMIN, seedAdminPasswordHash } from "@/lib/auth/seed-admin";
+import { DEFAULT_COMPANY_ID } from "@/types/tenant";
 import { ensureSchema, getSql, withDbRetry } from "@/server/db/client";
 
 export interface AuthRepository {
@@ -36,6 +37,7 @@ function mapRow(r: {
   role: string;
   active: boolean;
   avatar_url: string;
+  company_id?: string | null;
 }): AuthUser {
   return {
     id: r.id,
@@ -45,6 +47,7 @@ function mapRow(r: {
     role: r.role as AuthRole,
     active: r.active,
     avatarUrl: r.avatar_url ?? "",
+    companyId: r.company_id ?? DEFAULT_COMPANY_ID,
   };
 }
 
@@ -69,7 +72,7 @@ class PostgresAuthRepository implements AuthRepository {
     if (existing.length > 0) return;
 
     await sql`
-      INSERT INTO users (id, username, email, password_hash, name, role, active, avatar_url)
+      INSERT INTO users (id, username, email, password_hash, name, role, active, avatar_url, company_id)
       VALUES (
         ${SEED_ADMIN.id},
         ${SEED_ADMIN.username},
@@ -78,7 +81,8 @@ class PostgresAuthRepository implements AuthRepository {
         ${SEED_ADMIN.name},
         ${SEED_ADMIN.role},
         true,
-        ${SEED_ADMIN.avatarUrl}
+        ${SEED_ADMIN.avatarUrl},
+        ${DEFAULT_COMPANY_ID}
       )
     `;
   }
@@ -88,7 +92,7 @@ class PostgresAuthRepository implements AuthRepository {
     const sql = requireSql();
     const q = login.trim().toLowerCase();
     const rows = await sql`
-      SELECT id, username, email, password_hash, name, role, active, avatar_url
+      SELECT id, username, email, password_hash, name, role, active, avatar_url, company_id
       FROM users
       WHERE active = true
         AND (lower(email) = ${q} OR lower(username) = ${q})
@@ -114,7 +118,7 @@ class PostgresAuthRepository implements AuthRepository {
     await this.ensureSeedAdmin();
     const sql = requireSql();
     const rows = await sql`
-      SELECT id, username, email, name, role, active, avatar_url
+      SELECT id, username, email, name, role, active, avatar_url, company_id
       FROM users WHERE id = ${id} LIMIT 1
     `;
     const row = rows[0];
@@ -126,7 +130,7 @@ class PostgresAuthRepository implements AuthRepository {
     await this.ensureSeedAdmin();
     const sql = requireSql();
     const rows = await withDbRetry(() => sql`
-      SELECT id, username, email, name, role, active, avatar_url
+      SELECT id, username, email, name, role, active, avatar_url, company_id
       FROM users
       ORDER BY name ASC
     `);
@@ -161,7 +165,7 @@ class PostgresAuthRepository implements AuthRepository {
 
     const id = `usr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     await sql`
-      INSERT INTO users (id, username, email, password_hash, name, role, active, avatar_url)
+      INSERT INTO users (id, username, email, password_hash, name, role, active, avatar_url, company_id)
       VALUES (
         ${id},
         ${input.username.trim()},
@@ -170,7 +174,8 @@ class PostgresAuthRepository implements AuthRepository {
         ${input.name.trim()},
         ${input.role},
         ${input.active ?? true},
-        ''
+        '',
+        ${DEFAULT_COMPANY_ID}
       )
     `;
     const user = await this.findById(id);

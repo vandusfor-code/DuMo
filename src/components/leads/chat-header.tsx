@@ -1,31 +1,49 @@
 "use client";
 
-import { MoreVertical, Tag, Users } from "lucide-react";
+import { MoreVertical, Phone, Tag, Video } from "lucide-react";
 import { InitialsAvatar } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/format";
+import { cn } from "@/lib/utils";
+import { useChatUiTheme } from "@/components/leads/premium/chat-theme";
 import type { Conversation } from "@/types/conversation";
 
 export function ChatHeader({ conversation }: { conversation: Conversation }) {
+  const premium = useChatUiTheme() === "premium";
+
   return (
-    <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
+    <div
+      className={cn(
+        "flex shrink-0 items-center justify-between border-b border-line px-6",
+        premium ? "h-16 px-5" : "px-5 py-3.5",
+      )}
+    >
       <div className="flex items-center gap-3">
-        <InitialsAvatar initials={getInitials(conversation.customerName)} />
+        <InitialsAvatar
+          initials={getInitials(conversation.customerName)}
+          className={premium ? "size-11 text-[14px]" : undefined}
+        />
         <div className="leading-tight">
-          <p className="text-[15px] font-semibold text-ink">
-            {conversation.customerName}
-          </p>
-          <p className="flex items-center gap-1.5 text-[12px] text-muted">
-            {conversation.online && <span className="size-2 rounded-full bg-success" />}
+          <p className="text-[16px] font-semibold text-ink">{conversation.customerName}</p>
+          <p className="flex items-center gap-1.5 text-[13px] text-muted">
+            {conversation.online && (
+              <span className="size-2 rounded-full bg-success" aria-hidden />
+            )}
             {conversation.online ? "En línea" : "Desconectado"}
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-1">
-        {[Tag, Users, MoreVertical].map((Icon, i) => (
+      <div className="flex items-center gap-0.5">
+        {[
+          { Icon: Tag, label: "Etiqueta" },
+          { Icon: Phone, label: "Llamar" },
+          { Icon: Video, label: "Videollamada" },
+          { Icon: MoreVertical, label: "Más" },
+        ].map(({ Icon, label }) => (
           <button
-            key={i}
+            key={label}
             type="button"
-            className="grid size-9 place-items-center rounded-xl text-muted transition-colors hover:bg-brand-soft hover:text-brand"
+            aria-label={label}
+            className="grid size-9 place-items-center rounded-btn text-muted transition-colors duration-200 hover:bg-hover hover:text-ink"
           >
             <Icon className="size-[18px]" />
           </button>

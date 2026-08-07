@@ -7,19 +7,31 @@
  * these hex values in components; use the semantic utilities below.
  */
 @theme {
-  /* Brand */
-  --color-brand: #6d28d9;
-  --color-brand-hover: #5b21b6;
-  --color-brand-soft: #f4f0fe; /* very light purple — row/hover surfaces */
+  /* Brand — Premium 2026 */
+  --color-brand: #7c3aed;
+  --color-brand-hover: #6d28d9;
+  --color-brand-active: #5b21b6;
+  --color-brand-soft: #f4f0fe;
 
   /* Surfaces */
-  --color-canvas: #f8f8fc; /* app background */
+  --color-canvas: #fafafb;
   --color-card: #ffffff;
-  --color-line: #ececf3; /* borders / dividers */
+  --color-hover: #f8f9fb;
+  --color-active-surface: #f7f7f8;
+  --color-chat-bg: #fcfcfd;
+  --color-line: #eceef3;
+  --color-border: #eaecf0;
+  --color-border-strong: #e4e7ec;
+
+  /* Messages */
+  --color-msg-out: #f6f7f9;
+  --color-msg-out-text: #1d2939;
 
   /* Text */
-  --color-ink: #141625; /* primary text */
-  --color-muted: #6b7280; /* secondary text */
+  --color-ink: #111827;
+  --color-muted: #667085;
+  --color-placeholder: #98a2b3;
+  --color-disabled: #cbd5e1;
 
   /* Status */
   --color-success: #22c55e;
@@ -27,26 +39,32 @@
   --color-danger: #ef4444;
 
   /* Status — soft backgrounds for badges */
-  --color-success-soft: #e7f8ee;
-  --color-success-ink: #16a34a;
-  --color-warning-soft: #fef3e2;
-  --color-warning-ink: #d97706;
-  --color-danger-soft: #fdeaea;
-  --color-danger-ink: #dc2626;
+  --color-success-soft: #ecfdf3;
+  --color-success-ink: #027a48;
+  --color-warning-soft: #fff7e8;
+  --color-warning-ink: #b54708;
+  --color-danger-soft: #fef3f2;
+  --color-danger-ink: #b42318;
+  --color-info-soft: #eef4ff;
+  --color-info-ink: #3538cd;
 
   /* Radii */
   --radius-input: 12px;
   --radius-btn: 14px;
-  --radius-card: 22px;
+  --radius-card: 20px;
+  --radius-message: 16px;
+  --radius-composer: 18px;
 
   /* Elevation */
-  --shadow-card: 0 10px 35px rgba(15, 23, 42, 0.06);
-  --shadow-pop: 0 12px 30px rgba(15, 23, 42, 0.12);
+  --shadow-card: 0 4px 18px rgba(16, 24, 40, 0.04);
+  --shadow-card-hover: 0 10px 28px rgba(16, 24, 40, 0.06);
+  --shadow-send: 0 10px 24px rgba(124, 58, 237, 0.18);
+  --shadow-pop: 0 12px 30px rgba(16, 24, 40, 0.08);
 
   /* Typography */
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 
-  /* Motion — 180–220ms per spec */
+  /* Motion */
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -77,6 +95,25 @@
 /* Área de conversación — fondo sólido alineado al canvas de DuMo. */
 @layer utilities {
   .chat-bg {
-    background-color: var(--color-canvas);
+    background-color: var(--color-chat-bg);
+  }
+
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+
+  .shadow-card-hover {
+    box-shadow: var(--shadow-card-hover);
+  }
+
+  .shadow-send {
+    box-shadow: var(--shadow-send);
+  }
+
+  /* Leads: sin scroll de página — solo paneles internos */
+  html.leads-viewport-lock,
+  body.leads-viewport-lock {
+    height: 100%;
+    overflow: hidden;
   }
 }

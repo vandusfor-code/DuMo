@@ -1,5 +1,5 @@
 import "server-only";
-import type { Lead, Plan, SaveLeadInput } from "@/types/lead";
+import type { LatestGestionDraft, Lead, LeadType, Plan, SaveLeadInput } from "@/types/lead";
 import type { GeneratedSalesScript } from "@/types/sales-script";
 import type {
   AdminAdvisor,
@@ -104,6 +104,57 @@ export class PostgresLeadRepository {
       `,
     );
     return rows[0]?.sales_script ?? null;
+  }
+
+  async getSalesScriptByGestionId(gestionId: string): Promise<GeneratedSalesScript | null> {
+    await ensureSchema();
+    const sql = getSql();
+    if (!sql) return null;
+    const rows = await withDbRetry(() =>
+      sql<{ sales_script: GeneratedSalesScript | null }[]>`
+        SELECT sales_script
+        FROM lead_gestiones
+        WHERE id = ${gestionId}
+        LIMIT 1
+      `,
+    );
+    return rows[0]?.sales_script ?? null;
+  }
+
+  async getLatestGestionDraft(conversationId: string): Promise<LatestGestionDraft | null> {
+    await ensureSchema();
+    const sql = getSql();
+    if (!sql) return null;
+    const rows = await withDbRetry(() =>
+      sql<
+        {
+          id: string;
+          customer_name: string;
+          rut: string;
+          gestion_type: string;
+          notes: string;
+          lines: SaveLeadInput["lines"] | null;
+          sales_script: GeneratedSalesScript | null;
+        }[]
+      >`
+        SELECT id, customer_name, rut, gestion_type, notes, lines, sales_script
+        FROM lead_gestiones
+        WHERE conversation_id = ${conversationId}
+        ORDER BY created_at DESC
+        LIMIT 1
+      `,
+    );
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      gestionId: row.id,
+      customerName: row.customer_name ?? "",
+      rut: row.rut ?? "",
+      type: row.gestion_type as LeadType,
+      notes: row.notes ?? "",
+      lines: Array.isArray(row.lines) ? row.lines : [],
+      hasScript: row.sales_script != null,
+    };
   }
 
   listAdminConversations(): Promise<AdminConversation[]> {

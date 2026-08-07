@@ -6,15 +6,15 @@ import { Input, InputGroup } from "@/components/ui/input";
 import { FormField } from "@/components/forms/form-field";
 import type { LeadFormValues } from "@/types/lead-form";
 
-/** Información del cliente. El teléfono viene del chat y es readOnly. */
-export function ClientCard() {
+/** Nombre y RUT editables — alimentan el guardado y el script de venta. */
+export function ClientIdentityFields() {
   const {
     register,
     formState: { errors },
   } = useFormContext<LeadFormValues>();
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <FormField label="Nombre completo" htmlFor="lead-name" error={errors.customerName?.message}>
         <InputGroup icon={<User />}>
           <Input
@@ -38,17 +38,33 @@ export function ClientCard() {
           />
         </InputGroup>
       </FormField>
+    </div>
+  );
+}
 
-      <FormField label="Teléfono de contacto" htmlFor="lead-phone" hint="(desde el chat)">
-        <InputGroup icon={<Phone />}>
-          <Input
-            id="lead-phone"
-            readOnly
-            className="h-11 cursor-not-allowed bg-canvas pl-11 text-[14px] text-muted"
-            {...register("phone")}
-          />
-        </InputGroup>
-      </FormField>
+export function ClientPhoneField() {
+  const { register } = useFormContext<LeadFormValues>();
+
+  return (
+    <FormField label="Teléfono de contacto" htmlFor="lead-phone" hint="(desde el chat)">
+      <InputGroup icon={<Phone />}>
+        <Input
+          id="lead-phone"
+          readOnly
+          className="h-11 cursor-not-allowed bg-canvas pl-11 text-[14px] text-muted"
+          {...register("phone")}
+        />
+      </InputGroup>
+    </FormField>
+  );
+}
+
+/** Información del cliente (pestaña admin u otros flujos completos). */
+export function ClientCard() {
+  return (
+    <div className="space-y-5">
+      <ClientIdentityFields />
+      <ClientPhoneField />
     </div>
   );
 }

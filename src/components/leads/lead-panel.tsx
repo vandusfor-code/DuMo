@@ -10,19 +10,25 @@ import {
   MessageSquare,
   Plus,
   ScrollText,
-  User,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LeadTypeSelect } from "./lead-type-select";
 import { SaleDetails } from "./sale-details";
 import { ObservationField } from "./observation-field";
 import { ActionButtons } from "./action-buttons";
-import { ClientCard } from "./client-card";
+import { ClientIdentityFields, ClientPhoneField } from "./client-card";
 import { SalesScriptTab } from "./sales-script-tab";
 import { useSalesScript } from "@/hooks/use-sales-script";
+import {
+  SectionCard,
+  SectionCardBody,
+  SectionCardHeader,
+} from "@/components/leads/premium/section-card";
+import { StatusBadge } from "@/components/leads/premium/status-badge";
 import type { Conversation } from "@/types/conversation";
 import type { LeadFormValues } from "@/types/lead-form";
 import type { GeneratedSalesScript } from "@/types/sales-script";
+import { cn } from "@/lib/utils";
 
 export function LeadPanel({
   conversation,
@@ -30,6 +36,7 @@ export function LeadPanel({
   isError,
   errorMessage,
   isSuccess,
+  hasSavedGestion = false,
   onCancel,
   savedScript,
   scriptUnavailableReason,
@@ -39,6 +46,7 @@ export function LeadPanel({
   isError: boolean;
   errorMessage?: string;
   isSuccess: boolean;
+  hasSavedGestion?: boolean;
   onCancel: () => void;
   savedScript?: GeneratedSalesScript | null;
   scriptUnavailableReason?: string | null;
@@ -46,8 +54,14 @@ export function LeadPanel({
   const { control } = useFormContext<LeadFormValues>();
   const type = useWatch({ control, name: "type" });
   const [activeTab, setActiveTab] = useState("gestion");
-  const { data: fetchedScript } = useSalesScript(conversation.id);
+  const {
+    data: fetchedScript,
+    isLoading: isScriptLoading,
+    isError: isScriptError,
+    refetch: refetchScript,
+  } = useSalesScript(conversation.id);
   const script = savedScript ?? fetchedScript ?? null;
+  const gestionSaved = hasSavedGestion || isSuccess;
 
   useEffect(() => {
     if (isSuccess) {
@@ -56,47 +70,66 @@ export function LeadPanel({
   }, [isSuccess]);
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
-        <p className="text-[15px] font-semibold text-ink">Gestión del cliente</p>
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex shrink-0 items-center justify-between border-b border-line px-5 py-4">
+        <h2 className="text-[18px] font-semibold leading-[1.45] text-ink">Gestión del cliente</h2>
         <button
           type="button"
-          className="inline-flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-[13px] font-medium text-brand transition-colors hover:bg-brand-soft"
+          className="inline-flex h-10 items-center gap-2 rounded-btn bg-brand px-4 text-[13px] font-semibold text-white shadow-send transition-all duration-200 hover:scale-[1.02] hover:bg-brand-hover"
         >
-          <Plus className="size-4" />
+          <Plus className="size-[18px]" />
           Nueva conversación
         </button>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-h-0 flex-1 flex-col">
-        <div className="border-b border-line px-4 pt-3">
-          <TabsList className="w-full justify-start bg-transparent p-0">
-            <PanelTab value="gestion" icon={<ClipboardList className="size-4" />} label="Gestión" />
-            <PanelTab value="cliente" icon={<User className="size-4" />} label="Cliente" />
-            <PanelTab value="script" icon={<ScrollText className="size-4" />} label="Script" />
-            <PanelTab value="notas" icon={<MessageSquare className="size-4" />} label="Notas" />
-            <PanelTab value="historial" icon={<Clock className="size-4" />} label="Historial" />
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="shrink-0 border-b border-line px-6 pt-4">
+          <TabsList className="h-auto w-full justify-start gap-1 bg-transparent p-0">
+            <PanelTab value="gestion" icon={<ClipboardList className="size-[18px]" />} label="Gestión" />
+            <PanelTab value="script" icon={<ScrollText className="size-[18px]" />} label="Script" />
+            <PanelTab value="notas" icon={<MessageSquare className="size-[18px]" />} label="Notas" />
+            <PanelTab value="historial" icon={<Clock className="size-[18px]" />} label="Historial" />
           </TabsList>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-5">
-          <TabsContent value="gestion" className="space-y-5 outline-none">
-            <LeadTypeSelect />
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-4 lg:p-5 [&_input]:h-11 [&_input]:text-[14px] [&_textarea]:text-[14px]">
+          <TabsContent value="gestion" className="space-y-6 outline-none">
+            <SectionCard>
+              <SectionCardHeader title="Información general" />
+              <SectionCardBody className="space-y-4 pt-0">
+                <ClientIdentityFields />
+                <ClientPhoneField />
+                <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
+                  <span className="text-[13px] font-medium text-muted">Estado</span>
+                  <StatusBadge variant="in_progress">En gestión</StatusBadge>
+                  {type === "venta" ? <StatusBadge variant="active">Venta</StatusBadge> : null}
+                </div>
+                <LeadTypeSelect />
+              </SectionCardBody>
+            </SectionCard>
+
             {type === "venta" && <SaleDetails />}
-            <ObservationField
-              name="observations"
-              label="Observaciones"
-              hint="(opcional)"
-              placeholder="Escribe aquí cualquier observación relevante sobre la gestión..."
-            />
+
+            <SectionCard>
+              <SectionCardHeader title="Notas de gestión" />
+              <SectionCardBody className="pt-0">
+                <ObservationField
+                  name="observations"
+                  label="Observaciones"
+                  hint="(opcional)"
+                  placeholder="Escribe aquí cualquier observación relevante sobre la gestión..."
+                />
+              </SectionCardBody>
+            </SectionCard>
+
             {isError && (
-              <div className="flex items-start gap-2.5 rounded-xl border border-danger/20 bg-danger-soft px-4 py-3 text-[13px] text-danger-ink">
+              <div className="flex items-start gap-2.5 rounded-card border border-danger/20 bg-danger-soft px-4 py-3 text-[13px] text-danger-ink">
                 <AlertCircle className="mt-0.5 size-[18px] shrink-0" />
                 <span>{errorMessage || "No se pudo guardar la gestión. Intenta nuevamente."}</span>
               </div>
             )}
             {isSuccess && (
-              <div className="flex items-center gap-2.5 rounded-xl border border-success/20 bg-success-soft px-4 py-3 text-[13px] text-success-ink">
+              <div className="flex items-center gap-2.5 rounded-card border border-success/20 bg-success-soft px-4 py-3 text-[13px] text-success-ink">
                 <CheckCircle2 className="size-[18px]" />
                 {script
                   ? "Gestión guardada correctamente. El script de venta ya está disponible."
@@ -106,29 +139,42 @@ export function LeadPanel({
             <ActionButtons isSaving={isSaving} onCancel={onCancel} />
           </TabsContent>
 
-          <TabsContent value="cliente" className="outline-none">
-            <ClientCard />
-          </TabsContent>
-
           <TabsContent value="script" className="outline-none">
-            <SalesScriptTab
-              script={script}
-              gestionSaved={isSuccess}
-              unavailableReason={script ? null : scriptUnavailableReason}
-            />
+            <SectionCard>
+              <SectionCardBody>
+                <SalesScriptTab
+                  script={script}
+                  isLoading={isScriptLoading}
+                  isError={isScriptError}
+                  onRetry={() => refetchScript()}
+                  gestionSaved={gestionSaved}
+                  unavailableReason={script ? null : scriptUnavailableReason}
+                />
+              </SectionCardBody>
+            </SectionCard>
           </TabsContent>
 
           <TabsContent value="notas" className="outline-none">
-            <ObservationField
-              name="internalNotes"
-              label="Notas internas"
-              hint="(solo para el equipo)"
-              placeholder="Comentarios internos que no ve el cliente..."
-            />
+            <SectionCard>
+              <SectionCardHeader title="Notas internas" />
+              <SectionCardBody className="pt-0">
+                <ObservationField
+                  name="internalNotes"
+                  label="Notas internas"
+                  hint="(solo para el equipo)"
+                  placeholder="Comentarios internos que no ve el cliente..."
+                />
+              </SectionCardBody>
+            </SectionCard>
           </TabsContent>
 
           <TabsContent value="historial" className="outline-none">
-            <HistoryTab conversation={conversation} />
+            <SectionCard>
+              <SectionCardHeader title="Historial" />
+              <SectionCardBody className="pt-0">
+                <HistoryTab conversation={conversation} />
+              </SectionCardBody>
+            </SectionCard>
           </TabsContent>
         </div>
       </Tabs>
@@ -148,7 +194,11 @@ function PanelTab({
   return (
     <TabsTrigger
       value={value}
-      className="flex-1 gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2 pb-2.5 text-[13px] data-[state=active]:border-brand data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+      className={cn(
+        "gap-2 rounded-none border-b-2 border-transparent bg-transparent px-3 pb-3 text-[13px] font-medium text-muted",
+        "transition-colors duration-200 data-[state=active]:border-brand data-[state=active]:text-ink",
+        "data-[state=active]:bg-transparent data-[state=active]:shadow-none",
+      )}
     >
       {icon}
       <span className="hidden sm:inline">{label}</span>
@@ -158,8 +208,16 @@ function PanelTab({
 
 function HistoryTab({ conversation }: { conversation: Conversation }) {
   const events = [
-    { title: "Conversación iniciada", detail: "El cliente escribió por WhatsApp", time: conversation.lastMessageTime },
-    { title: "Mensaje recibido", detail: conversation.lastMessage, time: conversation.lastMessageTime },
+    {
+      title: "Conversación iniciada",
+      detail: "El cliente escribió por WhatsApp",
+      time: conversation.lastMessageTime,
+    },
+    {
+      title: "Mensaje recibido",
+      detail: conversation.lastMessage,
+      time: conversation.lastMessageTime,
+    },
   ];
   return (
     <ol className="space-y-5">

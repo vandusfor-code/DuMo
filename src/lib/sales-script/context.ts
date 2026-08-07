@@ -23,6 +23,7 @@ import {
 } from "@/lib/sales-script/teleprompter/delivery-config";
 import { getTeleprompterContextError } from "@/lib/sales-script/teleprompter/teleprompter-validation";
 import { joinNaturalList } from "@/lib/sales-script/teleprompter/speech-utils";
+import { resolveEquipmentIsPieCero } from "@/lib/equipment-catalog";
 import { formatFreeBillsLabels } from "@/lib/commercial-plan-offer";
 import { commercialPlansToAdvisorOptions } from "@/lib/commercial-plans-catalog";
 import type { LeadLineValues } from "@/types/lead-form";
@@ -38,6 +39,7 @@ export type ScriptEquipmentLine = {
   installments: string;
   installmentValue: string;
   equipmentValue: string;
+  isPieCero: boolean;
 };
 
 export type ScriptBuildContext = {
@@ -164,6 +166,7 @@ function buildEquipmentLine(
     installments: line.equipmentInstallments,
     installmentValue: line.equipmentInstallmentValue,
     equipmentValue: line.equipmentValue,
+    isPieCero: resolveEquipmentIsPieCero(catalogItem),
   };
 }
 

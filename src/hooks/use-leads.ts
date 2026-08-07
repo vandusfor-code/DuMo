@@ -1,9 +1,10 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiPost } from "@/lib/api-client";
+import { apiPost, apiPostForm } from "@/lib/api-client";
 import { advisorApiGet } from "@/lib/advisor-query";
 import { salesScriptKeys } from "@/hooks/use-sales-script";
+import { latestGestionKeys } from "@/hooks/use-latest-gestion";
 import type { ChatMessage, Conversation } from "@/types/conversation";
 import type { Plan, SaveLeadInput } from "@/types/lead";
 import type { SaveLeadResult } from "@/types/sales-script";
@@ -65,11 +66,13 @@ export function useSaveLead(conversationId?: string) {
   return useMutation({
     mutationFn: (input: SaveLeadInput) => apiPost<SaveLeadResult>("/api/leads", input),
     onSuccess: (result) => {
-      if (result.script && conversationId) {
+      if (!conversationId) return;
+      if (result.script) {
         queryClient.setQueryData(salesScriptKeys.byConversation(conversationId), result.script);
-      } else if (conversationId) {
+      } else {
         queryClient.invalidateQueries({ queryKey: salesScriptKeys.byConversation(conversationId) });
       }
+      queryClient.invalidateQueries({ queryKey: latestGestionKeys.byConversation(conversationId) });
     },
   });
 }
@@ -83,6 +86,26 @@ export function useSendMessage(conversationId: string | null) {
         to: input.to,
         text: input.text,
       }),
+    onSuccess: () => {
+      if (conversationId) {
+        queryClient.invalidateQueries({ queryKey: leadKeys.messages(conversationId) });
+      }
+      queryClient.invalidateQueries({ queryKey: leadKeys.conversations });
+    },
+  });
+}
+
+export function useSendMediaMessage(conversationId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { to: string; file: File; caption?: string }) => {
+      const form = new FormData();
+      form.append("file", input.file);
+      form.append("conversationId", conversationId ?? "");
+      form.append("to", input.to);
+      if (input.caption) form.append("caption", input.caption);
+      return apiPostForm<{ ok: boolean; id: string }>("/api/whatsapp/send-media", form);
+    },
     onSuccess: () => {
       if (conversationId) {
         queryClient.invalidateQueries({ queryKey: leadKeys.messages(conversationId) });

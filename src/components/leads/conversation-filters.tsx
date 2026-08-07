@@ -22,7 +22,7 @@ export function ConversationFilters({
   counts: Record<ConversationFilter, number>;
 }) {
   return (
-    <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+    <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
       {CONVERSATION_FILTERS.map((f) => {
         const active = f.value === value;
         return (
@@ -31,18 +31,21 @@ export function ConversationFilters({
             type="button"
             onClick={() => onChange(f.value)}
             className={cn(
-              "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors duration-200",
-              active ? "bg-brand text-white" : "text-muted hover:bg-brand-soft hover:text-brand",
+              "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5",
+              "text-[13px] font-medium transition-all duration-200",
+              active
+                ? "border-border-strong bg-active-surface text-ink"
+                : "border-line bg-card text-muted hover:bg-hover hover:text-ink",
             )}
           >
             {f.label}
             <span
               className={cn(
-                "grid h-4 min-w-4 place-items-center rounded-full px-1 text-[11px] font-semibold",
-                active ? "bg-white/25 text-white" : "bg-canvas text-muted",
+                "text-[12px] font-semibold",
+                active ? "text-muted" : "text-placeholder",
               )}
             >
-              {counts[f.value]}
+              ({counts[f.value]})
             </span>
           </button>
         );

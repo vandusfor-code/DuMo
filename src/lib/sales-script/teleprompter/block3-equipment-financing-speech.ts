@@ -22,14 +22,15 @@ export function buildBlock3EquipmentFinancingSpeech(equipment: ScriptEquipmentLi
   const nameToModalidad = equipment.color.trim() ? ", " : " ";
   const financingIntro = `Adicionalmente llevarás el equipo ${equipmentName}${nameToModalidad}con modalidad de compra en cuotas`;
 
-  if (downPaymentAmount > 0) {
-    const downPayment = formatCurrency(downPaymentAmount);
-    return [
-      `${financingIntro}, donde tu pago inicial es de ${downPayment} y ${installmentsCount} cuotas fijas de ${installmentValue}.`,
-      "Una vez aprobada tu venta, recibirás a tu correo un link para que puedas realizar el pago de tu equipo en máximo 24 horas y las distintas formas de pago que podrás utilizar.",
-    ].join(" ");
+  if (equipment.isPieCero) {
+    const financingIntroZeroPie = financingIntro.replace(" en cuotas", " a cuotas");
+    const totalEquipmentValue = formatCurrency(Number(equipment.equipmentValue));
+    return `${financingIntroZeroPie}, con pie cero, financiado en ${installmentsCount} cuotas fijas de ${installmentValue}. El valor total del equipo es de ${totalEquipmentValue}.`;
   }
 
-  const financingIntroZeroPie = financingIntro.replace(" en cuotas", " a cuotas");
-  return `${financingIntroZeroPie}, sin pago inicial, financiado en ${installmentsCount} cuotas fijas de ${installmentValue}.`;
+  const downPayment = formatCurrency(downPaymentAmount);
+  return [
+    `${financingIntro}, donde tu pago inicial es de ${downPayment} y ${installmentsCount} cuotas fijas de ${installmentValue}.`,
+    "Una vez aprobada tu venta, recibirás a tu correo un link para que puedas realizar el pago de tu equipo en máximo 24 horas y las distintas formas de pago que podrás utilizar.",
+  ].join(" ");
 }

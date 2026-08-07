@@ -14,10 +14,16 @@ export function SalesScriptTab({
   script,
   unavailableReason,
   gestionSaved,
+  isLoading,
+  isError,
+  onRetry,
 }: {
   script: GeneratedSalesScript | null | undefined;
   unavailableReason?: string | null;
   gestionSaved?: boolean;
+  isLoading?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
 }) {
   const [blockIndex, setBlockIndex] = useState(0);
   const [branchPhase, setBranchPhase] = useState<BranchPhase>("idle");
@@ -104,6 +110,35 @@ export function SalesScriptTab({
       )
     : false;
 
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-line bg-canvas/50 px-6 py-12 text-center">
+        <ScrollText className="size-10 animate-pulse text-muted" />
+        <p className="mt-3 text-[14px] font-medium text-ink">Cargando script…</p>
+        <p className="mt-1 max-w-sm text-[13px] text-muted">
+          Buscando el teleprompter de la última gestión guardada.
+        </p>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-line bg-canvas/50 px-6 py-12 text-center">
+        <ScrollText className="size-10 text-muted" />
+        <p className="mt-3 text-[14px] font-medium text-ink">No se pudo cargar el script</p>
+        <p className="mt-1 max-w-sm text-[13px] text-muted">
+          Revisa tu conexión e intenta de nuevo.
+        </p>
+        {onRetry ? (
+          <Button type="button" variant="secondary" size="sm" className="mt-4" onClick={onRetry}>
+            Reintentar
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
+
   if (!script) {
     return (
       <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-line bg-canvas/50 px-6 py-12 text-center">
@@ -116,7 +151,7 @@ export function SalesScriptTab({
             ? unavailableReason
             : gestionSaved
               ? "La gestión se guardó, pero no se pudo generar el script con los datos ingresados."
-              : "Guarda una gestión de venta de Portabilidad sin equipo para generar automáticamente el script de la llamada."}
+              : "Guarda una gestión de venta de Portabilidad (sin equipo o con equipo) para generar automáticamente el script de la llamada."}
         </p>
       </div>
     );

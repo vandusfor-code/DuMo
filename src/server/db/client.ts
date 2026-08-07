@@ -1,5 +1,6 @@
 import "server-only";
 import postgres, { type Sql } from "postgres";
+import { QUICK_REPLY_REQUIRED_COLUMNS, runQuickReplyAndTenantMigrations } from "@/server/db/migrations/quick-reply-schema";
 
 let sqlSingleton: Sql | null = null;
 let schemaPromise: Promise<void> | null = null;
@@ -109,6 +110,7 @@ const REQUIRED_COLUMNS = [
   "sale_lines.sale_id",
   "commission_payments.advisor_id",
   "lead_gestiones.conversation_id",
+  ...QUICK_REPLY_REQUIRED_COLUMNS,
 ];
 
 /** ¿Está el esquema completo? Una sola consulta al catálogo. */
@@ -297,12 +299,20 @@ async function runMigrations(sql: Sql) {
     `;
     await tx`ALTER TABLE lead_gestiones ADD COLUMN IF NOT EXISTS sales_script jsonb`;
 
+    await runQuickReplyAndTenantMigrations(tx);
+
     await tx`
       INSERT INTO app_config (key, value)
       VALUES ('schema_migrated_at', ${JSON.stringify(new Date().toISOString())}::jsonb)
       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()
     `;
   });
+}
+
+/** Fuerza re-ejecución de migraciones (p. ej. tras deploy con tablas nuevas). */
+export function resetSchemaCache(): void {
+  schemaReady = false;
+  schemaPromise = null;
 }
 
 export function ensureSchema(): Promise<void> {
@@ -325,9 +335,9 @@ export function ensureSchema(): Promise<void> {
       })
       .catch((err) => {
         schemaPromise = null;
+        schemaReady = false;
         console.error("[ensureSchema]", err);
-        // Evita bloquear cada request si la migración falla pero las tablas ya existen.
-        schemaReady = true;
+        throw err;
       });
   }
   return schemaPromise;

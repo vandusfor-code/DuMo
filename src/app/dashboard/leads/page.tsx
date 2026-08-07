@@ -1,17 +1,38 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Card } from "@/components/ui/card";
+import { useEffect, useMemo, useState } from "react";
 import { ConversationList } from "@/components/leads/conversation-list";
 import { ChatWindow } from "@/components/leads/chat-window";
 import { LeadFormPanel } from "@/components/leads/lead-form-panel";
 import { EmptyConversation } from "@/components/leads/empty-conversation";
+import { SectionCard } from "@/components/leads/premium/section-card";
 import { useConversations, useConversationMessages } from "@/hooks/use-leads";
+import { cn } from "@/lib/utils";
 import type { Conversation } from "@/types/conversation";
+
+const LIST_COLLAPSED_KEY = "dumo-leads-list-collapsed";
 
 export default function LeadsPage() {
   const { data: conversations, isLoading, isError, isFetching, refetch } = useConversations();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [listCollapsed, setListCollapsed] = useState(false);
+
+  useEffect(() => {
+    try {
+      setListCollapsed(localStorage.getItem(LIST_COLLAPSED_KEY) === "1");
+    } catch {
+      /* storage no disponible */
+    }
+  }, []);
+
+  const handleListCollapsed = (collapsed: boolean) => {
+    setListCollapsed(collapsed);
+    try {
+      localStorage.setItem(LIST_COLLAPSED_KEY, collapsed ? "1" : "0");
+    } catch {
+      /* storage no disponible */
+    }
+  };
 
   const selected = useMemo<Conversation | null>(
     () => conversations?.find((c) => c.id === selectedId) ?? null,
@@ -22,52 +43,62 @@ export default function LeadsPage() {
   const list = conversations ?? [];
 
   return (
-    <div className="grid h-full grid-cols-1 lg:grid-cols-[24fr_41fr_35fr]">
-      {/* Column 1 — conversations */}
-      <Card className="flex min-h-0 flex-col overflow-hidden rounded-none border-y-0 border-l-0 shadow-none">
-        {isError && list.length > 0 ? (
-          <div className="border-b border-warning-soft bg-warning-soft px-4 py-2 text-[12px] text-warning-ink">
-            No se pudo sincronizar. Mostrando la última versión.{" "}
-            <button type="button" onClick={() => refetch()} className="font-semibold underline">
-              Reintentar
-            </button>
-          </div>
-        ) : null}
-        <ConversationList
-          conversations={list}
-          isLoading={isLoading && list.length === 0}
-          isError={isError && list.length === 0}
-          isSyncing={isFetching && list.length > 0}
-          onRetry={() => refetch()}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
-        />
-      </Card>
+    <div className="leads-crm flex h-full min-h-0 flex-col overflow-hidden bg-canvas p-4 lg:p-5">
+      <div
+        className={cn(
+          "grid min-h-0 flex-1 gap-4 overflow-hidden transition-[grid-template-columns] duration-200 ease-out",
+          listCollapsed
+            ? "lg:grid-cols-[72px_minmax(300px,540px)_minmax(440px,1fr)] xl:grid-cols-[72px_minmax(320px,560px)_minmax(480px,1fr)]"
+            : "lg:grid-cols-[minmax(280px,340px)_minmax(300px,540px)_minmax(440px,1fr)] xl:grid-cols-[360px_minmax(320px,560px)_minmax(480px,1fr)]",
+        )}
+      >
+        <SectionCard className="flex min-h-0 flex-col overflow-hidden">
+          {isError && list.length > 0 && !listCollapsed ? (
+            <div className="border-b border-line bg-warning-soft px-5 py-2.5 text-[12px] text-warning-ink">
+              No se pudo sincronizar. Mostrando la última versión.{" "}
+              <button type="button" onClick={() => refetch()} className="font-semibold underline">
+                Reintentar
+              </button>
+            </div>
+          ) : null}
+          <ConversationList
+            conversations={list}
+            isLoading={isLoading && list.length === 0}
+            isError={isError && list.length === 0}
+            isSyncing={isFetching && list.length > 0}
+            onRetry={() => refetch()}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            collapsed={listCollapsed}
+            onCollapsedChange={handleListCollapsed}
+          />
+        </SectionCard>
 
-      {/* Columns 2 & 3 */}
-      {selected ? (
-        <>
-          <Card className="flex min-h-0 flex-col overflow-hidden rounded-none border-y-0 shadow-none">
-            <ChatWindow
-              conversation={selected}
-              messages={messages.data ?? []}
-              isLoading={messages.isLoading}
-              isError={messages.isError}
-              errorMessage={
-                messages.error instanceof Error ? messages.error.message : undefined
-              }
-              onRetry={() => messages.refetch()}
-            />
-          </Card>
-          <Card className="flex min-h-0 flex-col overflow-hidden rounded-none border-y-0 border-r-0 shadow-none">
-            <LeadFormPanel key={selected.id} conversation={selected} />
-          </Card>
-        </>
-      ) : (
-        <Card className="flex min-h-0 flex-col overflow-hidden rounded-none border-y-0 border-r-0 shadow-none lg:col-span-2">
-          <EmptyConversation />
-        </Card>
-      )}
+        {selected ? (
+          <>
+            <SectionCard className="flex min-h-0 flex-col overflow-hidden p-0">
+              <ChatWindow
+                conversation={selected}
+                messages={messages.data ?? []}
+                isLoading={messages.isLoading}
+                isError={messages.isError}
+                errorMessage={
+                  messages.error instanceof Error ? messages.error.message : undefined
+                }
+                onRetry={() => messages.refetch()}
+                uiTheme="premium"
+              />
+            </SectionCard>
+            <SectionCard className="flex min-h-0 flex-col overflow-hidden">
+              <LeadFormPanel key={selected.id} conversation={selected} />
+            </SectionCard>
+          </>
+        ) : (
+          <SectionCard className="flex min-h-0 flex-col overflow-hidden lg:col-span-2">
+            <EmptyConversation />
+          </SectionCard>
+        )}
+      </div>
     </div>
   );
 }

@@ -11,6 +11,8 @@ export interface EquipmentCatalogItem {
   installmentsCount: number;
   installmentValue: number;
   commercialText: string;
+  /** Campaña comercial Pie Cero (independiente del valor económico del pie). */
+  isPieCero: boolean;
   color?: string;
   memory?: string;
   promotions?: string;

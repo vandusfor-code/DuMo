@@ -16,6 +16,10 @@ export interface IncomingMessage {
   createdAt: string; // ISO
   /** Número de DuMo (phone_number_id) por el que entró el mensaje. */
   dumoPhoneId?: string;
+  messageType?: "text" | "image";
+  mediaAssetId?: string;
+  caption?: string;
+  companyId?: string;
 }
 
 /** Un número conectado a DuMo (lo registra "Conectar con DuMo"). */
@@ -92,6 +96,10 @@ type MsgRow = {
   body: string;
   created_at: string | Date;
   read: boolean;
+  message_type?: string;
+  media_asset_id?: string | null;
+  caption?: string | null;
+  media_public_url?: string | null;
 };
 
 function isoTimestamp(value: string | Date): string {
@@ -143,22 +151,31 @@ class PostgresConversationRepository implements ConversationRepository {
     const rows = await withQueryTimeout(
       withDbRetry(() =>
         sql`
-          SELECT id, conversation_id, direction, body, created_at, read
-          FROM lead_messages
-          WHERE conversation_id = ${conversationId}
-          ORDER BY created_at ASC
+          SELECT m.id, m.conversation_id, m.direction, m.body, m.created_at, m.read,
+                 m.message_type, m.media_asset_id, m.caption, a.public_url AS media_public_url
+          FROM lead_messages m
+          LEFT JOIN media_assets a ON a.id = m.media_asset_id
+          WHERE m.conversation_id = ${conversationId}
+          ORDER BY m.created_at ASC
         `,
       ),
       10_000,
     );
-    return (rows as unknown as MsgRow[]).map((r) => ({
-      id: r.id,
-      conversationId: r.conversation_id,
-      text: r.body ?? "",
-      time: formatChatTime(isoTimestamp(r.created_at)),
-      direction: r.direction === "out" ? "out" : "in",
-      read: Boolean(r.read),
-    }));
+    return (rows as unknown as MsgRow[]).map((r) => {
+      const isImage = r.message_type === "image" && Boolean(r.media_public_url);
+      return {
+        id: r.id,
+        conversationId: r.conversation_id,
+        text: r.body ?? "",
+        time: formatChatTime(isoTimestamp(r.created_at)),
+        direction: r.direction === "out" ? "out" : "in",
+        read: Boolean(r.read),
+        messageType: isImage ? "image" : "text",
+        mediaUrl: isImage ? (r.media_public_url ?? undefined) : undefined,
+        caption: isImage ? (r.caption ?? undefined) : undefined,
+        mediaAssetId: isImage ? (r.media_asset_id ?? undefined) : undefined,
+      };
+    });
   }
 
   async saveMessage(msg: IncomingMessage): Promise<void> {
@@ -187,9 +204,16 @@ class PostgresConversationRepository implements ConversationRepository {
     `;
 
     await sql`
-      INSERT INTO lead_messages (id, conversation_id, direction, body, created_at, read)
-      VALUES (${msg.waMessageId}, ${msg.conversationId}, ${msg.direction},
-              ${msg.body}, ${msg.createdAt}, ${msg.direction === "out"})
+      INSERT INTO lead_messages (
+        id, conversation_id, direction, body, created_at, read,
+        message_type, media_asset_id, caption, company_id
+      )
+      VALUES (
+        ${msg.waMessageId}, ${msg.conversationId}, ${msg.direction},
+        ${msg.body}, ${msg.createdAt}, ${msg.direction === "out"},
+        ${msg.messageType ?? "text"}, ${msg.mediaAssetId ?? null},
+        ${msg.caption ?? null}, ${msg.companyId ?? null}
+      )
       ON CONFLICT (id) DO NOTHING
     `;
   }

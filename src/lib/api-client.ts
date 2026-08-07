@@ -90,3 +90,17 @@ export async function apiDelete<T>(url: string): Promise<T> {
     headers: { Accept: "application/json" },
   });
 }
+
+/** POST multipart (p. ej. imágenes). No fija Content-Type: el navegador añade el boundary. */
+export async function apiPostForm<T>(
+  url: string,
+  form: FormData,
+  timeoutMs = 60_000,
+): Promise<T> {
+  return fetchJson<T>(url, {
+    method: "POST",
+    body: form,
+    timeoutMs,
+    headers: { Accept: "application/json" },
+  });
+}

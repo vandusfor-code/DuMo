@@ -3,8 +3,16 @@
  * Única fuente de verdad: equipment.repository / pantalla Admin Equipos.
  */
 
-import type { EquipmentCatalogItem } from "@/types/equipment";
+import type { EquipmentCatalogItem, UpsertEquipmentInput } from "@/types/equipment";
 import type { SaveLeadInput } from "@/types/lead";
+
+/** Compatibilidad: catálogos antiguos sin isPieCero usaban downPayment === 0. */
+export function resolveEquipmentIsPieCero(
+  item: Pick<EquipmentCatalogItem, "isPieCero" | "downPayment">,
+): boolean {
+  if (typeof item.isPieCero === "boolean") return item.isPieCero;
+  return Number(item.downPayment) === 0;
+}
 
 function lineLabel(index: number, isMain: boolean): string {
   if (isMain) return "la línea principal";
@@ -130,6 +138,16 @@ export function validateLineEquipmentForTeleprompter(
     );
   }
 
+  return null;
+}
+
+/** Valida campos obligatorios al crear o editar un equipo en el catálogo maestro. */
+export function validateEquipmentCatalogInput(
+  input: UpsertEquipmentInput & { isPieCero?: boolean },
+): string | null {
+  if (input.isPieCero !== undefined && typeof input.isPieCero !== "boolean") {
+    return "Indica si el equipo tiene beneficio Pie Cero (Sí o No).";
+  }
   return null;
 }
 

@@ -1,28 +1,19 @@
 "use client";
 
+import { useEffect } from "react";
 import { LeadPanel } from "./lead-panel";
 import { useSaveLead } from "@/hooks/use-leads";
+import { useLatestGestionDraft } from "@/hooks/use-latest-gestion";
 import type { Conversation } from "@/types/conversation";
-import { EMPTY_LEAD_LINE, type LeadFormValues } from "@/types/lead-form";
+import { type LeadFormValues } from "@/types/lead-form";
 import type { SaveLeadInput } from "@/types/lead";
 import {
+  draftToFormValues,
   formatSaveLeadApiError,
   isCompleteSaleLine,
   mapSaleLineForSave,
 } from "@/lib/lead-save";
 import { useForm, FormProvider } from "react-hook-form";
-
-function defaultsFor(c: Conversation): LeadFormValues {
-  return {
-    customerName: c.customerName,
-    rut: c.rut,
-    phone: c.phone,
-    type: "venta",
-    observations: "",
-    internalNotes: "",
-    lines: [{ ...EMPTY_LEAD_LINE }],
-  };
-}
 
 /**
  * Owns the commercial-management form. Mounted with `key={conversation.id}` by
@@ -31,9 +22,16 @@ function defaultsFor(c: Conversation): LeadFormValues {
  */
 export function LeadFormPanel({ conversation }: { conversation: Conversation }) {
   const saveLead = useSaveLead(conversation.id);
+  const gestionDraft = useLatestGestionDraft(conversation.id);
   const methods = useForm<LeadFormValues>({
-    defaultValues: defaultsFor(conversation),
+    defaultValues: draftToFormValues({ conversation }),
   });
+
+  useEffect(() => {
+    if (gestionDraft.isLoading) return;
+    methods.reset(draftToFormValues({ conversation, draft: gestionDraft.data }));
+    // Solo al cambiar de conversación o cuando llega otra gestión guardada.
+  }, [conversation.id, gestionDraft.data?.gestionId, gestionDraft.isLoading]);
 
   const onSubmit = methods.handleSubmit(async (values) => {
     if (values.type === "venta") {
@@ -74,16 +72,19 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
 
   return (
     <FormProvider {...methods}>
-      <form onSubmit={onSubmit} className="flex h-full flex-col">
+      <form onSubmit={onSubmit} className="flex h-full min-h-0 flex-col overflow-hidden">
         <LeadPanel
           conversation={conversation}
           isSaving={saveLead.isPending}
           isError={Boolean(methods.formState.errors.root) || saveLead.isError}
           errorMessage={methods.formState.errors.root?.message}
           isSuccess={saveLead.isSuccess}
+          hasSavedGestion={saveLead.isSuccess || Boolean(gestionDraft.data?.gestionId)}
           savedScript={saveLead.data?.script ?? null}
           scriptUnavailableReason={saveLead.data?.scriptUnavailableReason ?? null}
-          onCancel={() => methods.reset(defaultsFor(conversation))}
+          onCancel={() =>
+            methods.reset(draftToFormValues({ conversation, draft: gestionDraft.data }))
+          }
         />
       </form>
     </FormProvider>

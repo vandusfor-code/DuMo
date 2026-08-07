@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { getTenantScope } from "@/lib/tenant-scope";
 import { leadsService } from "@/services/leads.service";
 
 export const runtime = "nodejs";
@@ -12,6 +13,11 @@ const sendSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const scope = await getTenantScope();
+  if (!scope) {
+    return NextResponse.json({ error: "No autenticado." }, { status: 401 });
+  }
+
   let body: unknown;
   try {
     body = await request.json();

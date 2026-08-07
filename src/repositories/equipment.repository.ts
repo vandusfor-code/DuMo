@@ -6,6 +6,7 @@ import type {
   UpsertEquipmentInput,
 } from "@/types/equipment";
 import { EQUIPMENT_CATALOG_MOCK } from "@/data/mock/equipment.mock";
+import { resolveEquipmentIsPieCero } from "@/lib/equipment-catalog";
 import { getConfig, setConfig } from "@/server/db/app-config";
 import { hasDatabase } from "@/server/db/client";
 
@@ -27,6 +28,7 @@ function normalizeItem(raw: EquipmentCatalogItem): EquipmentCatalogItem {
     downPayment: Number(raw.downPayment) || 0,
     installmentsCount: Number(raw.installmentsCount) || 0,
     installmentValue: Number(raw.installmentValue) || 0,
+    isPieCero: resolveEquipmentIsPieCero(raw),
     status: raw.status === "inactive" ? "inactive" : "active",
   };
 }

@@ -1,5 +1,5 @@
 import "server-only";
-import type { Lead, Plan, SaveLeadInput } from "@/types/lead";
+import type { LatestGestionDraft, Lead, Plan, SaveLeadInput } from "@/types/lead";
 import type { GeneratedSalesScript } from "@/types/sales-script";
 import type {
   AdminAdvisor,
@@ -27,6 +27,8 @@ export interface LeadRepository {
   saveLead(input: SaveLeadInput): Promise<Lead>;
   saveSalesScript(gestionId: string, script: GeneratedSalesScript): Promise<void>;
   getLatestSalesScript(conversationId: string): Promise<GeneratedSalesScript | null>;
+  getSalesScriptByGestionId(gestionId: string): Promise<GeneratedSalesScript | null>;
+  getLatestGestionDraft(conversationId: string): Promise<LatestGestionDraft | null>;
   /** Admin CRM */
   listAdminConversations(): Promise<AdminConversation[]>;
   getAdminDetail(conversationId: string): Promise<AdminLeadDetail>;
@@ -63,6 +65,7 @@ class MockLeadRepository implements LeadRepository {
   private conversations: AdminConversation[] = [];
   private notes: LeadNote[] = [];
   private scriptsByConversation = new Map<string, GeneratedSalesScript>();
+  private scriptsByGestionId = new Map<string, GeneratedSalesScript>();
 
   async getPlans() {
     return withLatency(await commercialPlansService.getAdvisorPlanOptions());
@@ -71,13 +74,22 @@ class MockLeadRepository implements LeadRepository {
     return withLatency(buildLead(`LEAD-${Date.now()}`, input));
   }
 
-  saveSalesScript(_gestionId: string, script: GeneratedSalesScript) {
+  saveSalesScript(gestionId: string, script: GeneratedSalesScript) {
     this.scriptsByConversation.set(script.conversationId, script);
+    this.scriptsByGestionId.set(gestionId, script);
     return withLatency(undefined);
   }
 
   getLatestSalesScript(conversationId: string) {
     return withLatency(this.scriptsByConversation.get(conversationId) ?? null);
+  }
+
+  getSalesScriptByGestionId(gestionId: string) {
+    return withLatency(this.scriptsByGestionId.get(gestionId) ?? null);
+  }
+
+  getLatestGestionDraft() {
+    return withLatency(null);
   }
 
   listAdminConversations() {
@@ -250,6 +262,14 @@ class SheetsLeadRepository implements LeadRepository {
   }
 
   getLatestSalesScript() {
+    return withLatency(null);
+  }
+
+  getSalesScriptByGestionId() {
+    return withLatency(null);
+  }
+
+  getLatestGestionDraft() {
     return withLatency(null);
   }
 }

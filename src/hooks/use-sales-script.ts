@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { apiGet } from "@/lib/api-client";
+import { advisorApiGet } from "@/lib/advisor-query";
 import type { GeneratedSalesScript } from "@/types/sales-script";
 
 export const salesScriptKeys = {
@@ -12,10 +12,12 @@ export function useSalesScript(conversationId: string, enabled = true) {
   return useQuery({
     queryKey: salesScriptKeys.byConversation(conversationId),
     queryFn: () =>
-      apiGet<GeneratedSalesScript | null>(
+      advisorApiGet<GeneratedSalesScript | null>(
         `/api/leads/script?conversationId=${encodeURIComponent(conversationId)}`,
       ),
     enabled: Boolean(conversationId) && enabled,
-    staleTime: 30_000,
+    staleTime: 15_000,
+    retry: 2,
+    refetchOnWindowFocus: true,
   });
 }

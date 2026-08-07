@@ -13,8 +13,8 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
       className={cn(
         "h-[52px] w-full rounded-input border border-line bg-card px-4 text-[15px] text-ink shadow-sm/0",
         "placeholder:text-muted/70",
-        "transition-colors duration-200 outline-none",
-        "focus-visible:border-brand focus-visible:ring-4 focus-visible:ring-brand/12",
+        "transition-colors duration-150 outline-none",
+        "focus-visible:border-brand focus-visible:shadow-[0_0_0_4px_rgba(124,58,237,0.08)]",
         "disabled:cursor-not-allowed disabled:bg-canvas disabled:text-muted",
         "aria-[invalid=true]:border-danger aria-[invalid=true]:ring-4 aria-[invalid=true]:ring-danger/12",
         className,

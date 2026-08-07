@@ -5,6 +5,7 @@ import { getInitials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Conversation } from "@/types/conversation";
 
+/** ConversationCard — tarjeta compacta de conversación. */
 export function ConversationItem({
   conversation,
   active,
@@ -14,53 +15,53 @@ export function ConversationItem({
   active: boolean;
   onClick: () => void;
 }) {
+  const statusLabel = conversation.online
+    ? "En línea"
+    : conversation.unread > 0
+      ? "No leído"
+      : "Visto";
+
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        "flex w-full items-start gap-3 rounded-2xl border px-3.5 py-3 text-left transition-colors duration-200",
+        "flex w-full items-center gap-3 rounded-[14px] border px-3 py-2.5 text-left",
+        "transition-colors duration-200",
         active
-          ? "border-brand/20 bg-brand-soft"
-          : "border-transparent hover:bg-canvas",
+          ? "border-border-strong bg-active-surface"
+          : "border-transparent bg-card hover:bg-hover",
       )}
     >
       <div className="relative shrink-0">
-        <InitialsAvatar initials={getInitials(conversation.customerName)} />
+        <InitialsAvatar
+          initials={getInitials(conversation.customerName)}
+          className="size-10 text-[13px]"
+        />
         {conversation.online && (
-          <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-card bg-success" />
+          <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-card bg-success" />
         )}
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-2">
-          <p className="truncate text-[14px] font-semibold text-ink">
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="truncate text-[14px] font-semibold leading-tight text-ink">
             {conversation.customerName}
           </p>
-          <span className="shrink-0 text-[11px] text-muted">
-            {conversation.lastMessageTime}
-          </span>
+          <span className="shrink-0 text-[11px] text-muted">{conversation.lastMessageTime}</span>
         </div>
-        <div className="mt-0.5 flex items-center justify-between gap-2">
-          <p className="truncate text-[13px] text-muted">{conversation.lastMessage}</p>
-          {conversation.unread > 0 && (
-            <span className="grid size-5 shrink-0 place-items-center rounded-full bg-brand text-[11px] font-semibold text-white">
+        <div className="mt-0.5 flex items-center gap-2">
+          <p className="min-w-0 flex-1 truncate text-[13px] leading-snug text-muted">
+            {conversation.lastMessage}
+          </p>
+          {conversation.unread > 0 ? (
+            <span className="grid size-5 min-w-5 shrink-0 place-items-center rounded-full bg-brand text-[10px] font-semibold text-white">
               {conversation.unread}
             </span>
+          ) : (
+            <span className="shrink-0 text-[11px] text-placeholder">{statusLabel}</span>
           )}
         </div>
-        <span
-          className={cn(
-            "mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
-            conversation.online
-              ? "bg-success-soft text-success-ink"
-              : conversation.unread > 0
-                ? "bg-brand-soft text-brand"
-                : "bg-canvas text-muted",
-          )}
-        >
-          {conversation.online ? "En línea" : conversation.unread > 0 ? "No leído" : "Visto"}
-        </span>
       </div>
     </button>
   );

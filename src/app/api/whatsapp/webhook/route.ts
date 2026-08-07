@@ -5,18 +5,29 @@ import { leadsService } from "@/services/leads.service";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/**
- * Webhook de WhatsApp — Opción A (una sola Meta App en dulabs).
- *
- * Meta entrega TODO a dulabs (webhook único de la app). dulabs reenvía a este
- * endpoint solo los eventos de los números de DuMo. Por eso aquí aceptamos:
- *   - la firma original de Meta `X-Hub-Signature-256` (si dulabs reenvía el
- *     body crudo + ese header), validada con META_APP_SECRET; o
- *   - un secreto compartido `X-DuMo-Forward-Secret` == WHATSAPP_FORWARD_SECRET
- *     (si dulabs reenvía sin la firma original).
- *
- * El GET (hub.challenge) queda por si algún día Meta apunta directo a DuMo.
- */
+const UNSUPPORTED_TYPE_LABELS: Record<string, string> = {
+  document: "documentos",
+  video: "videos",
+  audio: "audios",
+  sticker: "stickers",
+  location: "ubicaciones",
+  contacts: "contactos",
+  interactive: "mensajes interactivos",
+  button: "botones",
+  reaction: "reacciones",
+  order: "pedidos",
+  system: "mensajes del sistema",
+  unknown: "este tipo de contenido",
+};
+
+function unsupportedBody(type: string): string {
+  const label = UNSUPPORTED_TYPE_LABELS[type] ?? UNSUPPORTED_TYPE_LABELS.unknown;
+  return `⚠️ DuMo no admite ${label}. Pide al cliente que envíe texto o una imagen.`;
+}
+
+function imageDownloadFailedBody(): string {
+  return "⚠️ No se pudo recibir la imagen. Pide al cliente que la reenvíe.";
+}
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
@@ -52,12 +63,95 @@ function hasValidForwardSecret(request: NextRequest): boolean {
   return safeEqual(provided, expected);
 }
 
-/** Números de DuMo permitidos (coma-separados). Vacío = acepta todos. */
 function allowedPhoneIds(): string[] {
   return (process.env.WHATSAPP_PHONE_NUMBER_IDS ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+type WaImagePayload = {
+  id?: string;
+  mime_type?: string;
+  caption?: string;
+};
+
+type WaMessage = {
+  from?: string;
+  id?: string;
+  timestamp?: string;
+  type?: string;
+  text?: { body?: string };
+  image?: WaImagePayload;
+};
+
+async function persistInboundMessage(input: {
+  msg: WaMessage;
+  phoneId?: string;
+  customerName: string;
+}) {
+  const { msg, phoneId, customerName } = input;
+  if (!msg.from || !msg.id) return;
+
+  const createdAt = msg.timestamp
+    ? new Date(Number(msg.timestamp) * 1000).toISOString()
+    : new Date().toISOString();
+
+  const base = {
+    waMessageId: msg.id,
+    conversationId: msg.from,
+    phone: msg.from,
+    customerName,
+    direction: "in" as const,
+    createdAt,
+    dumoPhoneId: phoneId,
+  };
+
+  const type = msg.type ?? "text";
+
+  if (type === "text" && msg.text?.body) {
+    await leadsService.receiveMessage({
+      ...base,
+      body: msg.text.body,
+      messageType: "text",
+    });
+    return;
+  }
+
+  if (type === "image" && msg.image?.id) {
+    try {
+      await leadsService.receiveInboundImage({
+        ...base,
+        waMediaId: msg.image.id,
+        caption: msg.image.caption,
+        mimeType: msg.image.mime_type,
+      });
+      return;
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      console.error("[webhook] inbound image failed", { messageId: msg.id, detail, error });
+      await leadsService.receiveMessage({
+        ...base,
+        body: imageDownloadFailedBody(),
+        messageType: "text",
+      });
+      return;
+    }
+  }
+
+  if (type !== "text") {
+    console.warn("[webhook] unsupported message type", { type, messageId: msg.id, from: msg.from });
+    await leadsService.receiveMessage({
+      ...base,
+      body: unsupportedBody(type),
+      messageType: "text",
+    });
+    return;
+  }
+
+  if (msg.text?.body) {
+    await leadsService.receiveMessage({ ...base, body: msg.text.body, messageType: "text" });
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -77,13 +171,7 @@ export async function POST(request: NextRequest) {
           value?: {
             metadata?: { phone_number_id?: string };
             contacts?: { profile?: { name?: string }; wa_id?: string }[];
-            messages?: {
-              from?: string;
-              id?: string;
-              timestamp?: string;
-              type?: string;
-              text?: { body?: string };
-            }[];
+            messages?: WaMessage[];
           };
         }[];
       }[];
@@ -94,24 +182,17 @@ export async function POST(request: NextRequest) {
     for (const entry of payload.entry ?? []) {
       for (const change of entry.changes ?? []) {
         const phoneId = change.value?.metadata?.phone_number_id;
-        // Ignora números que no son de DuMo (si hay lista de permitidos).
-        if (allow.length > 0 && phoneId && !allow.includes(phoneId)) continue;
+        if (allow.length > 0 && phoneId && !allow.includes(phoneId)) {
+          console.warn("[webhook] ignored phone_number_id", phoneId);
+          continue;
+        }
 
         const contact = change.value?.contacts?.[0];
         for (const msg of change.value?.messages ?? []) {
-          if (!msg.from || !msg.id) continue;
-          const createdAt = msg.timestamp
-            ? new Date(Number(msg.timestamp) * 1000).toISOString()
-            : new Date().toISOString();
-          await leadsService.receiveMessage({
-            waMessageId: msg.id,
-            conversationId: msg.from,
-            phone: msg.from,
+          await persistInboundMessage({
+            msg,
+            phoneId,
             customerName: contact?.profile?.name ?? "",
-            body: msg.text?.body ?? `[${msg.type ?? "mensaje"}]`,
-            direction: "in",
-            createdAt,
-            dumoPhoneId: phoneId,
           });
         }
       }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api-client";
+import { apiDelete, apiGet, apiPost, apiPostForm, apiPut } from "@/lib/api-client";
 import type {
   AdminAdvisor,
   AdminConversation,
@@ -153,6 +153,26 @@ export function useAdminSendMessage(conversationId: string | null) {
         to: input.to,
         text: input.text,
       }),
+    onSuccess: () => {
+      if (conversationId) {
+        qc.invalidateQueries({ queryKey: ["admin", "leads", "messages", conversationId] });
+      }
+      qc.invalidateQueries({ queryKey: ["admin", "leads", "conversations"] });
+    },
+  });
+}
+
+export function useAdminSendMediaMessage(conversationId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { to: string; file: File; caption?: string }) => {
+      const form = new FormData();
+      form.append("file", input.file);
+      form.append("conversationId", conversationId ?? "");
+      form.append("to", input.to);
+      if (input.caption) form.append("caption", input.caption);
+      return apiPostForm<{ ok: boolean; id: string }>("/api/whatsapp/send-media", form);
+    },
     onSuccess: () => {
       if (conversationId) {
         qc.invalidateQueries({ queryKey: ["admin", "leads", "messages", conversationId] });

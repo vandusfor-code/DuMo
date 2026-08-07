@@ -3,11 +3,17 @@ import { getLeadRepository } from "@/repositories/leads.repository";
 import { salesScriptService } from "@/services/sales-script.service";
 import { getCommercialConfigurationRepository } from "@/repositories/commercial-configuration.repository";
 import { equipmentService } from "@/services/equipment.service";
-import { getScriptUnavailableReason } from "@/lib/sales-script/eligibility";
+import { getScriptUnavailableReason, isScriptEligible } from "@/lib/sales-script/eligibility";
 import { getScriptBuildError } from "@/lib/sales-script/builder";
 import { getDeliveryConfigurationRepository } from "@/repositories/delivery-configuration.repository";
 import type { SaveLeadInput } from "@/types/lead";
 import type { SaveLeadResult } from "@/types/sales-script";
+
+const SCRIPT_DEBUG = "[script-debug]";
+
+function logScriptSaveCheckpoint(label: string, payload: Record<string, unknown>) {
+  console.log(`${SCRIPT_DEBUG} ${label}`, JSON.stringify(payload, null, 2));
+}
 
 export async function saveLeadWithScript(
   input: SaveLeadInput,
@@ -18,8 +24,26 @@ export async function saveLeadWithScript(
   let scriptUnavailableReason: string | null = null;
 
   if (input.type === "venta" && input.lines.length > 0) {
-    scriptUnavailableReason = getScriptUnavailableReason(input);
+    const main = input.lines[0];
+    const unavailableReason = getScriptUnavailableReason(input);
+    const eligible = isScriptEligible(input);
+
+    logScriptSaveCheckpoint("saveLeadWithScript · entrada", {
+      conversationId: input.conversationId,
+      gestionId: lead.id,
+      saleType: main.saleType,
+      equipmentMode: main.equipmentMode ?? null,
+      equipmentCatalogId: main.equipmentCatalogId ?? null,
+      getScriptUnavailableReason: unavailableReason,
+      isScriptEligible: eligible,
+      buildSalesScriptWillRun: unavailableReason === null,
+    });
+
+    scriptUnavailableReason = unavailableReason;
     if (!scriptUnavailableReason) {
+      logScriptSaveCheckpoint("saveLeadWithScript · llamando generateAndSave", {
+        gestionId: lead.id,
+      });
       try {
         script = await salesScriptService.generateAndSave({
           gestionId: lead.id,
@@ -38,18 +62,62 @@ export async function saveLeadWithScript(
             equipmentCatalog,
             deliveryConfig,
           });
+          logScriptSaveCheckpoint("saveLeadWithScript · buildSalesScript devolvió null", {
+            getScriptBuildError: scriptUnavailableReason,
+          });
+        } else {
+          logScriptSaveCheckpoint("saveLeadWithScript · script generado", {
+            scriptId: script.id,
+            flowKey: script.flowKey,
+            flowTitle: script.flowTitle,
+            stepsCount: script.steps.length,
+          });
         }
       } catch (error) {
         console.error("[saveLeadWithScript] script generation failed", error);
         scriptUnavailableReason =
           "Ocurrió un error al generar el script. La gestión se guardó correctamente.";
+        logScriptSaveCheckpoint("saveLeadWithScript · excepción", {
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
+    } else {
+      logScriptSaveCheckpoint("saveLeadWithScript · detenido por elegibilidad", {
+        scriptUnavailableReason,
+      });
     }
   }
 
-  return {
+  const result: SaveLeadResult = {
     lead,
     script,
     scriptUnavailableReason: script ? null : scriptUnavailableReason,
   };
+
+  logScriptSaveCheckpoint("saveLeadWithScript · antes de responder", {
+    script: result.script ? "SI" : "NO",
+    scriptUnavailableReason: result.scriptUnavailableReason,
+    flowTitle: result.script?.flowTitle ?? null,
+    "steps.length": result.script?.steps.length ?? null,
+  });
+
+  if (input.type === "venta" && input.lines.length > 0) {
+    try {
+      const persistedScript = await getLeadRepository().getSalesScriptByGestionId(lead.id);
+      logScriptSaveCheckpoint("saveLeadWithScript · relectura BD inmediata", {
+        id: lead.id,
+        "sales_script != null": persistedScript !== null,
+        "sales_script.flowTitle": persistedScript?.flowTitle ?? null,
+        "sales_script.steps.length": persistedScript?.steps.length ?? null,
+        scriptUnavailableReason: result.scriptUnavailableReason,
+      });
+    } catch (error) {
+      logScriptSaveCheckpoint("saveLeadWithScript · relectura BD falló", {
+        id: lead.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return result;
 }

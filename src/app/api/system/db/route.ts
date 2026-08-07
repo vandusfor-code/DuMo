@@ -151,9 +151,26 @@ export async function GET() {
       readTest = { conversationId: topId, count: msgs.length, ms: Date.now() - t0 };
     }
 
+    const lastMessage = await sql`
+      SELECT m.id, m.body, m.message_type, m.media_asset_id, m.direction, m.created_at,
+             a.public_url AS media_public_url
+      FROM lead_messages m
+      LEFT JOIN media_assets a ON a.id = m.media_asset_id
+      ORDER BY m.created_at DESC
+      LIMIT 1
+    `;
+    const mediaTable = await sql`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'media_assets'
+      ) AS ok
+    `;
+
     return NextResponse.json({
       adminListTest,
       readTest,
+      lastMessage: lastMessage[0] ?? null,
+      hasMediaAssetsTable: Boolean((mediaTable[0] as { ok?: boolean })?.ok),
       configured: true,
       connected: true,
       mode: "postgres",

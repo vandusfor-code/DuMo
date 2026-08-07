@@ -15,6 +15,7 @@ export interface AuthUser {
   role: AuthRole;
   active: boolean;
   avatarUrl: string;
+  companyId: string;
 }
 
 export interface LoginResult {

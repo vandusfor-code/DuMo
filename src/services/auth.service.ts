@@ -14,6 +14,7 @@ import {
 } from "@/lib/auth/session-cookie";
 import { verifySessionTokenEdge } from "@/lib/auth/session-edge";
 import type { AuthRole, AuthUser, LoginResult } from "@/types/auth";
+import { DEFAULT_COMPANY_ID } from "@/types/tenant";
 import { withQueryTimeout } from "@/server/db/client";
 
 async function resolveSessionPayload(token: string): Promise<SessionPayload | null> {
@@ -30,6 +31,7 @@ function userFromPayload(payload: SessionPayload): AuthUser | null {
     role: payload.role as AuthRole,
     active: true,
     avatarUrl: "",
+    companyId: payload.companyId ?? DEFAULT_COMPANY_ID,
   };
 }
 
@@ -42,10 +44,10 @@ export const authService = {
     return { user, redirectTo: redirectForRole(user.role) };
   },
 
-  async setSessionCookie(userId: string, role?: string): Promise<void> {
+  async setSessionCookie(userId: string, role?: string, companyId?: string): Promise<void> {
     // El rol debe viajar siempre en el token: un token sin rol deja la sesión
     // sin separación admin/asesora.
-    const token = createSessionToken(userId, role);
+    const token = createSessionToken(userId, role, companyId);
     const jar = await cookies();
     jar.set(SESSION_COOKIE, token, sessionCookieOptions());
   },

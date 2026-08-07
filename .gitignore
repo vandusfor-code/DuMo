@@ -49,3 +49,6 @@ GOOGLE_PRIVATE_KEY_base64.txt
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.vercel
+.env*

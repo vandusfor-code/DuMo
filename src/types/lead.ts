@@ -120,6 +120,17 @@ export interface Lead {
   createdAt: string;
 }
 
+/** Última gestión guardada — precarga el formulario al abrir la conversación. */
+export type LatestGestionDraft = {
+  gestionId: string;
+  customerName: string;
+  rut: string;
+  type: LeadType;
+  notes: string;
+  lines: SaveLeadInput["lines"];
+  hasScript: boolean;
+};
+
 /** Payload que la UI envía para guardar una gestión. */
 export interface SaveLeadInput {
   conversationId: string;

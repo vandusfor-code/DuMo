@@ -25,7 +25,9 @@ export interface Conversation {
   online: boolean;
 }
 
-/** Un mensaje dentro del chat. */
+/** Un mensaje dentro del chat — solo texto e imágenes. */
+export type ChatMessageType = "text" | "image";
+
 export interface ChatMessage {
   id: string;
   conversationId: string;
@@ -34,6 +36,10 @@ export interface ChatMessage {
   /** "in" = recibido del cliente, "out" = enviado por la asesora. */
   direction: "in" | "out";
   read?: boolean;
+  messageType?: ChatMessageType;
+  mediaUrl?: string;
+  caption?: string;
+  mediaAssetId?: string;
   /** Tarjeta de enlace opcional (preview). */
   link?: {
     title: string;

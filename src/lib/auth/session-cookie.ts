@@ -10,16 +10,19 @@ export type SessionPayload = {
   exp: number;
   /** Rol del usuario: permite que el middleware separe admin/asesora. */
   role?: string;
+  /** Tenant SaaS — empresa del usuario. */
+  companyId?: string;
 };
 
 function secret(): string {
   return process.env.AUTH_SECRET ?? "dumo-dev-auth-secret-change-in-production";
 }
 
-export function createSessionToken(userId: string, role?: string): string {
+export function createSessionToken(userId: string, role?: string, companyId?: string): string {
   const payload: SessionPayload = {
     userId,
     role,
+    companyId,
     exp: Math.floor(Date.now() / 1000) + MAX_AGE_SEC,
   };
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");

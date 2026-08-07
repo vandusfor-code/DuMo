@@ -5,18 +5,64 @@ import {
   type ConnectedNumber,
   type IncomingMessage,
 } from "@/repositories/conversation.repository";
+import { getLeadRepository } from "@/repositories/leads.repository";
 import type { ChatMessage, Conversation } from "@/types/conversation";
-import type { Plan, SaveLeadInput } from "@/types/lead";
+import type { LatestGestionDraft, Plan, SaveLeadInput } from "@/types/lead";
 import type { SaveLeadResult } from "@/types/sales-script";
 import { saveLeadWithScript } from "@/services/save-lead-with-script";
-import { graphVersion, resolveSendCredentials } from "@/server/whatsapp/credentials";
+import { mediaService } from "@/services/media.service";
+import {
+  defaultPhoneNumberId,
+  graphVersion,
+  resolveSendCredentials,
+} from "@/server/whatsapp/credentials";
+import { downloadWhatsAppMedia } from "@/server/whatsapp/media";
+import { DEFAULT_COMPANY_ID } from "@/types/tenant";
+import { assertSupportedImageMime } from "@/types/media";
+import { normalizeWhatsAppRecipient } from "@/lib/whatsapp/phone";
 
 const GRAPH = "https://graph.facebook.com";
+
+function waTo(input: { to: string; conversationId: string }): string {
+  return normalizeWhatsAppRecipient(input.to, input.conversationId);
+}
 
 export interface SendMessageInput {
   conversationId: string;
   to: string;
   text: string;
+  companyId?: string;
+}
+
+export interface SendMediaMessageInput {
+  conversationId: string;
+  to: string;
+  mediaUrl: string;
+  mimeType: string;
+  caption?: string;
+  mediaAssetId?: string;
+  companyId?: string;
+}
+
+async function resolveSendCreds(conversationId: string) {
+  const repo = getConversationRepository();
+  const envPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim() || "";
+  const convPhoneId = await repo.getSendFromPhoneId(conversationId);
+
+  let phoneId = envPhoneId;
+  if (convPhoneId) {
+    const connected = await repo.listConnectedPhoneIds().catch(() => [] as string[]);
+    const isActive =
+      convPhoneId === envPhoneId ||
+      (connected.length > 0 && connected.includes(convPhoneId));
+    phoneId = isActive ? convPhoneId : envPhoneId || convPhoneId;
+  }
+  const perNumberToken = phoneId ? await repo.getAccessTokenForPhoneId(phoneId) : null;
+  const creds = resolveSendCredentials(phoneId, perNumberToken);
+  if ("error" in creds) {
+    throw new Error(creds.error);
+  }
+  return creds;
 }
 
 export const leadsService = {
@@ -35,6 +81,9 @@ export const leadsService = {
   saveLead(input: SaveLeadInput, advisor?: { name: string; email: string }): Promise<SaveLeadResult> {
     return saveLeadWithScript(input, advisor);
   },
+  getLatestGestionDraft(conversationId: string): Promise<LatestGestionDraft | null> {
+    return getLeadRepository().getLatestGestionDraft(conversationId);
+  },
 
   /** Persiste un mensaje entrante recibido por el webhook. */
   async receiveMessage(msg: IncomingMessage): Promise<void> {
@@ -45,34 +94,110 @@ export const leadsService = {
     }
   },
 
-  /** Registra un número conectado a DuMo (lo llama "Conectar con DuMo"). */
-  registerNumber(number: ConnectedNumber): Promise<void> {
-    return getConversationRepository().registerNumber(number);
-  },
-
-  /** Envía un mensaje por la Cloud API y lo persiste como saliente. */
-  async sendMessage(input: SendMessageInput): Promise<{ id: string }> {
-    const version = graphVersion();
+  /** Descarga imagen de Meta, la guarda en Supabase y persiste el mensaje entrante. */
+  async receiveInboundImage(input: {
+    waMessageId: string;
+    conversationId: string;
+    phone: string;
+    customerName: string;
+    createdAt: string;
+    dumoPhoneId?: string;
+    waMediaId: string;
+    caption?: string;
+    mimeType?: string;
+    companyId?: string;
+  }): Promise<void> {
     const repo = getConversationRepository();
-    const envPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim() || "";
-    const convPhoneId = await repo.getSendFromPhoneId(input.conversationId);
-
-    // Responder SIEMPRE desde un número activo. Si la conversación entró por un
-    // número que ya se desconectó (p. ej. el 314 anterior), ese id ya no sirve:
-    // se usa el número configurado/registrado actual.
-    let phoneId = envPhoneId;
-    if (convPhoneId) {
-      const connected = await repo.listConnectedPhoneIds().catch(() => [] as string[]);
-      const isActive =
-        convPhoneId === envPhoneId ||
-        (connected.length > 0 && connected.includes(convPhoneId));
-      phoneId = isActive ? convPhoneId : envPhoneId || convPhoneId;
-    }
+    const companyId = input.companyId ?? DEFAULT_COMPANY_ID;
+    const phoneId = input.dumoPhoneId?.trim() || defaultPhoneNumberId() || "";
     const perNumberToken = phoneId ? await repo.getAccessTokenForPhoneId(phoneId) : null;
     const creds = resolveSendCredentials(phoneId, perNumberToken);
     if ("error" in creds) {
       throw new Error(creds.error);
     }
+
+    const downloaded = await downloadWhatsAppMedia({
+      mediaId: input.waMediaId,
+      token: creds.token,
+    });
+    const mimeType = input.mimeType ?? downloaded.mimeType;
+    assertSupportedImageMime(mimeType);
+
+    const asset = await mediaService.uploadChatMedia({
+      companyId,
+      conversationId: input.conversationId,
+      direction: "inbound",
+      fileName: downloaded.fileName ?? `wa-${input.waMediaId}.jpg`,
+      mimeType,
+      data: downloaded.data,
+      waMediaId: input.waMediaId,
+    });
+
+    const preview = input.caption?.trim() || "Imagen";
+
+    await this.receiveMessage({
+      waMessageId: input.waMessageId,
+      conversationId: input.conversationId,
+      phone: input.phone,
+      customerName: input.customerName,
+      body: preview,
+      direction: "in",
+      createdAt: input.createdAt,
+      dumoPhoneId: input.dumoPhoneId,
+      messageType: "image",
+      mediaAssetId: asset.id,
+      caption: input.caption,
+      companyId,
+    });
+  },
+
+  /** Sube imagen al storage propio y la envía por WhatsApp. */
+  async sendImageFromUpload(input: {
+    conversationId: string;
+    to: string;
+    fileName: string;
+    mimeType: string;
+    data: Buffer;
+    caption?: string;
+    companyId?: string;
+    createdBy?: string;
+  }): Promise<{ id: string; mediaAssetId: string }> {
+    assertSupportedImageMime(input.mimeType);
+    const companyId = input.companyId ?? DEFAULT_COMPANY_ID;
+    const asset = await mediaService.uploadChatMedia({
+      companyId,
+      conversationId: input.conversationId,
+      direction: "outbound",
+      fileName: input.fileName,
+      mimeType: input.mimeType,
+      data: input.data,
+      createdBy: input.createdBy,
+    });
+
+    const result = await this.sendMediaMessage({
+      conversationId: input.conversationId,
+      to: waTo({ to: input.to, conversationId: input.conversationId }),
+      mediaUrl: asset.publicUrl,
+      mimeType: input.mimeType,
+      caption: input.caption,
+      mediaAssetId: asset.id,
+      companyId,
+    });
+
+    return { id: result.id, mediaAssetId: asset.id };
+  },
+
+  /** Registra un número conectado a DuMo (lo llama "Conectar con DuMo"). */
+  registerNumber(number: ConnectedNumber): Promise<void> {
+    return getConversationRepository().registerNumber(number);
+  },
+
+  /** Envía un mensaje de texto por la Cloud API y lo persiste como saliente. */
+  async sendTextMessage(input: SendMessageInput): Promise<{ id: string }> {
+    const version = graphVersion();
+    const repo = getConversationRepository();
+    const creds = await resolveSendCreds(input.conversationId);
+    const to = waTo({ to: input.to, conversationId: input.conversationId });
 
     const res = await fetch(`${GRAPH}/${version}/${creds.phoneNumberId}/messages`, {
       method: "POST",
@@ -82,7 +207,7 @@ export const leadsService = {
       },
       body: JSON.stringify({
         messaging_product: "whatsapp",
-        to: input.to,
+        to,
         type: "text",
         text: { body: input.text },
       }),
@@ -94,7 +219,7 @@ export const leadsService = {
     if (!res.ok) {
       const hint =
         json.error?.code === 100 || json.error?.message?.includes("does not exist")
-          ? " El token no tiene permiso sobre ese phone_number_id — usa el mismo token permanente que dulabs (meta_permanent_token) o un System User con acceso al WABA."
+          ? " El token no tiene permiso sobre ese phone_number_id."
           : "";
       throw new Error((json.error?.message ?? "Error enviando el mensaje.") + hint);
     }
@@ -109,7 +234,65 @@ export const leadsService = {
       direction: "out",
       createdAt: new Date().toISOString(),
       dumoPhoneId: creds.phoneNumberId,
+      messageType: "text",
+      companyId: input.companyId,
     });
     return { id };
+  },
+
+  /** Envía imagen por URL pública (Supabase) y persiste el mensaje. */
+  async sendMediaMessage(input: SendMediaMessageInput): Promise<{ id: string }> {
+    const version = graphVersion();
+    const repo = getConversationRepository();
+    const creds = await resolveSendCreds(input.conversationId);
+    assertSupportedImageMime(input.mimeType);
+    const to = waTo({ to: input.to, conversationId: input.conversationId });
+
+    const res = await fetch(`${GRAPH}/${version}/${creds.phoneNumberId}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${creds.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to,
+        type: "image",
+        image: {
+          link: input.mediaUrl,
+          ...(input.caption ? { caption: input.caption } : {}),
+        },
+      }),
+    });
+    const json = (await res.json()) as {
+      messages?: { id?: string }[];
+      error?: { message?: string };
+    };
+    if (!res.ok) {
+      throw new Error(json.error?.message ?? "Error enviando la imagen.");
+    }
+    const id = json.messages?.[0]?.id ?? `out-${Date.now()}`;
+    const preview = input.caption?.trim() || "Imagen";
+
+    await repo.saveMessage({
+      waMessageId: id,
+      conversationId: input.conversationId,
+      phone: input.to,
+      customerName: "",
+      body: preview,
+      direction: "out",
+      createdAt: new Date().toISOString(),
+      dumoPhoneId: creds.phoneNumberId,
+      messageType: "image",
+      mediaAssetId: input.mediaAssetId,
+      caption: input.caption,
+      companyId: input.companyId,
+    });
+    return { id };
+  },
+
+  /** Envía un mensaje por la Cloud API y lo persiste como saliente. */
+  async sendMessage(input: SendMessageInput): Promise<{ id: string }> {
+    return this.sendTextMessage(input);
   },
 };
