@@ -1,4 +1,4 @@
-import type { ChatMessage } from "./conversation";
+import type { ChatMessage, ConversationChannel } from "./conversation";
 
 export type AdminLeadStatus =
   | "nuevo"
@@ -31,6 +31,7 @@ export interface AdminConversation {
   phone: string;
   rut: string;
   avatarUrl?: string;
+  channel?: ConversationChannel;
   lastMessage: string;
   lastMessageTime: string;
   lastMessageDirection?: "in" | "out";

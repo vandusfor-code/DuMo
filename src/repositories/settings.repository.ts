@@ -12,6 +12,7 @@ import { getConfig, setConfig } from "@/server/db/app-config";
 import { hasDatabase } from "@/server/db/client";
 import {
   getMessengerIntegrationConfig,
+  messengerVerifyToken,
   saveMessengerIntegrationConfig,
 } from "@/server/messenger/config";
 
@@ -60,11 +61,14 @@ function mergeSnapshot(stored: Partial<StoredSettings> | null): SettingsSnapshot
 async function messengerStatusFromConfig(): Promise<SettingsSnapshot["messenger"]> {
   const base = baseSnapshot().messenger;
   const integration = await getMessengerIntegrationConfig();
-  if (!integration) return base;
+  if (!integration) {
+    return { ...base, verifyToken: messengerVerifyToken() };
+  }
   return {
     pageId: integration.pageId,
     pageAccessToken: "••••••••••••••••",
     pageName: integration.pageName ?? "",
+    verifyToken: messengerVerifyToken(),
     connectionStatus: "connected",
     lastSync: integration.updatedAt ?? null,
   };
@@ -143,6 +147,7 @@ class PostgresSettingsRepository implements SettingsRepository {
       pageId: input.pageId,
       pageAccessToken: "••••••••••••••••",
       pageName: input.pageName,
+      verifyToken: messengerVerifyToken(),
       connectionStatus: "connected",
       lastSync: new Date().toISOString(),
     };

@@ -23,12 +23,23 @@ export function ChatHeader({ conversation }: { conversation: Conversation }) {
           className={premium ? "size-11 text-[14px]" : undefined}
         />
         <div className="leading-tight">
-          <p className="text-[16px] font-semibold text-ink">{conversation.customerName}</p>
+          <p className="text-[16px] font-semibold text-ink">
+            {conversation.customerName}
+            {conversation.channel === "messenger" ? (
+              <span className="ml-1.5 text-[12px] font-medium text-brand">Messenger</span>
+            ) : null}
+          </p>
           <p className="flex items-center gap-1.5 text-[13px] text-muted">
             {conversation.online && (
               <span className="size-2 rounded-full bg-success" aria-hidden />
             )}
-            {conversation.online ? "En línea" : "Desconectado"}
+            {conversation.channel === "messenger"
+              ? conversation.online
+                ? "Messenger · En línea"
+                : "Messenger · Desconectado"
+              : conversation.online
+                ? "En línea"
+                : "Desconectado"}
           </p>
         </div>
       </div>

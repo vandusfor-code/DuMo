@@ -135,6 +135,15 @@ export function SettingsSections({
             />
           </label>
           <label className="block sm:col-span-2">
+            <span className="text-[13px] text-muted">Verify token (Vercel)</span>
+            <input
+              value={messenger.verifyToken}
+              readOnly
+              placeholder="Define MESSENGER_VERIFY_TOKEN en Vercel"
+              className="mt-1 h-11 w-full rounded-xl border border-line bg-canvas px-4 text-[14px] text-muted"
+            />
+          </label>
+          <label className="block sm:col-span-2">
             <span className="text-[13px] text-muted">Page Access Token</span>
             <input
               value={messenger.pageAccessToken}

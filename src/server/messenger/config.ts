@@ -1,4 +1,5 @@
 import "server-only";
+import crypto from "node:crypto";
 import { getConfig, setConfig } from "@/server/db/app-config";
 
 export const MESSENGER_CONFIG_KEY = "messenger_integration";
@@ -10,6 +11,28 @@ export type MessengerIntegrationConfig = {
   updatedAt?: string;
 };
 
+function safeEqualVerifyToken(received: string, expected: string): boolean {
+  const a = crypto.createHash("sha256").update(received).digest();
+  const b = crypto.createHash("sha256").update(expected).digest();
+  return crypto.timingSafeEqual(a, b);
+}
+
+/** Tokens válidos para el handshake GET de Meta (Messenger y/o WhatsApp directo). */
+export function webhookVerifyTokens(): string[] {
+  const tokens = new Set<string>();
+  for (const key of ["MESSENGER_VERIFY_TOKEN", "WHATSAPP_VERIFY_TOKEN"] as const) {
+    const value = process.env[key]?.trim();
+    if (value) tokens.add(value);
+  }
+  return [...tokens];
+}
+
+export function matchesWebhookVerifyToken(received: string | null): boolean {
+  if (!received) return false;
+  return webhookVerifyTokens().some((expected) => safeEqualVerifyToken(received, expected));
+}
+
+/** Token principal para mostrar en Admin (Messenger primero, fallback WhatsApp). */
 export function messengerVerifyToken(): string {
   return (
     process.env.MESSENGER_VERIFY_TOKEN?.trim() ||

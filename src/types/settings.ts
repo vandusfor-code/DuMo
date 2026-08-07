@@ -31,6 +31,8 @@ export interface MessengerSettings {
   pageId: string;
   pageAccessToken: string;
   pageName: string;
+  /** Solo lectura — proviene de MESSENGER_VERIFY_TOKEN / WHATSAPP_VERIFY_TOKEN en Vercel. */
+  verifyToken: string;
   connectionStatus: ConnectionStatus;
   lastSync: string | null;
 }

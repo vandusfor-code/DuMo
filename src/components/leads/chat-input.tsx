@@ -16,6 +16,7 @@ import {
 import { PinnedQuickReplies } from "@/components/leads/premium/pinned-quick-replies";
 import type { ChatUiTheme } from "@/components/leads/premium/chat-theme";
 import { cn } from "@/lib/utils";
+import { isMessengerConversation } from "@/lib/messenger/conversation-id";
 
 /**
  * Composer del chat. Envía texto e imágenes por la Cloud API; el mensaje
@@ -35,6 +36,7 @@ export function ChatInput({
   uiTheme?: ChatUiTheme;
 }) {
   const premium = uiTheme === "premium";
+  const isMessenger = isMessengerConversation(conversationId);
   const [value, setValue] = useState("");
   const [dragActive, setDragActive] = useState(false);
   const advisorSend = useSendMessage(conversationId);
@@ -221,7 +223,9 @@ export function ChatInput({
             ? send.error.message
             : sendMedia.error instanceof Error
               ? sendMedia.error.message
-              : "No se pudo enviar. Revisa la configuración de WhatsApp."}
+              : isMessenger
+                ? "No se pudo enviar. Revisa la configuración de Messenger."
+                : "No se pudo enviar. Revisa la configuración de WhatsApp."}
         </p>
       )}
     </div>

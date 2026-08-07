@@ -15,6 +15,7 @@ import { getDefaultClientProfile, getMockMessages } from "@/data/mock/admin-lead
 import { getAuthRepository } from "@/repositories/auth.repository";
 import { getConversationRepository } from "@/repositories/conversation.repository";
 import { formatChatTime } from "@/lib/format";
+import { isMessengerConversation } from "@/lib/messenger/conversation-id";
 import { withLatency } from "@/lib/mock";
 import { getConfig, setConfig } from "@/server/db/app-config";
 import { ensureSchema, getSql, hasDatabase, withDbRetry, withQueryTimeout } from "@/server/db/client";
@@ -81,6 +82,7 @@ function mapConversation(r: ConvRow): AdminConversation {
     customerName: r.customer_name || r.phone,
     phone: r.phone,
     rut: "",
+    channel: isMessengerConversation(r.id) ? "messenger" : "whatsapp",
     lastMessage: r.last_message,
     lastMessageTime: formatChatTime(r.last_message_at),
     lastMessageDirection: r.last_message_direction === "out" ? "out" : "in",

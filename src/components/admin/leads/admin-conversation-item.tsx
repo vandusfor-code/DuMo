@@ -42,7 +42,12 @@ export function AdminConversationItem({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
-            <p className="truncate text-[14px] font-semibold text-ink">{conversation.customerName}</p>
+            <p className="truncate text-[14px] font-semibold text-ink">
+              {conversation.customerName}
+              {conversation.channel === "messenger" ? (
+                <span className="ml-1.5 text-[10px] font-medium text-brand">Messenger</span>
+              ) : null}
+            </p>
             <span className="shrink-0 text-[11px] text-muted">{conversation.lastMessageTime}</span>
           </div>
           <div className="mt-0.5 flex items-center justify-between gap-2">

@@ -5,7 +5,7 @@ import { persistMessengerInbound } from "@/server/messenger/inbound";
 import {
   allowedMessengerPageIds,
   getMessengerIntegrationConfig,
-  messengerVerifyToken,
+  matchesWebhookVerifyToken,
 } from "@/server/messenger/config";
 
 export const runtime = "nodejs";
@@ -40,9 +40,7 @@ export async function GET(request: NextRequest) {
   const mode = params.get("hub.mode");
   const token = params.get("hub.verify_token");
   const challenge = params.get("hub.challenge");
-  const verifyToken = messengerVerifyToken();
-
-  if (mode === "subscribe" && verifyToken && token === verifyToken) {
+  if (mode === "subscribe" && matchesWebhookVerifyToken(token)) {
     return new NextResponse(challenge ?? "", { status: 200 });
   }
   return new NextResponse("Forbidden", { status: 403 });
@@ -196,6 +194,12 @@ export async function POST(request: NextRequest) {
       const allowedPages = new Set(
         [...allowedMessengerPageIds(), messengerConfig?.pageId].filter(Boolean) as string[],
       );
+
+      if (allowedPages.size === 0) {
+        console.warn(
+          "[webhook] MESSENGER_PAGE_ID no configurado; se aceptan eventos de todas las páginas",
+        );
+      }
 
       for (const entry of payload.entry ?? []) {
         const pageId = entry.id ?? "";

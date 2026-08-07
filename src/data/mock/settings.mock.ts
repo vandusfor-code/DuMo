@@ -1,5 +1,6 @@
 import "server-only";
 import type { SettingsSnapshot } from "@/types/settings";
+import { messengerVerifyToken } from "@/server/messenger/config";
 
 function envStatus(ok: boolean): "connected" | "disconnected" {
   return ok ? "connected" : "disconnected";
@@ -27,6 +28,7 @@ export const SETTINGS_DEFAULT: SettingsSnapshot = {
     pageId: process.env.MESSENGER_PAGE_ID ?? "",
     pageAccessToken: process.env.MESSENGER_PAGE_ACCESS_TOKEN ? "••••••••••••••••" : "",
     pageName: "",
+    verifyToken: messengerVerifyToken(),
     connectionStatus: envStatus(!!process.env.MESSENGER_PAGE_ACCESS_TOKEN),
     lastSync: null,
   },
