@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { SESSION_COOKIE, verifySessionTokenEdge } from "@/lib/auth/session-edge";
+import { SESSION_COOKIE } from "@/lib/auth/session-edge";
 
 // TEMPORAL — BORRAR DESPUÉS DEL DIAGNÓSTICO (bloque debug-secret-edge más abajo)
 
@@ -55,27 +55,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(login);
   }
 
-  const payload = await verifySessionTokenEdge(token);
-
-  if (payload !== null) {
-    const role = payload.role;
-    if (role) {
-      const isAsesora = role === "asesora";
-      const home = isAsesora ? "/dashboard" : "/admin";
-      const wantsAdminArea = pathname.startsWith("/admin");
-      const wantsAdvisorArea = pathname.startsWith("/dashboard");
-
-      if ((isAsesora && wantsAdminArea) || (!isAsesora && wantsAdvisorArea)) {
-        return NextResponse.redirect(new URL(home, request.url));
-      }
-    }
-
-    return NextResponse.next();
-  }
-
-  const login = new URL("/login", request.url);
-  login.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
-  return NextResponse.redirect(login);
+  return NextResponse.next();
 }
 
 export const config = {
