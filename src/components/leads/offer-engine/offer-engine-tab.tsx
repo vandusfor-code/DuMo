@@ -24,10 +24,13 @@ import {
 } from "@/hooks/use-offer-engine";
 import { formatCurrency, formatMoneyInput, formatShortDate, parseMoneyInput } from "@/lib/format";
 import {
+  getOfferSaleTypeLabel,
+  offerSaleTypeUsesEquipment,
   OFFER_SALE_TYPE_LABELS,
   type PlanCommercialOffer,
   type OfferSaleType,
   type OfferSimulationRecord,
+  type OfferSimulationRequest,
 } from "@/types/offer-engine";
 import {
   SectionCard,
@@ -37,10 +40,17 @@ import {
 import { cn } from "@/lib/utils";
 import { OfferEngineDetailModal } from "./offer-engine-detail-modal";
 
-const LOADING_MESSAGES = [
+const LOADING_MESSAGES_WITH_EQUIPMENT = [
   "Analizando capacidad comercial...",
   "Consultando catálogo de planes...",
   "Evaluando equipos activos...",
+  "Generando ofertas viables...",
+];
+
+const LOADING_MESSAGES_PLANS_ONLY = [
+  "Analizando capacidad comercial...",
+  "Consultando catálogo de planes...",
+  "Calculando cargos fijos...",
   "Generando ofertas viables...",
 ];
 
@@ -55,12 +65,16 @@ type FormState = {
 };
 
 const DEFAULT_FORM: FormState = {
-  saleType: "portability",
+  saleType: "portability_postpaid",
   requestedLines: 1,
   lineCredit: "",
   equipmentCredit: "",
   wantsEquipment: false,
 };
+
+const SALE_TYPE_OPTIONS = (
+  Object.entries(OFFER_SALE_TYPE_LABELS) as [OfferSaleType, string][]
+).map(([value, label]) => ({ value, label }));
 
 function parseMoney(value: string): number {
   return parseMoneyInput(value);
@@ -76,13 +90,18 @@ export function OfferEngineTab({ conversationId }: { conversationId: string }) {
   const [detailId, setDetailId] = useState<string | null>(null);
   const detailQuery = useOfferSimulationDetail(detailId);
 
+  const isPrepaidPortability = form.saleType === "portability_prepaid";
+  const loadingMessages = isPrepaidPortability
+    ? LOADING_MESSAGES_PLANS_ONLY
+    : LOADING_MESSAGES_WITH_EQUIPMENT;
+
   useEffect(() => {
     if (!simulate.isPending) return;
     const timer = setInterval(() => {
-      setLoadingMsgIdx((i) => (i + 1) % LOADING_MESSAGES.length);
+      setLoadingMsgIdx((i) => (i + 1) % loadingMessages.length);
     }, 700);
     return () => clearInterval(timer);
-  }, [simulate.isPending]);
+  }, [simulate.isPending, loadingMessages.length]);
 
   const resetForm = () => {
     setForm(DEFAULT_FORM);
@@ -94,13 +113,18 @@ export function OfferEngineTab({ conversationId }: { conversationId: string }) {
     if (lineCredit <= 0) return;
 
     try {
-      const res = await simulate.mutateAsync({
+      const payload: Omit<OfferSimulationRequest, "leadId"> = {
         saleType: form.saleType,
         requestedLines: form.requestedLines,
         lineCredit,
-        equipmentCredit: parseMoney(form.equipmentCredit),
-        wantsEquipment: form.wantsEquipment,
-      });
+      };
+
+      if (!isPrepaidPortability) {
+        payload.equipmentCredit = parseMoney(form.equipmentCredit);
+        payload.wantsEquipment = form.wantsEquipment;
+      }
+
+      const res = await simulate.mutateAsync(payload);
       setResult(res);
     } catch {
       /* error below */
@@ -118,19 +142,26 @@ export function OfferEngineTab({ conversationId }: { conversationId: string }) {
             <Field label="Tipo de venta">
               <Select
                 value={form.saleType}
-                onValueChange={(v) => setForm((f) => ({ ...f, saleType: v as OfferSaleType }))}
+                onValueChange={(v) => {
+                  const saleType = v as OfferSaleType;
+                  setForm((f) => ({
+                    ...f,
+                    saleType,
+                    ...(saleType === "portability_prepaid"
+                      ? { equipmentCredit: "", wantsEquipment: false }
+                      : {}),
+                  }));
+                }}
               >
                 <SelectTrigger className="h-11">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Object.entries(OFFER_SALE_TYPE_LABELS) as [OfferSaleType, string][]).map(
-                    ([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        {label}
-                      </SelectItem>
-                    ),
-                  )}
+                  {SALE_TYPE_OPTIONS.map(({ value, label }) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </Field>
@@ -163,25 +194,29 @@ export function OfferEngineTab({ conversationId }: { conversationId: string }) {
               />
             </Field>
 
-            <Field label="Cupo Equipo">
-              <MoneyInput
-                value={form.equipmentCredit}
-                onChange={(v) => setForm((f) => ({ ...f, equipmentCredit: v }))}
-                placeholder="15000"
-              />
-            </Field>
+            {!isPrepaidPortability ? (
+              <>
+                <Field label="Cupo Equipo">
+                  <MoneyInput
+                    value={form.equipmentCredit}
+                    onChange={(v) => setForm((f) => ({ ...f, equipmentCredit: v }))}
+                    placeholder="15000"
+                  />
+                </Field>
 
-            <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-line px-4 py-3">
-              <input
-                type="checkbox"
-                checked={form.wantsEquipment}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, wantsEquipment: e.target.checked }))
-                }
-                className="size-4 rounded border-line accent-brand"
-              />
-              <span className="text-[14px] font-medium text-ink">El cliente desea equipo</span>
-            </label>
+                <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-line px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={form.wantsEquipment}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, wantsEquipment: e.target.checked }))
+                    }
+                    className="size-4 rounded border-line accent-brand"
+                  />
+                  <span className="text-[14px] font-medium text-ink">El cliente desea equipo</span>
+                </label>
+              </>
+            ) : null}
 
             <div className="flex flex-col gap-2 pt-2">
               <Button
@@ -193,7 +228,7 @@ export function OfferEngineTab({ conversationId }: { conversationId: string }) {
                 {simulate.isPending ? (
                   <>
                     <Loader2 className="size-4 animate-spin" />
-                    {LOADING_MESSAGES[loadingMsgIdx]}
+                    {loadingMessages[loadingMsgIdx]}
                   </>
                 ) : (
                   <>
@@ -223,7 +258,7 @@ export function OfferEngineTab({ conversationId }: { conversationId: string }) {
             <SectionCard>
               <SectionCardBody className="flex min-h-[280px] flex-col items-center justify-center gap-4 py-12">
                 <Loader2 className="size-10 animate-spin text-brand" />
-                <p className="text-[15px] font-medium text-ink">{LOADING_MESSAGES[loadingMsgIdx]}</p>
+                <p className="text-[15px] font-medium text-ink">{loadingMessages[loadingMsgIdx]}</p>
               </SectionCardBody>
             </SectionCard>
           ) : result ? (
@@ -236,7 +271,9 @@ export function OfferEngineTab({ conversationId }: { conversationId: string }) {
                   Ingresa los cupos del sistema comercial y presiona Generar Oferta
                 </p>
                 <p className="max-w-sm text-[13px] text-muted">
-                  El motor evaluará automáticamente todos los planes y equipos del catálogo.
+                  {isPrepaidPortability
+                    ? "El motor evaluará automáticamente todos los planes móviles del catálogo."
+                    : "El motor evaluará automáticamente todos los planes y equipos del catálogo."}
                 </p>
               </SectionCardBody>
             </SectionCard>
@@ -261,15 +298,23 @@ export function OfferEngineTab({ conversationId }: { conversationId: string }) {
 }
 
 function OfferResultsPanel({ result }: { result: OfferSimulationRecord }) {
+  const showEquipment = offerSaleTypeUsesEquipment(result.saleType);
+
   return (
     <div className="space-y-4">
+      {result.prepaidInfoMessage ? (
+        <div className="rounded-xl border border-brand/20 bg-brand-soft/30 px-4 py-3 text-[14px] leading-relaxed text-ink">
+          {result.prepaidInfoMessage}
+        </div>
+      ) : null}
+
       {result.optimizationMessage ? (
         <div className="rounded-xl border border-warning/25 bg-warning-soft/60 px-4 py-3 text-[14px] text-warning-ink">
           {result.optimizationMessage}
         </div>
       ) : null}
 
-      {result.equipmentCreditZeroMessage ? (
+      {showEquipment && result.equipmentCreditZeroMessage ? (
         <div className="rounded-xl border border-line bg-card/50 px-4 py-3 text-[13px] text-ink">
           {result.equipmentCreditZeroMessage}
         </div>
@@ -289,7 +334,7 @@ function OfferResultsPanel({ result }: { result: OfferSimulationRecord }) {
             {result.viableCount === 1 ? "" : "s"} — ordenadas por mayor margen disponible
           </p>
           {result.offers.map((offer) => (
-            <PlanCommercialOfferCard key={offer.planId} offer={offer} />
+            <PlanCommercialOfferCard key={offer.planId} offer={offer} showEquipment={showEquipment} />
           ))}
         </div>
       ) : (
@@ -311,7 +356,7 @@ function OfferResultsPanel({ result }: { result: OfferSimulationRecord }) {
         </DiscardedSection>
       ) : null}
 
-      {result.discardedEquipment.length > 0 ? (
+      {showEquipment && result.discardedEquipment.length > 0 ? (
         <DiscardedSection title="Equipos no disponibles">
           {result.discardedEquipment.map((e) => (
             <DiscardedRow
@@ -326,7 +371,13 @@ function OfferResultsPanel({ result }: { result: OfferSimulationRecord }) {
   );
 }
 
-function PlanCommercialOfferCard({ offer }: { offer: PlanCommercialOffer }) {
+function PlanCommercialOfferCard({
+  offer,
+  showEquipment,
+}: {
+  offer: PlanCommercialOffer;
+  showEquipment: boolean;
+}) {
   return (
     <SectionCard className="border-success/20">
       <SectionCardBody className="space-y-4 pt-5">
@@ -370,7 +421,7 @@ function PlanCommercialOfferCard({ offer }: { offer: PlanCommercialOffer }) {
           <Metric label="Disponible" value={formatCurrency(offer.lineRemaining)} highlight />
         </div>
 
-        {offer.wantsEquipment ? (
+        {showEquipment && offer.wantsEquipment ? (
           <div className="rounded-xl border border-brand/15 bg-brand-soft/25 p-4">
             <div className="flex items-center gap-2 text-brand">
               <Smartphone className="size-4" />
@@ -484,7 +535,7 @@ function OfferHistoryPanel({
                 {items.map((item) => (
                   <tr key={item.id} className="border-b border-line/60">
                     <td className="py-2.5 pr-3">{formatShortDate(item.createdAt)}</td>
-                    <td className="py-2.5 pr-3">{OFFER_SALE_TYPE_LABELS[item.saleType]}</td>
+                    <td className="py-2.5 pr-3">{getOfferSaleTypeLabel(item.saleType)}</td>
                     <td className="py-2.5 pr-3">{item.requestedSummary}</td>
                     <td className="py-2.5 pr-3">{item.resultSummary}</td>
                     <td className="py-2.5">

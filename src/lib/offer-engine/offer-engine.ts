@@ -8,6 +8,7 @@ import type {
   OfferSimulationRequest,
   PlanCommercialOffer,
 } from "@/types/offer-engine";
+import { PREPAID_PORTABILITY_INFO_MESSAGE } from "@/types/offer-engine";
 import { getAdditionalLineUnitPrice } from "@/lib/sales-script/teleprompter/contract-pricing";
 
 function sortPlansByCommercialOrder(plans: CommercialPlan[]): CommercialPlan[] {
@@ -19,11 +20,15 @@ function sortPlansByCommercialOrder(plans: CommercialPlan[]): CommercialPlan[] {
   });
 }
 
-/** Planes activos con cargo fijo real — todo desde catálogo, sin IDs quemados. */
+/** Planes activos con cargo fijo real y habilitados para el motor comercial. */
 export function getEvaluablePlans(allPlans: CommercialPlan[]): CommercialPlan[] {
   return sortPlansByCommercialOrder(
     allPlans.filter(
-      (p) => p.status === "active" && typeof p.womValue === "number" && p.womValue > 0,
+      (p) =>
+        p.status === "active" &&
+        typeof p.womValue === "number" &&
+        p.womValue > 0 &&
+        p.motorEnabled !== false,
     ),
   );
 }
@@ -94,11 +99,14 @@ function buildEligibleEquipment(
   input: OfferSimulationRequest,
   activeEquipment: EquipmentCatalogItem[],
 ): { maxInstallment: number; eligible: OfferEquipmentRef[]; onlyWithout: boolean; note?: string } {
-  if (!input.wantsEquipment) {
+  const wantsEquipment = input.wantsEquipment ?? false;
+  const equipmentCredit = input.equipmentCredit ?? 0;
+
+  if (!wantsEquipment) {
     return { maxInstallment: 0, eligible: [], onlyWithout: false };
   }
 
-  if (input.equipmentCredit <= 0) {
+  if (equipmentCredit <= 0) {
     return {
       maxInstallment: 0,
       eligible: [],
@@ -108,7 +116,7 @@ function buildEligibleEquipment(
   }
 
   const roomOnLine = input.lineCredit - planMonthlyTotal;
-  const maxInstallment = Math.max(0, Math.min(input.equipmentCredit, roomOnLine));
+  const maxInstallment = Math.max(0, Math.min(equipmentCredit, roomOnLine));
 
   if (maxInstallment <= 0) {
     return {
@@ -122,7 +130,7 @@ function buildEligibleEquipment(
   const eligible = activeEquipment
     .filter(
       (e) =>
-        e.installmentValue <= input.equipmentCredit &&
+        e.installmentValue <= equipmentCredit &&
         e.installmentValue <= maxInstallment &&
         planMonthlyTotal + e.installmentValue <= input.lineCredit,
     )
@@ -140,24 +148,99 @@ function buildEligibleEquipment(
   };
 }
 
-function evaluateAtLines(
+function emptyEquipmentBlock(): Pick<
+  PlanCommercialOffer,
+  | "equipmentCredit"
+  | "wantsEquipment"
+  | "maxEquipmentInstallment"
+  | "eligibleEquipment"
+  | "equipmentOnlyWithoutDevice"
+  | "note"
+> {
+  return {
+    equipmentCredit: 0,
+    wantsEquipment: false,
+    maxEquipmentInstallment: 0,
+    eligibleEquipment: [],
+    equipmentOnlyWithoutDevice: false,
+    note: undefined,
+  };
+}
+
+type EvaluateResult = {
+  offers: PlanCommercialOffer[];
+  discardedPlans: DiscardedPlan[];
+  discardedEquipment: DiscardedEquipment[];
+};
+
+function evaluatePlansOnlyAtLines(
+  lines: number,
+  input: OfferSimulationRequest,
+  plans: CommercialPlan[],
+): EvaluateResult {
+  const offers: PlanCommercialOffer[] = [];
+  const discardedPlans: DiscardedPlan[] = [];
+
+  for (const plan of plans) {
+    const rules = planLineRules(plan, lines);
+    const pricing = calculatePlanFixedCharge(plan, lines);
+
+    if (!rules.ok) {
+      discardedPlans.push({
+        planId: plan.id,
+        planName: plan.name,
+        reason: rules.reason ?? "No cumple reglas comerciales.",
+      });
+      continue;
+    }
+
+    if (pricing.planMonthlyTotal > input.lineCredit) {
+      discardedPlans.push({
+        planId: plan.id,
+        planName: plan.name,
+        reason: "Supera el Cupo Línea.",
+      });
+      continue;
+    }
+
+    offers.push({
+      rank: 0,
+      planId: plan.id,
+      planName: plan.name,
+      promotionalPrice: plan.promotionalPrice ?? null,
+      lines,
+      ...pricing,
+      lineCredit: input.lineCredit,
+      lineConsumed: pricing.planMonthlyTotal,
+      lineRemaining: input.lineCredit - pricing.planMonthlyTotal,
+      ...emptyEquipmentBlock(),
+    });
+  }
+
+  offers.sort((a, b) => b.lineRemaining - a.lineRemaining || a.planName.localeCompare(b.planName, "es"));
+  offers.forEach((o, i) => {
+    o.rank = i + 1;
+  });
+
+  return { offers, discardedPlans, discardedEquipment: [] };
+}
+
+function evaluateWithEquipmentAtLines(
   lines: number,
   input: OfferSimulationRequest,
   plans: CommercialPlan[],
   equipmentCatalog: EquipmentCatalogItem[],
-): {
-  offers: PlanCommercialOffer[];
-  discardedPlans: DiscardedPlan[];
-  discardedEquipment: DiscardedEquipment[];
-} {
+): EvaluateResult {
   const offers: PlanCommercialOffer[] = [];
   const discardedPlans: DiscardedPlan[] = [];
   const discardedEquipment: DiscardedEquipment[] = [];
+  const wantsEquipment = input.wantsEquipment ?? false;
+  const equipmentCredit = input.equipmentCredit ?? 0;
   const activeEquipment = getActiveEquipment(equipmentCatalog);
 
-  if (input.wantsEquipment && input.equipmentCredit > 0) {
+  if (wantsEquipment && equipmentCredit > 0) {
     for (const eq of activeEquipment) {
-      if (eq.installmentValue > input.equipmentCredit) {
+      if (eq.installmentValue > equipmentCredit) {
         discardedEquipment.push({
           id: eq.id,
           label: eq.commercialName || `${eq.brand} ${eq.model}`.trim(),
@@ -206,8 +289,8 @@ function evaluateAtLines(
       lineCredit: input.lineCredit,
       lineConsumed: pricing.planMonthlyTotal,
       lineRemaining: input.lineCredit - pricing.planMonthlyTotal,
-      equipmentCredit: input.equipmentCredit,
-      wantsEquipment: input.wantsEquipment,
+      equipmentCredit,
+      wantsEquipment,
       maxEquipmentInstallment: equipmentBlock.maxInstallment,
       eligibleEquipment: equipmentBlock.eligible,
       equipmentOnlyWithoutDevice: equipmentBlock.onlyWithout,
@@ -233,62 +316,154 @@ function optimizationMessage(
   return undefined;
 }
 
-/** Motor comercial WOM: evalúa todos los planes activos y equipos del catálogo. */
-export function generateCommercialOffers(
+function runLineOptimization(
   input: OfferSimulationRequest,
-  allPlans: CommercialPlan[],
-  equipmentCatalog: EquipmentCatalogItem[],
+  evaluate: (lines: number) => EvaluateResult,
+  extras: Partial<OfferGenerationResult> = {},
 ): OfferGenerationResult {
-  const plans = getEvaluablePlans(allPlans);
-  let equipmentCreditZeroMessage: string | undefined;
-
-  if (input.wantsEquipment && input.equipmentCredit <= 0) {
-    equipmentCreditZeroMessage =
-      "No es posible ofrecer equipo porque el cupo para equipo es $0.";
-  }
+  const equipmentCredit = input.equipmentCredit ?? 0;
+  const wantsEquipment = input.wantsEquipment ?? false;
 
   for (let lines = input.requestedLines; lines >= 1; lines--) {
-    const evaluated = evaluateAtLines(lines, input, plans, equipmentCatalog);
+    const evaluated = evaluate(lines);
     if (evaluated.offers.length > 0) {
       return {
         saleType: input.saleType,
         requestedLines: input.requestedLines,
         evaluatedLines: lines,
         lineCredit: input.lineCredit,
-        equipmentCredit: input.equipmentCredit,
-        wantsEquipment: input.wantsEquipment,
+        equipmentCredit,
+        wantsEquipment,
         optimized: lines < input.requestedLines,
         optimizationMessage: optimizationMessage(input.requestedLines, lines),
-        equipmentCreditZeroMessage,
         offers: evaluated.offers,
         discardedPlans: evaluated.discardedPlans,
         discardedEquipment: evaluated.discardedEquipment,
         viableCount: evaluated.offers.length,
+        ...extras,
       };
     }
   }
 
-  const fallback = evaluateAtLines(
-    input.requestedLines,
-    input,
-    plans,
-    equipmentCatalog,
-  );
+  const fallback = evaluate(input.requestedLines);
 
   return {
     saleType: input.saleType,
     requestedLines: input.requestedLines,
     evaluatedLines: input.requestedLines,
     lineCredit: input.lineCredit,
-    equipmentCredit: input.equipmentCredit,
-    wantsEquipment: input.wantsEquipment,
+    equipmentCredit,
+    wantsEquipment,
     optimized: false,
-    equipmentCreditZeroMessage,
     offers: [],
     discardedPlans: fallback.discardedPlans,
     discardedEquipment: fallback.discardedEquipment,
     viableCount: 0,
     optimizationMessage:
       "No fue posible encontrar una combinación comercial viable con los cupos ingresados.",
+    ...extras,
   };
+}
+
+/** Motor Portabilidad Postpago — evalúa planes y equipos. */
+function generatePortabilityPostpaidOffers(
+  input: OfferSimulationRequest,
+  plans: CommercialPlan[],
+  equipmentCatalog: EquipmentCatalogItem[],
+): OfferGenerationResult {
+  let equipmentCreditZeroMessage: string | undefined;
+
+  const wantsEquipment = input.wantsEquipment ?? false;
+  const equipmentCredit = input.equipmentCredit ?? 0;
+
+  if (wantsEquipment && equipmentCredit <= 0) {
+    equipmentCreditZeroMessage =
+      "No es posible ofrecer equipo porque el cupo para equipo es $0.";
+  }
+
+  return runLineOptimization(
+    input,
+    (lines) => evaluateWithEquipmentAtLines(lines, input, plans, equipmentCatalog),
+    { equipmentCreditZeroMessage },
+  );
+}
+
+/** Motor Prepago → Postpago — solo planes móviles, sin equipos. */
+function generatePortabilityPrepaidOffers(
+  input: OfferSimulationRequest,
+  plans: CommercialPlan[],
+): OfferGenerationResult {
+  const sanitized: OfferSimulationRequest = {
+    ...input,
+    wantsEquipment: false,
+    equipmentCredit: 0,
+  };
+
+  return runLineOptimization(
+    sanitized,
+    (lines) => evaluatePlansOnlyAtLines(lines, sanitized, plans),
+    {
+      prepaidInfoMessage: PREPAID_PORTABILITY_INFO_MESSAGE,
+      equipmentCredit: 0,
+      wantsEquipment: false,
+      discardedEquipment: [],
+    },
+  );
+}
+
+/** Motor Línea Nueva — evalúa planes y equipos (reglas propias, separado del postpago). */
+function generateNewLineOffers(
+  input: OfferSimulationRequest,
+  plans: CommercialPlan[],
+  equipmentCatalog: EquipmentCatalogItem[],
+): OfferGenerationResult {
+  let equipmentCreditZeroMessage: string | undefined;
+
+  const wantsEquipment = input.wantsEquipment ?? false;
+  const equipmentCredit = input.equipmentCredit ?? 0;
+
+  if (wantsEquipment && equipmentCredit <= 0) {
+    equipmentCreditZeroMessage =
+      "No es posible ofrecer equipo porque el cupo para equipo es $0.";
+  }
+
+  return runLineOptimization(
+    input,
+    (lines) => evaluateWithEquipmentAtLines(lines, input, plans, equipmentCatalog),
+    { equipmentCreditZeroMessage },
+  );
+}
+
+function withEquipmentDefaults(input: OfferSimulationRequest): Required<
+  Pick<OfferSimulationRequest, "equipmentCredit" | "wantsEquipment">
+> &
+  OfferSimulationRequest {
+  return {
+    ...input,
+    equipmentCredit: input.equipmentCredit ?? 0,
+    wantsEquipment: input.wantsEquipment ?? false,
+  };
+}
+
+/** Motor comercial WOM — delega en estrategia según tipo de venta. */
+export function generateCommercialOffers(
+  input: OfferSimulationRequest,
+  allPlans: CommercialPlan[],
+  equipmentCatalog: EquipmentCatalogItem[],
+): OfferGenerationResult {
+  const plans = getEvaluablePlans(allPlans);
+  const normalized = withEquipmentDefaults(input);
+
+  switch (normalized.saleType) {
+    case "portability_prepaid":
+      return generatePortabilityPrepaidOffers(normalized, plans);
+    case "portability_postpaid":
+      return generatePortabilityPostpaidOffers(normalized, plans, equipmentCatalog);
+    case "new_line":
+      return generateNewLineOffers(normalized, plans, equipmentCatalog);
+    default: {
+      const _exhaustive: never = normalized.saleType;
+      return _exhaustive;
+    }
+  }
 }

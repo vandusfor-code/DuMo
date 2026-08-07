@@ -90,6 +90,8 @@ export interface CommercialPlan {
   promotionalPrice?: number | null;
   /** Orden comercial para presentación (menor = primero). */
   commercialOrder?: number | null;
+  /** Si false, el plan no participa en el Motor Comercial. Default: true. */
+  motorEnabled?: boolean;
   /** Valor mensual por línea adicional — derivado de offer.additionalLinePrice. */
   additionalLineValue: number;
   /** Cantidad máxima de líneas (principal + adicionales). */
@@ -121,6 +123,7 @@ export interface UpsertCommercialPlanInput {
   womValue: number;
   promotionalPrice?: number | null;
   commercialOrder?: number | null;
+  motorEnabled?: boolean;
   additionalLineValue: number;
   maxLines: number;
   dumoValue: number;

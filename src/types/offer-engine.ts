@@ -1,10 +1,42 @@
-/** Tipo de venta del motor comercial (subset WOM). */
-export type OfferSaleType = "portability" | "new_line";
+/** Tipo de venta del motor comercial WOM. */
+export type OfferSaleType =
+  | "portability_postpaid"
+  | "portability_prepaid"
+  | "new_line";
+
+/** Valor legacy almacenado antes de separar postpago / prepago. */
+export type LegacyOfferSaleType = "portability";
 
 export const OFFER_SALE_TYPE_LABELS: Record<OfferSaleType, string> = {
-  portability: "Portabilidad",
+  portability_postpaid: "Portabilidad Postpago",
+  portability_prepaid: "Portabilidad Prepago → Postpago",
   new_line: "Línea Nueva",
 };
+
+export const PREPAID_PORTABILITY_INFO_MESSAGE =
+  "Cliente Prepago → Postpago. En este tipo de venta únicamente se evalúan planes móviles. No aplica financiación de equipos.";
+
+export function normalizeOfferSaleType(saleType: string): OfferSaleType {
+  if (saleType === "portability") return "portability_postpaid";
+  if (
+    saleType === "portability_postpaid" ||
+    saleType === "portability_prepaid" ||
+    saleType === "new_line"
+  ) {
+    return saleType;
+  }
+  return "portability_postpaid";
+}
+
+export function getOfferSaleTypeLabel(saleType: string): string {
+  return OFFER_SALE_TYPE_LABELS[normalizeOfferSaleType(saleType)];
+}
+
+/** Tipos que evalúan catálogo de equipos y cupo equipo. */
+export function offerSaleTypeUsesEquipment(saleType: OfferSaleType | string): boolean {
+  const normalized = normalizeOfferSaleType(saleType);
+  return normalized === "portability_postpaid" || normalized === "new_line";
+}
 
 export type OfferEquipmentRef = {
   id: string;
@@ -57,8 +89,8 @@ export type OfferSimulationRequest = {
   saleType: OfferSaleType;
   requestedLines: number;
   lineCredit: number;
-  equipmentCredit: number;
-  wantsEquipment: boolean;
+  equipmentCredit?: number;
+  wantsEquipment?: boolean;
 };
 
 export type OfferGenerationResult = {
@@ -71,6 +103,8 @@ export type OfferGenerationResult = {
   optimized: boolean;
   optimizationMessage?: string;
   equipmentCreditZeroMessage?: string;
+  /** Mensaje informativo Prepago → Postpago (Regla 8). */
+  prepaidInfoMessage?: string;
   offers: PlanCommercialOffer[];
   discardedPlans: DiscardedPlan[];
   discardedEquipment: DiscardedEquipment[];

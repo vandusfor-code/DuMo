@@ -3,7 +3,8 @@
 import { Loader2, X } from "lucide-react";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import {
-  OFFER_SALE_TYPE_LABELS,
+  getOfferSaleTypeLabel,
+  offerSaleTypeUsesEquipment,
   type OfferSimulationRecord,
 } from "@/types/offer-engine";
 
@@ -48,11 +49,19 @@ export function OfferEngineDetailModal({
           ) : (
             <>
               <MetaRow label="Fecha" value={formatDateTime(record.createdAt)} />
-              <MetaRow label="Tipo venta" value={OFFER_SALE_TYPE_LABELS[record.saleType]} />
+              <MetaRow label="Tipo venta" value={getOfferSaleTypeLabel(record.saleType)} />
               <MetaRow label="Líneas solicitadas" value={String(record.requestedLines)} />
               <MetaRow label="Líneas evaluadas" value={String(record.evaluatedLines)} />
               <MetaRow label="Cupo Línea" value={formatCurrency(record.lineCredit)} />
-              <MetaRow label="Cupo Equipo" value={formatCurrency(record.equipmentCredit)} />
+              {offerSaleTypeUsesEquipment(record.saleType) ? (
+                <MetaRow label="Cupo Equipo" value={formatCurrency(record.equipmentCredit)} />
+              ) : null}
+
+              {record.prepaidInfoMessage ? (
+                <p className="rounded-lg border border-brand/15 bg-brand-soft/25 px-3 py-2 text-[13px] text-ink">
+                  {record.prepaidInfoMessage}
+                </p>
+              ) : null}
 
               {record.optimizationMessage ? (
                 <p className="rounded-lg bg-warning-soft/50 px-3 py-2 text-[13px] text-warning-ink">
@@ -68,7 +77,8 @@ export function OfferEngineDetailModal({
                   <div className="mt-2 space-y-1 text-[13px]">
                     <Row label="Cargo fijo total" value={formatCurrency(offer.planMonthlyTotal)} />
                     <Row label="Margen línea" value={formatCurrency(offer.lineRemaining)} />
-                    {offer.eligibleEquipment.length > 0 ? (
+                    {offerSaleTypeUsesEquipment(record.saleType) &&
+                    offer.eligibleEquipment.length > 0 ? (
                       <Row
                         label="Equipos compatibles"
                         value={String(offer.eligibleEquipment.length)}

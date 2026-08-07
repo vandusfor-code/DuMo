@@ -2,11 +2,11 @@ import "server-only";
 
 import type {
   OfferGenerationResult,
-  OfferSaleType,
   OfferSimulationHistoryItem,
   OfferSimulationRecord,
   OfferSimulationRequest,
 } from "@/types/offer-engine";
+import { normalizeOfferSaleType } from "@/types/offer-engine";
 import { ensureSchema, getSql, hasDatabase, withDbRetry } from "@/server/db/client";
 
 export interface OfferSimulationRepository {
@@ -34,15 +34,19 @@ function summarizeResult(result: OfferGenerationResult): string {
 
 function rowToRecord(row: Record<string, unknown>): OfferSimulationRecord {
   const recommendationJson = row.recommendation_json as OfferGenerationResult;
-  return {
+  const normalizedJson: OfferGenerationResult = {
     ...recommendationJson,
+    saleType: normalizeOfferSaleType(String(recommendationJson.saleType ?? row.sale_type)),
+  };
+  return {
+    ...normalizedJson,
     id: String(row.id),
     leadId: String(row.lead_id),
     companyId: String(row.company_id),
     createdBy: String(row.created_by),
     createdByName: String(row.created_by_name ?? ""),
     createdAt: String(row.created_at),
-    recommendationJson,
+    recommendationJson: normalizedJson,
   };
 }
 
@@ -106,6 +110,9 @@ class PostgresOfferSimulationRepository implements OfferSimulationRepository {
     const now = new Date().toISOString();
     const topOffer = result.offers[0];
 
+    const wantsEquipment = result.wantsEquipment;
+    const equipmentCredit = result.equipmentCredit;
+
     await withDbRetry(() =>
       sql`
         INSERT INTO offer_simulations (
@@ -120,10 +127,10 @@ class PostgresOfferSimulationRepository implements OfferSimulationRepository {
           ${id}, ${input.leadId}, ${meta.companyId}, ${meta.createdBy},
           ${meta.createdByName}, ${now},
           ${input.saleType}, ${input.requestedLines}, ${result.evaluatedLines},
-          ${input.wantsEquipment}, ${Boolean(topOffer?.eligibleEquipment.length)},
-          ${JSON.stringify({ requestedLines: input.requestedLines, wantsEquipment: input.wantsEquipment })}::jsonb,
+          ${wantsEquipment}, ${Boolean(topOffer?.eligibleEquipment.length)},
+          ${JSON.stringify({ requestedLines: input.requestedLines, wantsEquipment })}::jsonb,
           ${JSON.stringify(topOffer ?? null)}::jsonb,
-          ${input.lineCredit}, ${input.equipmentCredit},
+          ${input.lineCredit}, ${equipmentCredit},
           ${topOffer?.planMonthlyTotal ?? 0}, ${topOffer?.planMonthlyTotal ?? 0},
           ${topOffer?.lineRemaining ?? 0},
           ${result.optimized ? "REDUCE_LINES" : "NONE"}, ${result.viableCount > 0 ? "APPROVED" : "REJECTED"},
@@ -163,7 +170,7 @@ class PostgresOfferSimulationRepository implements OfferSimulationRepository {
       return {
         id: rec.id,
         createdAt: rec.createdAt,
-        saleType: rec.saleType as OfferSaleType,
+        saleType: rec.saleType,
         requestedSummary: summarizeRequested({
           leadId: rec.leadId,
           saleType: rec.saleType,

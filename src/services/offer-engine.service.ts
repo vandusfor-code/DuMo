@@ -31,7 +31,9 @@ export const offerEngineService = {
 
     const [{ plans }, equipmentCatalog] = await Promise.all([
       getCommercialConfigurationRepository().getSnapshot(),
-      getEquipmentRepository().listAll(),
+      input.saleType === "portability_prepaid"
+        ? Promise.resolve([])
+        : getEquipmentRepository().listAll(),
     ]);
 
     const result = generateCommercialOffers(input, plans, equipmentCatalog);
