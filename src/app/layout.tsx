@@ -14,6 +14,10 @@ export const metadata: Metadata = {
   title: "DuMo — Gestión de ventas y comisiones",
   description:
     "Plataforma para la gestión de ventas y comisiones de asesores comerciales.",
+  icons: {
+    icon: [{ url: "/logo-dumo.jpg", type: "image/jpeg" }],
+    apple: [{ url: "/logo-dumo.jpg", type: "image/jpeg" }],
+  },
 };
 
 export default function RootLayout({
