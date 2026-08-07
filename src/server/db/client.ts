@@ -3,6 +3,7 @@ import postgres, { type Sql } from "postgres";
 import { SEED_ADMIN, seedAdminPasswordHash } from "@/lib/auth/seed-admin";
 import { DEFAULT_COMPANY_ID } from "@/types/tenant";
 import { QUICK_REPLY_REQUIRED_COLUMNS, runQuickReplyAndTenantMigrations } from "@/server/db/migrations/quick-reply-schema";
+import { runTeleprompterScriptMigrations } from "@/server/db/migrations/teleprompter-scripts-schema";
 
 let sqlSingleton: Sql | null = null;
 let schemaPromise: Promise<void> | null = null;
@@ -419,6 +420,7 @@ async function runMigrations(sql: Sql) {
     await ensureOfferSimulationsTable(tx);
 
     await runQuickReplyAndTenantMigrations(tx);
+    await runTeleprompterScriptMigrations(tx);
 
     await tx`
       INSERT INTO users (id, username, email, password_hash, name, role, active, avatar_url, company_id)

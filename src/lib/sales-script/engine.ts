@@ -1,15 +1,21 @@
 import type { ScriptBuildContext } from "./context";
 import { resolveScriptFlow } from "./flows/registry";
 import type { GeneratedSalesScript, StructuredScriptPayload } from "@/types/sales-script";
+import type { ScriptOverrideMap } from "@/lib/sales-script/cms/types";
+import { applyPortabilidadOverrides } from "@/lib/sales-script/cms/override-applicator";
 
 export function assembleGeneratedScript(input: {
   gestionId: string;
   conversationId: string;
   ctx: ScriptBuildContext;
   meta: GeneratedSalesScript["meta"];
+  overrides?: ScriptOverrideMap;
 }): GeneratedSalesScript {
   const flow = resolveScriptFlow(input.ctx);
-  const steps = flow.buildSteps(input.ctx);
+  const builtSteps = flow.buildSteps(input.ctx);
+  const steps = input.overrides
+    ? applyPortabilidadOverrides(builtSteps, input.ctx, input.overrides)
+    : builtSteps;
   const structured: StructuredScriptPayload = {
     tipo: flow.key,
     pasos: steps.map((s, i) => ({

@@ -2,6 +2,7 @@ import type { SaveLeadInput } from "@/types/lead";
 import type { CommercialPlan } from "@/types/commercial-config";
 import type { EquipmentCatalogItem } from "@/types/equipment";
 import type { GeneratedSalesScript } from "@/types/sales-script";
+import type { ScriptOverrideMap } from "@/lib/sales-script/cms/types";
 import { buildScriptContext, getTeleprompterContextError } from "./context";
 import { assembleGeneratedScript } from "./engine";
 import { getScriptUnavailableReason, isScriptEligible } from "./eligibility";
@@ -38,6 +39,7 @@ export function buildSalesScript(input: {
   equipmentCatalog?: EquipmentCatalogItem[];
   advisor?: { name: string; email: string };
   deliveryConfig: DeliveryTeleprompterConfig;
+  overrides?: ScriptOverrideMap;
 }): GeneratedSalesScript | null {
   const main = input.gestion.lines[0];
   const eligible = isScriptEligible(input.gestion);
@@ -96,6 +98,7 @@ export function buildSalesScript(input: {
     gestionId: input.gestionId,
     conversationId: input.gestion.conversationId,
     ctx,
+    overrides: input.overrides,
     meta: {
       clientName: input.gestion.customerName,
       saleTypeLabel: ctx.vars.tipo_venta,
