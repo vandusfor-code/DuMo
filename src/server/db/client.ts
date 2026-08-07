@@ -8,6 +8,8 @@ let sqlSingleton: Sql | null = null;
 let schemaPromise: Promise<void> | null = null;
 let schemaReady = false;
 
+type MigrationSql = Sql | postgres.TransactionSql;
+
 /**
  * DuMo usa Postgres directo (compatible con Supabase, Neon, Vercel Postgres).
  * En Vercel/Supabase la URI va en **DATABASE_URL1** (Transaction pooler, puerto 6543).
@@ -149,7 +151,6 @@ const REQUIRED_COLUMNS = [
   "commission_payments.advisor_id",
   "lead_gestiones.conversation_id",
   "crm_clients.conversation_id",
-  "offer_simulations.lead_id",
   ...QUICK_REPLY_REQUIRED_COLUMNS,
 ];
 
@@ -165,6 +166,56 @@ async function schemaIsComplete(sql: Sql): Promise<boolean> {
     return (rows[0]?.n ?? 0) >= REQUIRED_COLUMNS.length;
   } catch {
     return false;
+  }
+}
+
+/** Crea offer_simulations sin correr el bloque DDL completo (no bloquea lead_conversations). */
+async function ensureOfferSimulationsTable(sql: MigrationSql): Promise<void> {
+  await sql`
+    CREATE TABLE IF NOT EXISTS offer_simulations (
+      id text PRIMARY KEY,
+      lead_id text NOT NULL,
+      company_id text NOT NULL DEFAULT 'company-default',
+      created_by text NOT NULL,
+      created_by_name text NOT NULL DEFAULT '',
+      created_at timestamptz NOT NULL DEFAULT now(),
+      sale_type text NOT NULL,
+      requested_lines integer NOT NULL,
+      approved_lines integer NOT NULL,
+      requested_equipment boolean NOT NULL DEFAULT false,
+      approved_equipment boolean NOT NULL DEFAULT false,
+      requested_plan_json jsonb NOT NULL DEFAULT '{}',
+      approved_plan_json jsonb NOT NULL DEFAULT '{}',
+      line_credit numeric NOT NULL DEFAULT 0,
+      equipment_credit numeric NOT NULL DEFAULT 0,
+      requested_total numeric NOT NULL DEFAULT 0,
+      approved_total numeric NOT NULL DEFAULT 0,
+      remaining_credit numeric NOT NULL DEFAULT 0,
+      optimization_type text NOT NULL DEFAULT 'NONE',
+      status text NOT NULL,
+      recommendation text NOT NULL DEFAULT '',
+      recommendation_json jsonb NOT NULL DEFAULT '{}'
+    )
+  `;
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_offer_simulations_lead
+    ON offer_simulations (lead_id, created_at DESC)
+  `;
+}
+
+/** Tablas nuevas en prod ya marcada como schema_complete — sin migración pesada. */
+async function ensureIncrementalMigrations(sql: Sql): Promise<void> {
+  try {
+    const rows = await sql<{ exists: boolean }[]>`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'offer_simulations'
+      ) AS exists
+    `;
+    if (rows[0]?.exists) return;
+    await ensureOfferSimulationsTable(sql);
+  } catch (err) {
+    console.error("[ensureIncrementalMigrations]", err);
   }
 }
 
@@ -365,36 +416,7 @@ async function runMigrations(sql: Sql) {
       CREATE INDEX IF NOT EXISTS idx_crm_clients_advisor ON crm_clients (advisor_id, updated_at DESC)
     `;
 
-    await tx`
-      CREATE TABLE IF NOT EXISTS offer_simulations (
-        id text PRIMARY KEY,
-        lead_id text NOT NULL,
-        company_id text NOT NULL DEFAULT 'company-default',
-        created_by text NOT NULL,
-        created_by_name text NOT NULL DEFAULT '',
-        created_at timestamptz NOT NULL DEFAULT now(),
-        sale_type text NOT NULL,
-        requested_lines integer NOT NULL,
-        approved_lines integer NOT NULL,
-        requested_equipment boolean NOT NULL DEFAULT false,
-        approved_equipment boolean NOT NULL DEFAULT false,
-        requested_plan_json jsonb NOT NULL DEFAULT '{}',
-        approved_plan_json jsonb NOT NULL DEFAULT '{}',
-        line_credit numeric NOT NULL DEFAULT 0,
-        equipment_credit numeric NOT NULL DEFAULT 0,
-        requested_total numeric NOT NULL DEFAULT 0,
-        approved_total numeric NOT NULL DEFAULT 0,
-        remaining_credit numeric NOT NULL DEFAULT 0,
-        optimization_type text NOT NULL DEFAULT 'NONE',
-        status text NOT NULL,
-        recommendation text NOT NULL DEFAULT '',
-        recommendation_json jsonb NOT NULL DEFAULT '{}'
-      )
-    `;
-    await tx`
-      CREATE INDEX IF NOT EXISTS idx_offer_simulations_lead
-      ON offer_simulations (lead_id, created_at DESC)
-    `;
+    await ensureOfferSimulationsTable(tx);
 
     await runQuickReplyAndTenantMigrations(tx);
 
@@ -452,8 +474,10 @@ export function ensureSchema(): Promise<void> {
   if (!schemaPromise) {
     schemaPromise = withQueryTimeout(
       withDbRetry(async () => {
-        // Siempre verificar columnas requeridas — el flag schema_complete no
-        // debe saltar DDL cuando se añaden tablas nuevas (p. ej. offer_simulations).
+        if (await isSchemaMarkedComplete(sql)) {
+          await ensureIncrementalMigrations(sql);
+          return;
+        }
         if (await schemaIsComplete(sql)) {
           await markSchemaComplete(sql);
           return;
