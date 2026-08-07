@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiPost } from "@/lib/api-client";
+import { apiDelete, apiPost } from "@/lib/api-client";
 import { ADVISOR_QUERY_OPTIONS, advisorApiGet } from "@/lib/advisor-query";
 import type { NewSaleInput, SaleDetail, SaleSummary } from "@/types/sale";
 
@@ -34,6 +34,19 @@ export function useCreateSale() {
   return useMutation({
     mutationFn: (input: NewSaleInput) =>
       apiPost<SaleDetail>("/api/sales", input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: salesKeys.all });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["commissions"] });
+    },
+  });
+}
+
+export function useDeleteSale() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiDelete(`/api/sales/${encodeURIComponent(id)}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: salesKeys.all });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });

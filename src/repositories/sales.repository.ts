@@ -24,6 +24,7 @@ export interface SalesRepository {
   list(scope?: AdvisorScope | null): Promise<SaleSummary[]>;
   getById(id: string): Promise<SaleDetail | null>;
   create(input: NewSaleInput, scope?: AdvisorScope | null): Promise<SaleDetail>;
+  delete(id: string, scope?: AdvisorScope | null): Promise<void>;
 }
 
 /* ----------------------------- Mock ----------------------------- */
@@ -72,6 +73,9 @@ class MockSalesRepository implements SalesRepository {
       ],
     };
     return withLatency(detail);
+  }
+  delete(_id: string) {
+    return Promise.resolve();
   }
 }
 
@@ -224,6 +228,10 @@ class SheetsSalesRepository implements SalesRepository {
     };
   }
 
+  delete(_id: string) {
+    return Promise.resolve();
+  }
+
   private safeUser(contexto: string | undefined): string {
     try {
       const parsed = JSON.parse(contexto ?? "{}");
@@ -244,6 +252,7 @@ export function getSalesRepository(): SalesRepository {
       list: (scope) => store.listSummaries(scope ?? null),
       getById: (id) => store.getSaleDetail(id),
       create: (input, scope) => store.createSale(input, scope ?? null),
+      delete: (id, scope) => store.deleteSale(id, scope ?? null),
     };
   }
   return new MockSalesRepository();

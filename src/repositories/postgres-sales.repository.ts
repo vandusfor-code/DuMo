@@ -403,6 +403,28 @@ export class PostgresSalesStore {
     });
   }
 
+  /** Elimina una venta verificando que pertenezca a la asesora conectada. */
+  async deleteSale(id: string, scope: AdvisorScope | null = null): Promise<void> {
+    await ensureSchema();
+    const sql = getSql();
+    if (!sql) throw new Error("Base de datos no configurada");
+
+    const normalized = id.replace(/^#/, "");
+    const rows = await withDbRetry(() =>
+      sql<SaleRow[]>`
+        SELECT id, advisor_id, advisor_name FROM sales WHERE id = ${normalized} LIMIT 1
+      `,
+    );
+    const row = rows[0];
+    if (!row) throw new Error("Venta no encontrada.");
+
+    if (scope && !matchesAdvisor(row, scope)) {
+      throw new Error("No tienes permiso para eliminar esta venta.");
+    }
+
+    await this.deleteSales([normalized]);
+  }
+
   async listAdminCommissions(filters: AdminCommissionFilters): Promise<AdminCommissionResult> {
     const configRepo = getCommercialConfigurationRepository();
     const config = await configRepo.getSnapshot();

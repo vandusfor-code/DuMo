@@ -13,4 +13,7 @@ export const salesService = {
   create(input: NewSaleInput, scope?: AdvisorScope | null): Promise<SaleDetail> {
     return getSalesRepository().create(input, scope ?? null);
   },
+  delete(id: string, scope?: AdvisorScope | null): Promise<void> {
+    return getSalesRepository().delete(id, scope ?? null);
+  },
 };

@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import {
   ArrowLeft,
   Calendar,
@@ -34,7 +36,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SaleStatusBadge } from "@/components/shared/sale-status-badge";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { formatDateTime, formatLongDate } from "@/lib/format";
+import { useDeleteSale } from "@/hooks/use-sales";
 import { SALE_TYPE_LABELS, type SaleDetail } from "@/types/sale";
 
 export function SaleDetailView({
@@ -46,7 +50,20 @@ export function SaleDetailView({
   backHref?: string;
   backLabel?: string;
 }) {
+  const router = useRouter();
+  const deleteSale = useDeleteSale();
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const deviceCount = sale.lines.filter((l) => l.deviceName).length;
+
+  const handleDelete = async () => {
+    try {
+      await deleteSale.mutateAsync(sale.id);
+      setConfirmOpen(false);
+      router.push(backHref);
+    } catch {
+      /* mutation error */
+    }
+  };
 
   return (
     <div className="space-y-6 pt-1">
@@ -84,7 +101,7 @@ export function SaleDetailView({
                   <Pencil /> Editar venta
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem tone="danger">
+                <DropdownMenuItem tone="danger" onSelect={() => setConfirmOpen(true)}>
                   <Trash2 /> Eliminar venta
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -225,6 +242,16 @@ export function SaleDetailView({
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Eliminar venta"
+        description={`¿Eliminar la venta de ${sale.customer.name}? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        isLoading={deleteSale.isPending}
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={() => void handleDelete()}
+      />
     </div>
   );
 }
