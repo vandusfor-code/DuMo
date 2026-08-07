@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyConversation } from "@/components/leads/empty-conversation";
@@ -25,13 +26,27 @@ import {
 } from "@/hooks/use-admin-leads";
 
 export default function AdminLeadsPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminLeadsPageContent />
+    </Suspense>
+  );
+}
+
+function AdminLeadsPageContent() {
+  const searchParams = useSearchParams();
+  const conversationFromUrl = searchParams.get("conversationId");
   const convQuery = useAdminConversations();
   const { data: conversations, isLoading, refetch } = convQuery;
   const { data: advisors = [] } = useAdminAdvisors();
   const { data: autoAssign } = useAutoAssignSettings();
   const setAutoAssign = useSetAutoAssign();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(conversationFromUrl);
   const assign = useAssignAdvisor();
+
+  useEffect(() => {
+    if (conversationFromUrl) setSelectedId(conversationFromUrl);
+  }, [conversationFromUrl]);
 
   const selected = useMemo(
     () => conversations?.find((c) => c.id === selectedId) ?? null,

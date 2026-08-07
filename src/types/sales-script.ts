@@ -115,4 +115,5 @@ export type SaveLeadResult = {
   scriptUnavailableReason?: string | null;
   sale?: import("./sale").SaleDetail | null;
   saleError?: string | null;
+  saveAction?: import("./crm-client").SaveLeadAction;
 };

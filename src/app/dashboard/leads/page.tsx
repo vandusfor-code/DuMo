@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { ConversationList } from "@/components/leads/conversation-list";
 import { ChatWindow } from "@/components/leads/chat-window";
 import { LeadFormPanel } from "@/components/leads/lead-form-panel";
@@ -13,9 +14,25 @@ import type { Conversation } from "@/types/conversation";
 const LIST_COLLAPSED_KEY = "dumo-leads-list-collapsed";
 
 export default function LeadsPage() {
+  return (
+    <Suspense fallback={null}>
+      <LeadsPageContent />
+    </Suspense>
+  );
+}
+
+function LeadsPageContent() {
+  const searchParams = useSearchParams();
+  const conversationFromUrl = searchParams.get("conversationId");
   const { data: conversations, isLoading, isError, isFetching, refetch } = useConversations();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(conversationFromUrl);
   const [listCollapsed, setListCollapsed] = useState(false);
+
+  useEffect(() => {
+    if (conversationFromUrl) {
+      setSelectedId(conversationFromUrl);
+    }
+  }, [conversationFromUrl]);
 
   useEffect(() => {
     try {

@@ -75,6 +75,7 @@ export const saveLeadSchema = z.object({
   lines: z.array(leadLineSchema).optional().default([]),
   /** Si es true, también registra la venta en Mis Ventas. */
   registerSale: z.boolean().optional().default(false),
+  saveAction: z.enum(["tipify", "script", "sale"]).optional().default("script"),
 });
 
 export type SaveLeadValues = z.infer<typeof saveLeadSchema>;

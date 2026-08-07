@@ -29,6 +29,7 @@ import { StatusBadge } from "@/components/leads/premium/status-badge";
 import type { Conversation } from "@/types/conversation";
 import type { LeadFormValues } from "@/types/lead-form";
 import type { GeneratedSalesScript } from "@/types/sales-script";
+import type { SaveLeadAction } from "@/types/crm-client";
 import { cn } from "@/lib/utils";
 
 export function LeadPanel({
@@ -43,8 +44,10 @@ export function LeadPanel({
   scriptUnavailableReason,
   saleError,
   saleRegistered = false,
+  lastSaveAction = null,
   onSaveSale,
   onGenerateScript,
+  onTipify,
 }: {
   conversation: Conversation;
   isSaving: boolean;
@@ -55,13 +58,16 @@ export function LeadPanel({
   onCancel: () => void;
   onSaveSale: () => void;
   onGenerateScript: () => void;
+  onTipify: () => void;
   savedScript?: GeneratedSalesScript | null;
   scriptUnavailableReason?: string | null;
   saleError?: string | null;
   saleRegistered?: boolean;
+  lastSaveAction?: SaveLeadAction | null;
 }) {
   const { control } = useFormContext<LeadFormValues>();
   const type = useWatch({ control, name: "type" });
+  const isVenta = type === "venta";
   const [activeTab, setActiveTab] = useState("gestion");
   const {
     data: fetchedScript,
@@ -73,35 +79,45 @@ export function LeadPanel({
   const gestionSaved = hasSavedGestion || isSuccess;
 
   useEffect(() => {
-    if (isSuccess) {
+    if (isSuccess && isVenta && lastSaveAction !== "tipify") {
       setActiveTab("script");
     }
-  }, [isSuccess]);
+  }, [isSuccess, isVenta, lastSaveAction]);
+
+  useEffect(() => {
+    if (!isVenta && activeTab === "script") {
+      setActiveTab("gestion");
+    }
+  }, [isVenta, activeTab]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center justify-between border-b border-line px-5 py-4">
         <h2 className="text-[18px] font-semibold leading-[1.45] text-ink">Gestión del cliente</h2>
-        <button
-          type="submit"
-          disabled={isSaving}
-          onClick={onSaveSale}
-          className="inline-flex h-10 items-center gap-2 rounded-btn bg-brand px-4 text-[13px] font-semibold text-white shadow-send transition-all duration-200 hover:scale-[1.02] hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isSaving ? (
-            <Loader2 className="size-[18px] animate-spin" />
-          ) : (
-            <Save className="size-[18px]" />
-          )}
-          Guardar venta
-        </button>
+        {isVenta ? (
+          <button
+            type="submit"
+            disabled={isSaving}
+            onClick={onSaveSale}
+            className="inline-flex h-10 items-center gap-2 rounded-btn bg-brand px-4 text-[13px] font-semibold text-white shadow-send transition-all duration-200 hover:scale-[1.02] hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSaving ? (
+              <Loader2 className="size-[18px] animate-spin" />
+            ) : (
+              <Save className="size-[18px]" />
+            )}
+            Guardar venta
+          </button>
+        ) : null}
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="shrink-0 border-b border-line px-6 pt-4">
           <TabsList className="h-auto w-full justify-start gap-1 bg-transparent p-0">
             <PanelTab value="gestion" icon={<ClipboardList className="size-[18px]" />} label="Gestión" />
-            <PanelTab value="script" icon={<ScrollText className="size-[18px]" />} label="Script" />
+            {isVenta ? (
+              <PanelTab value="script" icon={<ScrollText className="size-[18px]" />} label="Script" />
+            ) : null}
             <PanelTab value="notas" icon={<MessageSquare className="size-[18px]" />} label="Notas" />
             <PanelTab value="historial" icon={<Clock className="size-[18px]" />} label="Historial" />
           </TabsList>
@@ -152,36 +168,43 @@ export function LeadPanel({
             {isSuccess && (
               <div className="flex items-center gap-2.5 rounded-card border border-success/20 bg-success-soft px-4 py-3 text-[13px] text-success-ink">
                 <CheckCircle2 className="size-[18px]" />
-                {saleRegistered
-                  ? script
-                    ? "Venta guardada en Mis Ventas. El script de la llamada ya está disponible."
-                    : "Venta guardada correctamente. Ya aparece en Mis Ventas."
-                  : script
-                    ? "Gestión guardada. El script de la llamada ya está disponible."
-                    : "Gestión guardada correctamente."}
+                {lastSaveAction === "tipify"
+                  ? "Cliente tipificado correctamente. Ya aparece en Clientes."
+                  : saleRegistered
+                    ? script
+                      ? "Venta guardada en Mis Ventas. El script de la llamada ya está disponible."
+                      : "Venta guardada correctamente. Ya aparece en Mis Ventas."
+                    : script
+                      ? "Gestión guardada. El script de la llamada ya está disponible."
+                      : isVenta
+                        ? "Gestión guardada correctamente."
+                        : "Cliente tipificado correctamente. Ya aparece en Clientes."}
               </div>
             )}
             <ActionButtons
               isSaving={isSaving}
               onCancel={onCancel}
-              onGenerateScript={onGenerateScript}
+              mode={isVenta ? "script" : "tipify"}
+              onPrimaryAction={isVenta ? onGenerateScript : onTipify}
             />
           </TabsContent>
 
-          <TabsContent value="script" className="outline-none">
-            <SectionCard>
-              <SectionCardBody>
-                <SalesScriptTab
-                  script={script}
-                  isLoading={isScriptLoading}
-                  isError={isScriptError}
-                  onRetry={() => refetchScript()}
-                  gestionSaved={gestionSaved}
-                  unavailableReason={script ? null : scriptUnavailableReason}
-                />
-              </SectionCardBody>
-            </SectionCard>
-          </TabsContent>
+          {isVenta ? (
+            <TabsContent value="script" className="outline-none">
+              <SectionCard>
+                <SectionCardBody>
+                  <SalesScriptTab
+                    script={script}
+                    isLoading={isScriptLoading}
+                    isError={isScriptError}
+                    onRetry={() => refetchScript()}
+                    gestionSaved={gestionSaved}
+                    unavailableReason={script ? null : scriptUnavailableReason}
+                  />
+                </SectionCardBody>
+              </SectionCard>
+            </TabsContent>
+          ) : null}
 
           <TabsContent value="notas" className="outline-none">
             <SectionCard>

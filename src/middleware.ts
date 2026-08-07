@@ -31,6 +31,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/api/admin") ||
     pathname.startsWith("/api/leads") ||
+    pathname.startsWith("/api/clients") ||
     pathname.startsWith("/api/sales") ||
     pathname.startsWith("/api/commissions") ||
     pathname.startsWith("/api/dashboard") ||

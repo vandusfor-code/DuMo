@@ -110,6 +110,7 @@ const REQUIRED_COLUMNS = [
   "sale_lines.sale_id",
   "commission_payments.advisor_id",
   "lead_gestiones.conversation_id",
+  "crm_clients.conversation_id",
   ...QUICK_REPLY_REQUIRED_COLUMNS,
 ];
 
@@ -298,6 +299,26 @@ async function runMigrations(sql: Sql) {
       )
     `;
     await tx`ALTER TABLE lead_gestiones ADD COLUMN IF NOT EXISTS sales_script jsonb`;
+
+    await tx`
+      CREATE TABLE IF NOT EXISTS crm_clients (
+        id text PRIMARY KEY,
+        conversation_id text NOT NULL,
+        customer_name text NOT NULL DEFAULT '',
+        rut text NOT NULL DEFAULT '',
+        phone text NOT NULL DEFAULT '',
+        gestion_type text NOT NULL DEFAULT 'consulta',
+        advisor_id text NOT NULL,
+        advisor_name text NOT NULL DEFAULT '',
+        has_sale boolean NOT NULL DEFAULT false,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (conversation_id, advisor_id)
+      )
+    `;
+    await tx`
+      CREATE INDEX IF NOT EXISTS idx_crm_clients_advisor ON crm_clients (advisor_id, updated_at DESC)
+    `;
 
     await runQuickReplyAndTenantMigrations(tx);
 

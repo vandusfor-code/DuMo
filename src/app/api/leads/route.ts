@@ -26,7 +26,11 @@ export async function POST(request: NextRequest) {
   try {
     const user = await authService.getSessionUser();
     const scope = advisorScopeFromUser(user);
-    const result = await leadsService.saveLead(parsed.data, scope);
+    const result = await leadsService.saveLead({
+      ...parsed.data,
+      saveAction: parsed.data.saveAction,
+      registerSale: parsed.data.registerSale,
+    }, scope);
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     console.error("[POST /api/leads]", error);

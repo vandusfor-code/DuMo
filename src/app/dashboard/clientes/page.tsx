@@ -1,10 +1,10 @@
-import { ComingSoon } from "@/components/shared/coming-soon";
+"use client";
 
-export default function Page() {
-  return (
-    <ComingSoon
-      title="Clientes"
-      subtitle="Administra tu cartera de clientes."
-    />
-  );
+import { ClientsPortfolio } from "@/components/clients/clients-portfolio";
+import { useCrmClients } from "@/hooks/use-crm-clients";
+
+export default function ClientesPage() {
+  const { data, isLoading } = useCrmClients();
+
+  return <ClientsPortfolio clients={data ?? []} isLoading={isLoading} />;
 }

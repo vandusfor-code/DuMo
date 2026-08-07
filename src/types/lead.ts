@@ -165,4 +165,6 @@ export interface SaveLeadInput {
   }[];
   /** Registra la venta en Mis Ventas (botón superior). Por defecto solo guarda gestión/script. */
   registerSale?: boolean;
+  /** Acción del formulario: tipificar, generar script o registrar venta. */
+  saveAction?: import("@/types/crm-client").SaveLeadAction;
 }

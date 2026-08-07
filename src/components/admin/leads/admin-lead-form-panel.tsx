@@ -164,6 +164,7 @@ export function AdminLeadFormPanel({
                 <ActionButtons
                   isSaving={saveLead.isPending}
                   onCancel={() => methods.reset(defaultsFor(conversation))}
+                  mode={type === "venta" ? "script" : "tipify"}
                 />
               </TabsContent>
 

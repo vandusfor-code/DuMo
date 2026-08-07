@@ -4,6 +4,8 @@ import { leadGestionToNewSaleInput } from "@/lib/lead-save";
 import { getLeadRepository } from "@/repositories/leads.repository";
 import { salesScriptService } from "@/services/sales-script.service";
 import { salesService } from "@/services/sales.service";
+import { crmClientsService } from "@/services/crm-clients.service";
+import type { SaveLeadAction } from "@/types/crm-client";
 import { getCommercialConfigurationRepository } from "@/repositories/commercial-configuration.repository";
 import { equipmentService } from "@/services/equipment.service";
 import { getScriptUnavailableReason, isScriptEligible } from "@/lib/sales-script/eligibility";
@@ -29,7 +31,13 @@ export async function saveLeadWithScript(
   let sale = null;
   let saleError: string | null = null;
 
-  if (input.type === "venta" && input.lines.length > 0) {
+  const saveAction: SaveLeadAction =
+    input.saveAction ?? (input.registerSale ? "sale" : "script");
+  const shouldGenerateScript =
+    saveAction !== "tipify" && input.type === "venta" && input.lines.length > 0;
+  const shouldRegisterSale = saveAction === "sale" && input.type === "venta" && input.lines.length > 0;
+
+  if (shouldGenerateScript) {
     const main = input.lines[0];
     const unavailableReason = getScriptUnavailableReason(input);
     const eligible = isScriptEligible(input);
@@ -94,7 +102,7 @@ export async function saveLeadWithScript(
     }
   }
 
-  if (input.registerSale && input.type === "venta" && input.lines.length > 0 && scope) {
+  if (shouldRegisterSale && scope) {
     const saleInput = leadGestionToNewSaleInput(input);
     if (saleInput) {
       try {
@@ -106,12 +114,30 @@ export async function saveLeadWithScript(
     }
   }
 
+  if (scope) {
+    try {
+      await crmClientsService.upsertFromGestion({
+        conversationId: input.conversationId,
+        customerName: input.customerName,
+        rut: input.rut,
+        phone: input.phone,
+        gestionType: input.type,
+        advisorId: scope.id,
+        advisorName: scope.name,
+        hasSale: Boolean(sale),
+      });
+    } catch (error) {
+      console.error("[saveLeadWithScript] crm client upsert failed", error);
+    }
+  }
+
   const result: SaveLeadResult = {
     lead,
     script,
     scriptUnavailableReason: script ? null : scriptUnavailableReason,
     sale,
     saleError,
+    saveAction,
   };
 
   logScriptSaveCheckpoint("saveLeadWithScript · antes de responder", {
