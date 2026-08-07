@@ -1,6 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import crypto from "node:crypto";
 import { leadsService } from "@/services/leads.service";
+import { persistMessengerInbound } from "@/server/messenger/inbound";
+import {
+  allowedMessengerPageIds,
+  getMessengerIntegrationConfig,
+  messengerVerifyToken,
+} from "@/server/messenger/config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,7 +40,7 @@ export async function GET(request: NextRequest) {
   const mode = params.get("hub.mode");
   const token = params.get("hub.verify_token");
   const challenge = params.get("hub.challenge");
-  const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
+  const verifyToken = messengerVerifyToken();
 
   if (mode === "subscribe" && verifyToken && token === verifyToken) {
     return new NextResponse(challenge ?? "", { status: 200 });
@@ -166,7 +172,15 @@ export async function POST(request: NextRequest) {
 
   try {
     const payload = JSON.parse(rawBody) as {
-      entry?: {
+      object?: string;
+      entry?: Array<{
+        id?: string;
+        messaging?: Array<{
+          sender?: { id?: string };
+          recipient?: { id?: string };
+          timestamp?: number;
+          message?: { mid?: string; text?: string; is_echo?: boolean };
+        }>;
         changes?: {
           value?: {
             metadata?: { phone_number_id?: string };
@@ -174,8 +188,29 @@ export async function POST(request: NextRequest) {
             messages?: WaMessage[];
           };
         }[];
-      }[];
+      }>;
     };
+
+    if (payload.object === "page") {
+      const messengerConfig = await getMessengerIntegrationConfig();
+      const allowedPages = new Set(
+        [...allowedMessengerPageIds(), messengerConfig?.pageId].filter(Boolean) as string[],
+      );
+
+      for (const entry of payload.entry ?? []) {
+        const pageId = entry.id ?? "";
+        if (allowedPages.size > 0 && pageId && !allowedPages.has(pageId)) {
+          console.warn("[webhook] ignored messenger page_id", pageId);
+          continue;
+        }
+
+        for (const event of entry.messaging ?? []) {
+          await persistMessengerInbound(event, pageId);
+        }
+      }
+
+      return new NextResponse("EVENT_RECEIVED", { status: 200 });
+    }
 
     const allow = allowedPhoneIds();
 

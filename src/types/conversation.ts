@@ -8,6 +8,9 @@ export const CONVERSATION_STATUS_LABELS: Record<ConversationStatus, string> = {
   lost: "Perdido",
 };
 
+/** Canal de origen de la conversación. */
+export type ConversationChannel = "whatsapp" | "messenger";
+
 /** Resumen de una conversación en la bandeja. */
 export interface Conversation {
   id: string;
@@ -15,6 +18,7 @@ export interface Conversation {
   phone: string;
   rut: string;
   avatarUrl?: string;
+  channel?: ConversationChannel;
   lastMessage: string;
   /** Hora legible del último mensaje, ej. "3:25 p. m.". */
   lastMessageTime: string;

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   Building2,
+  Facebook,
   FileSpreadsheet,
   MessageCircle,
   Server,
@@ -30,17 +31,20 @@ export function SettingsSections({
   data,
   onSaveCompany,
   onSaveWhatsApp,
+  onSaveMessenger,
   onSaveGoogleSheets,
   onTestGoogleSheets,
 }: {
   data: SettingsSnapshot;
   onSaveCompany: (values: SettingsSnapshot["company"]) => void;
   onSaveWhatsApp: (values: SettingsSnapshot["whatsapp"]) => void;
+  onSaveMessenger: (values: SettingsSnapshot["messenger"]) => void;
   onSaveGoogleSheets: (values: SettingsSnapshot["googleSheets"]) => void;
   onTestGoogleSheets: () => void;
 }) {
   const [company, setCompany] = useState(data.company);
   const [whatsapp, setWhatsapp] = useState(data.whatsapp);
+  const [messenger, setMessenger] = useState(data.messenger);
   const [sheets, setSheets] = useState(data.googleSheets);
 
   return (
@@ -100,6 +104,54 @@ export function SettingsSections({
       <Card className="p-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
+            <span className="grid size-10 place-items-center rounded-xl bg-brand-soft text-brand">
+              <Facebook className="size-5" />
+            </span>
+            <div>
+              <h3 className="text-[15px] font-semibold text-ink">Facebook Messenger (Página)</h3>
+              <ConnectionBadge status={messenger.connectionStatus} />
+            </div>
+          </div>
+          <p className="max-w-xs text-right text-[12px] text-muted">
+            Webhook: <code className="text-[11px]">/api/whatsapp/webhook</code> · Suscripción:{" "}
+            <strong>messages</strong>
+          </p>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="text-[13px] text-muted">Page ID</span>
+            <input
+              value={messenger.pageId}
+              onChange={(e) => setMessenger({ ...messenger, pageId: e.target.value })}
+              className="mt-1 h-11 w-full rounded-xl border border-line px-4 text-[14px]"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[13px] text-muted">Nombre de la página (opcional)</span>
+            <input
+              value={messenger.pageName}
+              onChange={(e) => setMessenger({ ...messenger, pageName: e.target.value })}
+              className="mt-1 h-11 w-full rounded-xl border border-line px-4 text-[14px]"
+            />
+          </label>
+          <label className="block sm:col-span-2">
+            <span className="text-[13px] text-muted">Page Access Token</span>
+            <input
+              value={messenger.pageAccessToken}
+              onChange={(e) => setMessenger({ ...messenger, pageAccessToken: e.target.value })}
+              placeholder="Token de la página con permiso pages_messaging"
+              className="mt-1 h-11 w-full rounded-xl border border-line px-4 text-[14px]"
+            />
+          </label>
+        </div>
+        <div className="mt-4 flex justify-end">
+          <Button size="sm" onClick={() => onSaveMessenger(messenger)}>Guardar Messenger</Button>
+        </div>
+      </Card>
+
+      <Card className="p-5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
             <span className="grid size-10 place-items-center rounded-xl bg-brand-soft text-brand"><FileSpreadsheet className="size-5" /></span>
             <div>
               <h3 className="text-[15px] font-semibold text-ink">Google Sheets</h3>
@@ -142,6 +194,7 @@ function SystemStatusCard({
     { label: "Versión", value: system.version },
     { label: "Google Sheets", value: system.googleSheetsStatus },
     { label: "WhatsApp", value: system.whatsappStatus },
+    { label: "Messenger", value: system.messengerStatus },
     { label: "APIs", value: system.apisStatus },
     { label: "Último respaldo", value: system.lastBackup ? new Date(system.lastBackup).toLocaleString("es-CL") : "—" },
   ];

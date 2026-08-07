@@ -3,24 +3,30 @@ import type {
   SettingsSnapshot,
   UpdateCompanyInput,
   UpdateGoogleSheetsInput,
+  UpdateMessengerInput,
   UpdateWhatsAppInput,
 } from "@/types/settings";
 import { SETTINGS_DEFAULT } from "@/data/mock/settings.mock";
 import { getSheetsClient } from "@/server/google/sheets-client";
 import { getConfig, setConfig } from "@/server/db/app-config";
 import { hasDatabase } from "@/server/db/client";
+import {
+  getMessengerIntegrationConfig,
+  saveMessengerIntegrationConfig,
+} from "@/server/messenger/config";
 
 export interface SettingsRepository {
   getSnapshot(): Promise<SettingsSnapshot>;
   updateCompany(input: UpdateCompanyInput): Promise<SettingsSnapshot["company"]>;
   updateWhatsApp(input: UpdateWhatsAppInput): Promise<SettingsSnapshot["whatsapp"]>;
+  updateMessenger(input: UpdateMessengerInput): Promise<SettingsSnapshot["messenger"]>;
   updateGoogleSheets(input: UpdateGoogleSheetsInput): Promise<SettingsSnapshot["googleSheets"]>;
   testGoogleSheetsConnection(): Promise<{ ok: boolean; message: string }>;
 }
 
 const SETTINGS_KEY = "settings_snapshot";
 
-type StoredSettings = Pick<SettingsSnapshot, "company" | "whatsapp" | "googleSheets">;
+type StoredSettings = Pick<SettingsSnapshot, "company" | "whatsapp" | "messenger" | "googleSheets">;
 
 function baseSnapshot(): SettingsSnapshot {
   return structuredClone(SETTINGS_DEFAULT);
@@ -40,7 +46,27 @@ function mergeSnapshot(stored: Partial<StoredSettings> | null): SettingsSnapshot
         ? "••••••••••••••••"
         : base.whatsapp.accessToken,
     },
+    messenger: {
+      ...base.messenger,
+      ...(stored.messenger ?? {}),
+      pageAccessToken: stored.messenger?.pageAccessToken
+        ? "••••••••••••••••"
+        : base.messenger.pageAccessToken,
+    },
     googleSheets: { ...base.googleSheets, ...stored.googleSheets },
+  };
+}
+
+async function messengerStatusFromConfig(): Promise<SettingsSnapshot["messenger"]> {
+  const base = baseSnapshot().messenger;
+  const integration = await getMessengerIntegrationConfig();
+  if (!integration) return base;
+  return {
+    pageId: integration.pageId,
+    pageAccessToken: "••••••••••••••••",
+    pageName: integration.pageName ?? "",
+    connectionStatus: "connected",
+    lastSync: integration.updatedAt ?? null,
   };
 }
 
@@ -56,6 +82,10 @@ class PostgresSettingsRepository implements SettingsRepository {
         ...snapshot.whatsapp,
         accessToken: snapshot.whatsapp.accessToken ? "stored" : "",
       },
+      messenger: {
+        ...snapshot.messenger,
+        pageAccessToken: snapshot.messenger.pageAccessToken ? "stored" : "",
+      },
       googleSheets: snapshot.googleSheets,
     };
     await setConfig(SETTINGS_KEY, toStore);
@@ -64,6 +94,8 @@ class PostgresSettingsRepository implements SettingsRepository {
   async getSnapshot() {
     const stored = await this.loadStored();
     const snapshot = mergeSnapshot(stored);
+    snapshot.messenger = await messengerStatusFromConfig();
+    snapshot.system.messengerStatus = snapshot.messenger.connectionStatus;
     snapshot.system.googleSheetsStatus = "disconnected";
     return snapshot;
   }
@@ -87,6 +119,36 @@ class PostgresSettingsRepository implements SettingsRepository {
     snapshot.system.whatsappStatus = snapshot.whatsapp.connectionStatus;
     await this.saveStored(snapshot);
     return { ...snapshot.whatsapp };
+  }
+
+  async updateMessenger(input: UpdateMessengerInput) {
+    const current = await getMessengerIntegrationConfig();
+    const token =
+      input.pageAccessToken && !input.pageAccessToken.includes("••")
+        ? input.pageAccessToken
+        : current?.pageAccessToken ?? "";
+
+    if (!input.pageId.trim() || !token) {
+      throw new Error("Page ID y Page Access Token son obligatorios.");
+    }
+
+    await saveMessengerIntegrationConfig({
+      pageId: input.pageId,
+      pageAccessToken: token,
+      pageName: input.pageName,
+    });
+
+    const snapshot = await this.getSnapshot();
+    snapshot.messenger = {
+      pageId: input.pageId,
+      pageAccessToken: "••••••••••••••••",
+      pageName: input.pageName,
+      connectionStatus: "connected",
+      lastSync: new Date().toISOString(),
+    };
+    snapshot.system.messengerStatus = "connected";
+    await this.saveStored(snapshot);
+    return { ...snapshot.messenger };
   }
 
   async updateGoogleSheets(input: UpdateGoogleSheetsInput) {
@@ -128,6 +190,18 @@ class MockSettingsRepository implements SettingsRepository {
     };
     this.snapshot.system.whatsappStatus = this.snapshot.whatsapp.connectionStatus;
     return Promise.resolve({ ...this.snapshot.whatsapp });
+  }
+
+  updateMessenger(input: UpdateMessengerInput) {
+    this.snapshot.messenger = {
+      ...this.snapshot.messenger,
+      ...input,
+      pageAccessToken: input.pageAccessToken ? "••••••••••••••••" : "",
+      connectionStatus: input.pageAccessToken ? "connected" : "disconnected",
+      lastSync: new Date().toISOString(),
+    };
+    this.snapshot.system.messengerStatus = this.snapshot.messenger.connectionStatus;
+    return Promise.resolve({ ...this.snapshot.messenger });
   }
 
   updateGoogleSheets(input: UpdateGoogleSheetsInput) {

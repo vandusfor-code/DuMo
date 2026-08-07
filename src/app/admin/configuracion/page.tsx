@@ -9,6 +9,7 @@ import {
   useTestGoogleSheets,
   useUpdateCompany,
   useUpdateGoogleSheets,
+  useUpdateMessenger,
   useUpdateWhatsApp,
 } from "@/hooks/use-admin-settings";
 
@@ -16,6 +17,7 @@ export default function AdminConfiguracionPage() {
   const { data, isLoading, isError, refetch } = useSettings();
   const updateCompany = useUpdateCompany();
   const updateWhatsApp = useUpdateWhatsApp();
+  const updateMessenger = useUpdateMessenger();
   const updateGoogleSheets = useUpdateGoogleSheets();
   const testSheets = useTestGoogleSheets();
 
@@ -39,6 +41,7 @@ export default function AdminConfiguracionPage() {
           data={data}
           onSaveCompany={(v) => updateCompany.mutate(v)}
           onSaveWhatsApp={(v) => updateWhatsApp.mutate(v)}
+          onSaveMessenger={(v) => updateMessenger.mutate(v)}
           onSaveGoogleSheets={(v) => updateGoogleSheets.mutate(v)}
           onTestGoogleSheets={() => testSheets.mutate()}
         />

@@ -47,6 +47,9 @@ export function ConversationItem({
         <div className="flex items-baseline justify-between gap-2">
           <p className="truncate text-[14px] font-semibold leading-tight text-ink">
             {conversation.customerName}
+            {conversation.channel === "messenger" ? (
+              <span className="ml-1.5 text-[10px] font-medium text-brand">Messenger</span>
+            ) : null}
           </p>
           <span className="shrink-0 text-[11px] text-muted">{conversation.lastMessageTime}</span>
         </div>

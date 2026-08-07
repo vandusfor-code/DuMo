@@ -22,6 +22,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(await settingsService.updateCompany(body.data));
       case "whatsapp":
         return NextResponse.json(await settingsService.updateWhatsApp(body.data));
+      case "messenger":
+        return NextResponse.json(await settingsService.updateMessenger(body.data));
       case "googleSheets":
         return NextResponse.json(await settingsService.updateGoogleSheets(body.data));
       case "testGoogleSheets":

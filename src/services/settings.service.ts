@@ -4,6 +4,7 @@ import type {
   SettingsSnapshot,
   UpdateCompanyInput,
   UpdateGoogleSheetsInput,
+  UpdateMessengerInput,
   UpdateWhatsAppInput,
 } from "@/types/settings";
 
@@ -16,6 +17,9 @@ export const settingsService = {
   },
   updateWhatsApp(input: UpdateWhatsAppInput) {
     return getSettingsRepository().updateWhatsApp(input);
+  },
+  updateMessenger(input: UpdateMessengerInput) {
+    return getSettingsRepository().updateMessenger(input);
   },
   updateGoogleSheets(input: UpdateGoogleSheetsInput) {
     return getSettingsRepository().updateGoogleSheets(input);

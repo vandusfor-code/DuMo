@@ -21,6 +21,12 @@ import { downloadWhatsAppMedia } from "@/server/whatsapp/media";
 import { DEFAULT_COMPANY_ID } from "@/types/tenant";
 import { assertSupportedImageMime } from "@/types/media";
 import { normalizeWhatsAppRecipient } from "@/lib/whatsapp/phone";
+import {
+  isMessengerConversation,
+  parseMessengerPsid,
+} from "@/lib/messenger/conversation-id";
+import { sendMessengerText } from "@/server/messenger/send";
+import { getMessengerIntegrationConfig } from "@/server/messenger/config";
 
 const GRAPH = "https://graph.facebook.com";
 
@@ -193,8 +199,29 @@ export const leadsService = {
     return getConversationRepository().registerNumber(number);
   },
 
-  /** Envía un mensaje de texto por la Cloud API y lo persiste como saliente. */
+  /** Envía un mensaje de texto por WhatsApp o Messenger y lo persiste como saliente. */
   async sendTextMessage(input: SendMessageInput): Promise<{ id: string }> {
+    if (isMessengerConversation(input.conversationId)) {
+      const psid = parseMessengerPsid(input.conversationId);
+      if (!psid) throw new Error("Conversación de Messenger inválida.");
+      const sent = await sendMessengerText({ psid, text: input.text });
+      const messengerConfig = await getMessengerIntegrationConfig();
+      const repo = getConversationRepository();
+      await repo.saveMessage({
+        waMessageId: sent.id,
+        conversationId: input.conversationId,
+        phone: psid,
+        customerName: "",
+        body: input.text,
+        direction: "out",
+        createdAt: new Date().toISOString(),
+        dumoPhoneId: messengerConfig?.pageId,
+        messageType: "text",
+        companyId: input.companyId,
+      });
+      return sent;
+    }
+
     const version = graphVersion();
     const repo = getConversationRepository();
     const creds = await resolveSendCreds(input.conversationId);
@@ -243,6 +270,9 @@ export const leadsService = {
 
   /** Envía imagen por URL pública (Supabase) y persiste el mensaje. */
   async sendMediaMessage(input: SendMediaMessageInput): Promise<{ id: string }> {
+    if (isMessengerConversation(input.conversationId)) {
+      throw new Error("El envío de imágenes por Messenger aún no está disponible. Usa texto.");
+    }
     const version = graphVersion();
     const repo = getConversationRepository();
     const creds = await resolveSendCreds(input.conversationId);

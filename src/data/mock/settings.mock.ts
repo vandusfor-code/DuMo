@@ -23,6 +23,13 @@ export const SETTINGS_DEFAULT: SettingsSnapshot = {
     connectionStatus: envStatus(!!process.env.WHATSAPP_TOKEN),
     lastSync: null,
   },
+  messenger: {
+    pageId: process.env.MESSENGER_PAGE_ID ?? "",
+    pageAccessToken: process.env.MESSENGER_PAGE_ACCESS_TOKEN ? "••••••••••••••••" : "",
+    pageName: "",
+    connectionStatus: envStatus(!!process.env.MESSENGER_PAGE_ACCESS_TOKEN),
+    lastSync: null,
+  },
   googleSheets: {
     spreadsheetId: process.env.GOOGLE_SHEET_ID ?? "",
     sheetName: process.env.GOOGLE_SHEET_NAME ?? "DuMo_Data",
@@ -33,6 +40,7 @@ export const SETTINGS_DEFAULT: SettingsSnapshot = {
     version: process.env.npm_package_version ?? "1.0.0",
     googleSheetsStatus: envStatus(!!process.env.GOOGLE_SHEET_ID),
     whatsappStatus: envStatus(!!process.env.WHATSAPP_TOKEN),
+    messengerStatus: envStatus(!!process.env.MESSENGER_PAGE_ACCESS_TOKEN),
     apisStatus: envStatus(!!(process.env.DATABASE_URL1 || process.env.DATABASE_URL)),
     lastBackup: null,
   },

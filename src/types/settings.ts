@@ -27,6 +27,14 @@ export interface WhatsAppSettings {
   lastSync: string | null;
 }
 
+export interface MessengerSettings {
+  pageId: string;
+  pageAccessToken: string;
+  pageName: string;
+  connectionStatus: ConnectionStatus;
+  lastSync: string | null;
+}
+
 export interface GoogleSheetsSettings {
   spreadsheetId: string;
   sheetName: string;
@@ -47,6 +55,7 @@ export interface SystemStatus {
   version: string;
   googleSheetsStatus: ConnectionStatus;
   whatsappStatus: ConnectionStatus;
+  messengerStatus: ConnectionStatus;
   apisStatus: ConnectionStatus;
   lastBackup: string | null;
 }
@@ -61,6 +70,7 @@ export interface SystemLog {
 export interface SettingsSnapshot {
   company: CompanySettings;
   whatsapp: WhatsAppSettings;
+  messenger: MessengerSettings;
   googleSheets: GoogleSheetsSettings;
   system: SystemStatus;
   logs: SystemLog[];
@@ -80,6 +90,12 @@ export interface UpdateWhatsAppInput {
   phoneNumberId: string;
   accessToken: string;
   verifyToken: string;
+}
+
+export interface UpdateMessengerInput {
+  pageId: string;
+  pageAccessToken: string;
+  pageName: string;
 }
 
 export interface UpdateGoogleSheetsInput {
