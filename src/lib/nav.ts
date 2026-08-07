@@ -7,7 +7,6 @@ import {
   LineChart,
   LogOut,
   MessagesSquare,
-  Plus,
   User,
   Users,
   type LucideIcon,
@@ -23,13 +22,10 @@ export type NavItem = {
 
 /**
  * Primary navigation — kept identical across every screen so the shared
- * Sidebar has a single source of truth. "Nueva Venta" lives here as a nav
- * item (per product decision); the Dashboard additionally exposes it as a
- * header CTA.
+ * Sidebar has a single source of truth. Las ventas se registran desde Leads.
  */
 export const PRIMARY_NAV: NavItem[] = [
   { label: "Inicio", href: "/dashboard", icon: Home },
-  { label: "Nueva Venta", href: "/dashboard/nueva-venta", icon: Plus },
   { label: "Mis ventas", href: "/dashboard/mis-ventas", icon: FileText },
   { label: "Leads", href: "/dashboard/leads", icon: MessagesSquare },
   { label: "Clientes", href: "/dashboard/clientes", icon: Users },

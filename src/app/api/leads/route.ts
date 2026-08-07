@@ -26,13 +26,7 @@ export async function POST(request: NextRequest) {
   try {
     const user = await authService.getSessionUser();
     const scope = advisorScopeFromUser(user);
-    const advisor = scope
-      ? { name: scope.name, email: user?.email ?? "" }
-      : user
-        ? { name: user.name, email: user.email }
-        : undefined;
-
-    const result = await leadsService.saveLead(parsed.data, advisor);
+    const result = await leadsService.saveLead(parsed.data, scope);
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     console.error("[POST /api/leads]", error);

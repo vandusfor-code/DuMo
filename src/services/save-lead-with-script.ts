@@ -1,6 +1,9 @@
 import "server-only";
+import type { AdvisorScope } from "@/lib/advisor-scope";
+import { leadGestionToNewSaleInput } from "@/lib/lead-save";
 import { getLeadRepository } from "@/repositories/leads.repository";
 import { salesScriptService } from "@/services/sales-script.service";
+import { salesService } from "@/services/sales.service";
 import { getCommercialConfigurationRepository } from "@/repositories/commercial-configuration.repository";
 import { equipmentService } from "@/services/equipment.service";
 import { getScriptUnavailableReason, isScriptEligible } from "@/lib/sales-script/eligibility";
@@ -17,11 +20,14 @@ function logScriptSaveCheckpoint(label: string, payload: Record<string, unknown>
 
 export async function saveLeadWithScript(
   input: SaveLeadInput,
-  advisor?: { name: string; email: string },
+  scope?: AdvisorScope | null,
 ): Promise<SaveLeadResult> {
   const lead = await getLeadRepository().saveLead(input);
+  const advisor = scope ? { name: scope.name, email: "" } : undefined;
   let script = null;
   let scriptUnavailableReason: string | null = null;
+  let sale = null;
+  let saleError: string | null = null;
 
   if (input.type === "venta" && input.lines.length > 0) {
     const main = input.lines[0];
@@ -88,10 +94,24 @@ export async function saveLeadWithScript(
     }
   }
 
+  if (input.type === "venta" && input.lines.length > 0 && scope) {
+    const saleInput = leadGestionToNewSaleInput(input);
+    if (saleInput) {
+      try {
+        sale = await salesService.create(saleInput, scope);
+      } catch (error) {
+        console.error("[saveLeadWithScript] sale registration failed", error);
+        saleError = "La gestión se guardó, pero no se pudo registrar en Mis Ventas.";
+      }
+    }
+  }
+
   const result: SaveLeadResult = {
     lead,
     script,
     scriptUnavailableReason: script ? null : scriptUnavailableReason,
+    sale,
+    saleError,
   };
 
   logScriptSaveCheckpoint("saveLeadWithScript · antes de responder", {

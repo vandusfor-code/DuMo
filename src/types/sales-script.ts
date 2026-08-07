@@ -113,4 +113,6 @@ export type SaveLeadResult = {
   lead: import("./lead").Lead;
   script: GeneratedSalesScript | null;
   scriptUnavailableReason?: string | null;
+  sale?: import("./sale").SaleDetail | null;
+  saleError?: string | null;
 };

@@ -5,6 +5,7 @@ import { apiPost, apiPostForm } from "@/lib/api-client";
 import { advisorApiGet } from "@/lib/advisor-query";
 import { salesScriptKeys } from "@/hooks/use-sales-script";
 import { latestGestionKeys } from "@/hooks/use-latest-gestion";
+import { salesKeys } from "@/hooks/use-sales";
 import type { ChatMessage, Conversation } from "@/types/conversation";
 import type { Plan, SaveLeadInput } from "@/types/lead";
 import type { SaveLeadResult } from "@/types/sales-script";
@@ -73,6 +74,8 @@ export function useSaveLead(conversationId?: string) {
         queryClient.invalidateQueries({ queryKey: salesScriptKeys.byConversation(conversationId) });
       }
       queryClient.invalidateQueries({ queryKey: latestGestionKeys.byConversation(conversationId) });
+      queryClient.invalidateQueries({ queryKey: salesKeys.all });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }

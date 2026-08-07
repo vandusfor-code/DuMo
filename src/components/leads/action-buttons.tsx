@@ -21,7 +21,7 @@ export function ActionButtons({
         ) : (
           <Save className="size-[18px]" />
         )}
-        Guardar gestión
+        Guardar venta
       </Button>
     </div>
   );

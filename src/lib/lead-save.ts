@@ -9,6 +9,7 @@ import type {
   LineAccountType,
   SaveLeadInput,
 } from "@/types/lead";
+import type { NewSaleInput, SaleType } from "@/types/sale";
 
 const INTERNAL_NOTES_PREFIX = "\n\nNotas internas: ";
 
@@ -130,4 +131,41 @@ export function formatSaveLeadApiError(error: unknown): string {
   }
   if (parts.length === 0) return base;
   return `${base} ${parts.slice(0, 3).join(" · ")}`;
+}
+
+/** Mapea tipo de venta del formulario Leads al catálogo de Mis Ventas. */
+export function mapLeadLineToSaleType(
+  saleType: LeadSaleType,
+  equipmentMode: EquipmentMode | "",
+): SaleType {
+  if (saleType === "portability") {
+    return equipmentMode === "with" ? "portability_device" : "portability";
+  }
+  if (saleType === "renewal") {
+    return equipmentMode === "with" ? "device_renewal" : "portability";
+  }
+  if (saleType === "migration") return "migration";
+  if (saleType === "new_line") return "new_line";
+  return "portability";
+}
+
+/** Convierte una gestión de venta guardada en Leads al payload de Mis Ventas. */
+export function leadGestionToNewSaleInput(input: SaveLeadInput): NewSaleInput | null {
+  if (input.type !== "venta" || input.lines.length === 0) return null;
+  return {
+    customerName: input.customerName,
+    rut: input.rut,
+    phone: input.phone,
+    email: input.lines.find((l) => l.email?.trim())?.email || undefined,
+    notes: input.notes || undefined,
+    lines: input.lines.map((line) => ({
+      phoneNumber: line.phone,
+      saleType: mapLeadLineToSaleType(line.saleType, line.equipmentMode ?? "none"),
+      deviceName:
+        line.equipmentModel?.trim() ||
+        line.equipment?.trim() ||
+        line.equipmentCommercialText?.trim() ||
+        undefined,
+    })),
+  };
 }

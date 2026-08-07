@@ -106,11 +106,7 @@ export async function POST(request: NextRequest) {
       const settings = await adminLeadsService.setAutoAssignEnabled(Boolean(body.enabled));
       return NextResponse.json(settings);
     }
-    const session = await authService.getSessionUser();
-    const lead = await adminLeadsService.saveLead(body, {
-      name: session?.name ?? "Administrador",
-      email: session?.email ?? "",
-    });
+    const lead = await adminLeadsService.saveLead(body);
     return NextResponse.json(lead);
   } catch (error) {
     console.error("[POST /api/admin/leads]", error);

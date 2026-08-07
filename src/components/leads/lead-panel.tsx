@@ -7,8 +7,9 @@ import {
   CheckCircle2,
   ClipboardList,
   Clock,
+  Loader2,
   MessageSquare,
-  Plus,
+  Save,
   ScrollText,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -40,6 +41,7 @@ export function LeadPanel({
   onCancel,
   savedScript,
   scriptUnavailableReason,
+  saleError,
 }: {
   conversation: Conversation;
   isSaving: boolean;
@@ -50,6 +52,7 @@ export function LeadPanel({
   onCancel: () => void;
   savedScript?: GeneratedSalesScript | null;
   scriptUnavailableReason?: string | null;
+  saleError?: string | null;
 }) {
   const { control } = useFormContext<LeadFormValues>();
   const type = useWatch({ control, name: "type" });
@@ -74,11 +77,16 @@ export function LeadPanel({
       <div className="flex shrink-0 items-center justify-between border-b border-line px-5 py-4">
         <h2 className="text-[18px] font-semibold leading-[1.45] text-ink">Gestión del cliente</h2>
         <button
-          type="button"
-          className="inline-flex h-10 items-center gap-2 rounded-btn bg-brand px-4 text-[13px] font-semibold text-white shadow-send transition-all duration-200 hover:scale-[1.02] hover:bg-brand-hover"
+          type="submit"
+          disabled={isSaving}
+          className="inline-flex h-10 items-center gap-2 rounded-btn bg-brand px-4 text-[13px] font-semibold text-white shadow-send transition-all duration-200 hover:scale-[1.02] hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <Plus className="size-[18px]" />
-          Nueva conversación
+          {isSaving ? (
+            <Loader2 className="size-[18px] animate-spin" />
+          ) : (
+            <Save className="size-[18px]" />
+          )}
+          Guardar venta
         </button>
       </div>
 
@@ -128,12 +136,22 @@ export function LeadPanel({
                 <span>{errorMessage || "No se pudo guardar la gestión. Intenta nuevamente."}</span>
               </div>
             )}
+            {isSuccess && saleError ? (
+              <div className="flex items-start gap-2.5 rounded-card border border-warning/20 bg-warning-soft px-4 py-3 text-[13px] text-warning-ink">
+                <AlertCircle className="mt-0.5 size-[18px] shrink-0" />
+                <span>{saleError}</span>
+              </div>
+            ) : null}
             {isSuccess && (
               <div className="flex items-center gap-2.5 rounded-card border border-success/20 bg-success-soft px-4 py-3 text-[13px] text-success-ink">
                 <CheckCircle2 className="size-[18px]" />
-                {script
-                  ? "Gestión guardada correctamente. El script de venta ya está disponible."
-                  : "Gestión guardada correctamente."}
+                {type === "venta"
+                  ? script
+                    ? "Venta guardada correctamente. El script de la llamada ya está disponible."
+                    : "Venta guardada correctamente. Ya aparece en Mis Ventas."
+                  : script
+                    ? "Gestión guardada correctamente. El script de venta ya está disponible."
+                    : "Gestión guardada correctamente."}
               </div>
             )}
             <ActionButtons isSaving={isSaving} onCancel={onCancel} />

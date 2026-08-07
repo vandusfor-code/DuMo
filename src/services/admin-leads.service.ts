@@ -52,8 +52,8 @@ export const adminLeadsService = {
   getPlans(): Promise<Plan[]> {
     return commercialPlansService.getAdvisorPlanOptions();
   },
-  saveLead(input: SaveLeadInput, advisor?: { name: string; email: string }): Promise<SaveLeadResult> {
-    return saveLeadWithScript(input, advisor);
+  saveLead(input: SaveLeadInput): Promise<SaveLeadResult> {
+    return saveLeadWithScript(input, null);
   },
   getAutoAssignSettings() {
     return getAdminLeadsRepository().getAutoAssignSettings();

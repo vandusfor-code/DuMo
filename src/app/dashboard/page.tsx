@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Plus } from "lucide-react";
+import { MessagesSquare } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { SalesTrendCard } from "@/components/dashboard/sales-trend-card";
@@ -33,9 +33,9 @@ export default function DashboardPage() {
             size="lg"
             className="h-14 rounded-2xl px-6 text-[15px]"
           >
-            <Link href="/dashboard/nueva-venta">
-              <Plus className="size-5" />
-              Nueva Venta
+            <Link href="/dashboard/leads">
+              <MessagesSquare className="size-5" />
+              Ir a Leads
             </Link>
           </Button>
         }

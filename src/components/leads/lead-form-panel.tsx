@@ -82,6 +82,7 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
           hasSavedGestion={saveLead.isSuccess || Boolean(gestionDraft.data?.gestionId)}
           savedScript={saveLead.data?.script ?? null}
           scriptUnavailableReason={saveLead.data?.scriptUnavailableReason ?? null}
+          saleError={saveLead.data?.saleError ?? null}
           onCancel={() =>
             methods.reset(draftToFormValues({ conversation, draft: gestionDraft.data }))
           }

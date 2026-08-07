@@ -9,6 +9,7 @@ import { getLeadRepository } from "@/repositories/leads.repository";
 import type { ChatMessage, Conversation } from "@/types/conversation";
 import type { LatestGestionDraft, Plan, SaveLeadInput } from "@/types/lead";
 import type { SaveLeadResult } from "@/types/sales-script";
+import type { AdvisorScope } from "@/lib/advisor-scope";
 import { saveLeadWithScript } from "@/services/save-lead-with-script";
 import { mediaService } from "@/services/media.service";
 import {
@@ -78,8 +79,8 @@ export const leadsService = {
   getPlans(): Promise<Plan[]> {
     return commercialPlansService.getAdvisorPlanOptions();
   },
-  saveLead(input: SaveLeadInput, advisor?: { name: string; email: string }): Promise<SaveLeadResult> {
-    return saveLeadWithScript(input, advisor);
+  saveLead(input: SaveLeadInput, scope?: AdvisorScope | null): Promise<SaveLeadResult> {
+    return saveLeadWithScript(input, scope);
   },
   getLatestGestionDraft(conversationId: string): Promise<LatestGestionDraft | null> {
     return getLeadRepository().getLatestGestionDraft(conversationId);
