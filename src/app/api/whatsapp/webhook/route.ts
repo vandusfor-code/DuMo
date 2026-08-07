@@ -204,7 +204,10 @@ export async function POST(request: NextRequest) {
       for (const entry of payload.entry ?? []) {
         const pageId = entry.id ?? "";
         if (allowedPages.size > 0 && pageId && !allowedPages.has(pageId)) {
-          console.warn("[webhook] ignored messenger page_id", pageId);
+          console.warn("[webhook] ignored messenger page_id", {
+            received: pageId,
+            allowed: [...allowedPages],
+          });
           continue;
         }
 
