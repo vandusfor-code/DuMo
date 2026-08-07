@@ -74,8 +74,10 @@ export function useSaveLead(conversationId?: string) {
         queryClient.invalidateQueries({ queryKey: salesScriptKeys.byConversation(conversationId) });
       }
       queryClient.invalidateQueries({ queryKey: latestGestionKeys.byConversation(conversationId) });
-      queryClient.invalidateQueries({ queryKey: salesKeys.all });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      if (result.sale) {
+        queryClient.invalidateQueries({ queryKey: salesKeys.all });
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      }
     },
   });
 }

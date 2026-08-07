@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { LeadPanel } from "./lead-panel";
 import { useSaveLead } from "@/hooks/use-leads";
 import { useLatestGestionDraft } from "@/hooks/use-latest-gestion";
@@ -23,6 +23,7 @@ import { useForm, FormProvider } from "react-hook-form";
 export function LeadFormPanel({ conversation }: { conversation: Conversation }) {
   const saveLead = useSaveLead(conversation.id);
   const gestionDraft = useLatestGestionDraft(conversation.id);
+  const saveModeRef = useRef<"script" | "sale">("script");
   const methods = useForm<LeadFormValues>({
     defaultValues: draftToFormValues({ conversation }),
   });
@@ -61,6 +62,7 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
         values.type === "venta"
           ? values.lines.filter(isCompleteSaleLine).map(mapSaleLineForSave)
           : [],
+      registerSale: saveModeRef.current === "sale",
     };
     try {
       await saveLead.mutateAsync(input);
@@ -83,6 +85,13 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
           savedScript={saveLead.data?.script ?? null}
           scriptUnavailableReason={saveLead.data?.scriptUnavailableReason ?? null}
           saleError={saveLead.data?.saleError ?? null}
+          saleRegistered={Boolean(saveLead.data?.sale)}
+          onSaveSale={() => {
+            saveModeRef.current = "sale";
+          }}
+          onGenerateScript={() => {
+            saveModeRef.current = "script";
+          }}
           onCancel={() =>
             methods.reset(draftToFormValues({ conversation, draft: gestionDraft.data }))
           }

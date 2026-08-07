@@ -73,6 +73,8 @@ export const saveLeadSchema = z.object({
   type: leadTypeSchema,
   notes: z.string().trim().max(4000, "Máximo 4000 caracteres.").optional().default(""),
   lines: z.array(leadLineSchema).optional().default([]),
+  /** Si es true, también registra la venta en Mis Ventas. */
+  registerSale: z.boolean().optional().default(false),
 });
 
 export type SaveLeadValues = z.infer<typeof saveLeadSchema>;

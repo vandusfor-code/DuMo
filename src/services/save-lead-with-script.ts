@@ -94,7 +94,7 @@ export async function saveLeadWithScript(
     }
   }
 
-  if (input.type === "venta" && input.lines.length > 0 && scope) {
+  if (input.registerSale && input.type === "venta" && input.lines.length > 0 && scope) {
     const saleInput = leadGestionToNewSaleInput(input);
     if (saleInput) {
       try {

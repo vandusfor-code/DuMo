@@ -42,6 +42,9 @@ export function LeadPanel({
   savedScript,
   scriptUnavailableReason,
   saleError,
+  saleRegistered = false,
+  onSaveSale,
+  onGenerateScript,
 }: {
   conversation: Conversation;
   isSaving: boolean;
@@ -50,9 +53,12 @@ export function LeadPanel({
   isSuccess: boolean;
   hasSavedGestion?: boolean;
   onCancel: () => void;
+  onSaveSale: () => void;
+  onGenerateScript: () => void;
   savedScript?: GeneratedSalesScript | null;
   scriptUnavailableReason?: string | null;
   saleError?: string | null;
+  saleRegistered?: boolean;
 }) {
   const { control } = useFormContext<LeadFormValues>();
   const type = useWatch({ control, name: "type" });
@@ -79,6 +85,7 @@ export function LeadPanel({
         <button
           type="submit"
           disabled={isSaving}
+          onClick={onSaveSale}
           className="inline-flex h-10 items-center gap-2 rounded-btn bg-brand px-4 text-[13px] font-semibold text-white shadow-send transition-all duration-200 hover:scale-[1.02] hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isSaving ? (
@@ -145,16 +152,20 @@ export function LeadPanel({
             {isSuccess && (
               <div className="flex items-center gap-2.5 rounded-card border border-success/20 bg-success-soft px-4 py-3 text-[13px] text-success-ink">
                 <CheckCircle2 className="size-[18px]" />
-                {type === "venta"
+                {saleRegistered
                   ? script
-                    ? "Venta guardada correctamente. El script de la llamada ya está disponible."
+                    ? "Venta guardada en Mis Ventas. El script de la llamada ya está disponible."
                     : "Venta guardada correctamente. Ya aparece en Mis Ventas."
                   : script
-                    ? "Gestión guardada correctamente. El script de venta ya está disponible."
+                    ? "Gestión guardada. El script de la llamada ya está disponible."
                     : "Gestión guardada correctamente."}
               </div>
             )}
-            <ActionButtons isSaving={isSaving} onCancel={onCancel} />
+            <ActionButtons
+              isSaving={isSaving}
+              onCancel={onCancel}
+              onGenerateScript={onGenerateScript}
+            />
           </TabsContent>
 
           <TabsContent value="script" className="outline-none">

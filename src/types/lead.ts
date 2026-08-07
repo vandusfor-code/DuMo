@@ -163,4 +163,6 @@ export interface SaveLeadInput {
     /** Homologación / upselling (doc oficial línea 14). */
     isUpselling?: boolean;
   }[];
+  /** Registra la venta en Mis Ventas (botón superior). Por defecto solo guarda gestión/script. */
+  registerSale?: boolean;
 }
