@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { SESSION_COOKIE, verifySessionTokenEdge } from "@/lib/auth/session-edge";
 
+// TEMPORAL — BORRAR DESPUÉS DEL DIAGNÓSTICO (bloque debug-secret-edge más abajo)
+
 const PUBLIC_PREFIXES = [
   "/login",
   "/logout",
@@ -13,6 +15,23 @@ const PUBLIC_PREFIXES = [
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // TEMPORAL — BORRAR DESPUÉS DEL DIAGNÓSTICO
+  if (pathname === "/api/system/debug-secret-edge") {
+    const secret = process.env.AUTH_SECRET ?? "dumo-dev-auth-secret-change-in-production";
+    const enc = new TextEncoder().encode(secret);
+    const digest = await crypto.subtle.digest("SHA-256", enc);
+    const fingerprint = Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("")
+      .slice(0, 12);
+    return NextResponse.json({
+      runtime: "edge",
+      hasEnvVar: !!process.env.AUTH_SECRET,
+      length: secret.length,
+      fingerprint,
+    });
+  }
 
   if (
     pathname === "/" ||
