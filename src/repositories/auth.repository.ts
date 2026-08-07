@@ -11,7 +11,7 @@ import { AUTH_ROLE_LABELS } from "@/types/auth";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { SEED_ADMIN, seedAdminPasswordHash } from "@/lib/auth/seed-admin";
 import { DEFAULT_COMPANY_ID } from "@/types/tenant";
-import { ensureSchema, getSql, withDbRetry } from "@/server/db/client";
+import { ensureAuthSchema, getSql, withDbRetry } from "@/server/db/client";
 
 export interface AuthRepository {
   ensureSeedAdmin(): Promise<void>;
@@ -69,7 +69,7 @@ const touchCache = new Map<string, number>();
 
 class PostgresAuthRepository implements AuthRepository {
   async ensureSeedAdmin(): Promise<void> {
-    await ensureSchema();
+    await ensureAuthSchema();
     const sql = requireSql();
 
     const existing = await sql`
@@ -121,7 +121,7 @@ class PostgresAuthRepository implements AuthRepository {
   }
 
   async findById(id: string): Promise<AuthUser | null> {
-    await this.ensureSeedAdmin();
+    await ensureAuthSchema();
     const sql = requireSql();
     const rows = await sql`
       SELECT id, username, email, name, role, active, avatar_url, company_id, monthly_sales_goal
@@ -279,7 +279,7 @@ class PostgresAuthRepository implements AuthRepository {
     if (now - last < 60_000) return;
     touchCache.set(id, now);
     try {
-      await ensureSchema();
+      await ensureAuthSchema();
       const sql = requireSql();
       await withDbRetry(() => sql`UPDATE users SET last_seen_at = now() WHERE id = ${id}`);
     } catch {
@@ -288,7 +288,7 @@ class PostgresAuthRepository implements AuthRepository {
   }
 
   async setAdvisorSalesGoal(id: string, monthlySalesGoal: number | null): Promise<AuthUser> {
-    await ensureSchema();
+    await ensureAuthSchema();
     const sql = requireSql();
     const user = await this.findById(id);
     if (!user || user.role !== "asesora") {

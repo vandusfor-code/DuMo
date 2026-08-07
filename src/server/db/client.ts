@@ -336,6 +336,57 @@ async function runMigrations(sql: Sql) {
 export function resetSchemaCache(): void {
   schemaReady = false;
   schemaPromise = null;
+  authSchemaReady = false;
+  authSchemaPromise = null;
+}
+
+let authSchemaReady = false;
+let authSchemaPromise: Promise<void> | null = null;
+
+/**
+ * Esquema mínimo para login y sesión. No espera migraciones pesadas (plantillas,
+ * leads, etc.) que pueden agotar el timeout en cold-start y bloquear el login.
+ */
+export function ensureAuthSchema(): Promise<void> {
+  if (authSchemaReady) return Promise.resolve();
+  const sql = getSql();
+  if (!sql) return Promise.resolve();
+
+  if (!authSchemaPromise) {
+    authSchemaPromise = withQueryTimeout(
+      withDbRetry(async () => {
+        await sql.begin(async (tx) => {
+          await tx`
+            CREATE TABLE IF NOT EXISTS users (
+              id text PRIMARY KEY,
+              username text UNIQUE NOT NULL,
+              email text UNIQUE NOT NULL,
+              password_hash text NOT NULL,
+              name text NOT NULL,
+              role text NOT NULL,
+              active boolean NOT NULL DEFAULT true,
+              avatar_url text NOT NULL DEFAULT '',
+              created_at timestamptz NOT NULL DEFAULT now()
+            )
+          `;
+          await tx`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at timestamptz`;
+          await tx`ALTER TABLE users ADD COLUMN IF NOT EXISTS company_id text`;
+          await tx`ALTER TABLE users ADD COLUMN IF NOT EXISTS monthly_sales_goal integer`;
+        });
+      }, 2),
+      8_000,
+    )
+      .then(() => {
+        authSchemaReady = true;
+      })
+      .catch((err) => {
+        authSchemaPromise = null;
+        authSchemaReady = false;
+        console.error("[ensureAuthSchema]", err);
+        throw err;
+      });
+  }
+  return authSchemaPromise;
 }
 
 export function ensureSchema(): Promise<void> {
@@ -351,7 +402,7 @@ export function ensureSchema(): Promise<void> {
         if (await schemaIsComplete(sql)) return;
         await runMigrations(sql);
       }),
-      12_000,
+      30_000,
     )
       .then(() => {
         schemaReady = true;
@@ -377,7 +428,7 @@ export async function pingDatabase(): Promise<{ ok: boolean; message: string }> 
   }
   try {
     await withDbRetry(async () => {
-      await ensureSchema();
+      await ensureAuthSchema();
       const sql = getSql()!;
       await sql`SELECT 1 AS ok`;
     });
