@@ -14,7 +14,7 @@ export default function AdminLayout({
       <AdminNotificationsMount />
       <AdminSidebar />
       <div className="lg:pl-[260px]">
-        <div className="w-full px-6 sm:px-8 lg:px-10 pb-12">{children}</div>
+        <div className="w-full px-6 sm:px-8 lg:px-10 pb-16">{children}</div>
       </div>
     </div>
   );

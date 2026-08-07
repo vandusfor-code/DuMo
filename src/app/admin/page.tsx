@@ -81,12 +81,12 @@ export default function AdminDashboardPage() {
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-          className="grid grid-cols-1 gap-6 xl:grid-cols-4"
+          className="grid grid-cols-1 gap-4 xl:grid-cols-4"
         >
           {/* Columna principal */}
-          <div className="space-y-6 xl:col-span-3">
+          <div className="space-y-4 xl:col-span-3">
             {/* KPIs */}
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <AdminKpiCard icon={<ShoppingBag />} iconClass="bg-brand-soft text-brand" label="Ventas registradas hoy" kpi={data.kpis.salesToday} />
               <AdminKpiCard icon={<CheckCircle2 />} iconClass="bg-success-soft text-success-ink" label="Ventas finalizadas hoy" kpi={data.kpis.finishedToday} />
               <AdminKpiCard icon={<Truck />} iconClass="bg-warning-soft text-warning-ink" label="Ventas en reparto" kpi={data.kpis.inDelivery} />
@@ -98,7 +98,7 @@ export default function AdminDashboardPage() {
             </div>
 
             {/* Gráficas */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 2xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-4">
               <ChartCard title="Ventas por asesora">
                 <AdvisorBarChart data={data.salesByAdvisor} />
               </ChartCard>
@@ -114,14 +114,14 @@ export default function AdminDashboardPage() {
             </div>
 
             {/* Metas del mes */}
-            <div className="space-y-6">
+            <div className="space-y-4 pb-2">
               <MonthlyGoalCard goal={data.monthlyGoal} />
               <EconomicGoalCard goal={data.economicGoal} />
             </div>
           </div>
 
           {/* Columna derecha */}
-          <div className="space-y-6 xl:col-span-1">
+          <div className="space-y-4 xl:col-span-1">
             <AlertsCard alerts={data.alerts} />
             <RecentActivityCard activity={data.activity} />
           </div>
@@ -137,23 +137,24 @@ export default function AdminDashboardPage() {
 
 function DashboardSkeleton() {
   return (
-    <div className="grid grid-cols-1 gap-6 xl:grid-cols-4">
-      <div className="space-y-6 xl:col-span-3">
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
+      <div className="space-y-4 xl:col-span-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="h-28 rounded-card" />
+            <Skeleton key={i} className="h-24 rounded-card" />
           ))}
         </div>
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 2xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-64 rounded-card" />
+            <Skeleton key={i} className="h-[212px] rounded-card" />
           ))}
         </div>
-        <Skeleton className="h-32 rounded-card" />
+        <Skeleton className="h-28 rounded-card" />
+        <Skeleton className="h-28 rounded-card" />
       </div>
-      <div className="space-y-6 xl:col-span-1">
-        <Skeleton className="h-64 rounded-card" />
-        <Skeleton className="h-64 rounded-card" />
+      <div className="space-y-4 xl:col-span-1">
+        <Skeleton className="h-56 rounded-card" />
+        <Skeleton className="h-56 rounded-card" />
       </div>
     </div>
   );

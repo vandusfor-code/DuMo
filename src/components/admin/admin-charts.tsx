@@ -15,14 +15,15 @@ import type { ChartPoint } from "@/types/common";
 import type { NamedValue } from "@/types/admin-dashboard";
 
 const BRAND = "#6D28D9";
-const AXIS_TICK = { fill: "#9ca3af", fontSize: 12 };
+const AXIS_TICK = { fill: "#9ca3af", fontSize: 11 };
+const CHART_HEIGHT = 160;
 
 /** Ventas por asesora — barras verticales con valor arriba. */
 export function AdvisorBarChart({ data }: { data: NamedValue[] }) {
   return (
-    <div className="h-[220px] w-full">
+    <div className="w-full" style={{ height: CHART_HEIGHT }}>
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 22, right: 4, left: 4, bottom: 0 }}>
+        <BarChart data={data} margin={{ top: 18, right: 4, left: 4, bottom: 0 }}>
           <XAxis dataKey="label" axisLine={false} tickLine={false} tick={AXIS_TICK} dy={6} />
           <Bar dataKey="value" fill={BRAND} radius={[6, 6, 0, 0]} maxBarSize={34}>
             <LabelList
@@ -40,9 +41,9 @@ export function AdvisorBarChart({ data }: { data: NamedValue[] }) {
 /** Ventas por día — línea con puntos y valores. */
 export function DailyLineChart({ data }: { data: ChartPoint[] }) {
   return (
-    <div className="h-[220px] w-full">
+    <div className="w-full" style={{ height: CHART_HEIGHT }}>
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 24, right: 12, left: 12, bottom: 0 }}>
+        <LineChart data={data} margin={{ top: 18, right: 8, left: 8, bottom: 0 }}>
           <XAxis dataKey="label" axisLine={false} tickLine={false} tick={AXIS_TICK} dy={6} interval={0} />
           <Line
             type="monotone"
@@ -67,12 +68,12 @@ export function DailyLineChart({ data }: { data: ChartPoint[] }) {
 /** Barras horizontales con etiqueta a la izquierda y valor al final. */
 export function HorizontalBarChart({ data }: { data: NamedValue[] }) {
   return (
-    <div className="h-[220px] w-full">
+    <div className="w-full" style={{ height: CHART_HEIGHT }}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={data}
           layout="vertical"
-          margin={{ top: 4, right: 40, left: 8, bottom: 4 }}
+          margin={{ top: 0, right: 36, left: 4, bottom: 0 }}
         >
           <CartesianGrid horizontal={false} stroke="#f1f1f6" />
           <XAxis type="number" hide />
@@ -81,10 +82,10 @@ export function HorizontalBarChart({ data }: { data: NamedValue[] }) {
             dataKey="label"
             axisLine={false}
             tickLine={false}
-            tick={{ fill: "#6B7280", fontSize: 13 }}
-            width={92}
+            tick={{ fill: "#6B7280", fontSize: 12 }}
+            width={88}
           />
-          <Bar dataKey="value" fill={BRAND} radius={[0, 6, 6, 0]} barSize={16}>
+          <Bar dataKey="value" fill={BRAND} radius={[0, 6, 6, 0]} barSize={14}>
             <LabelList
               dataKey="value"
               position="right"

@@ -11,11 +11,11 @@ const money = new Intl.NumberFormat("es-CL", {
 export function EconomicGoalCard({ goal }: { goal: EconomicGoal }) {
   const progress = Math.max(0, Math.min(100, goal.progress));
   return (
-    <Card className="p-6">
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
-        <div className="flex items-start gap-4 lg:w-80">
-          <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-success-soft text-success-ink">
-            <DollarSign className="size-7" />
+    <Card className="p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+        <div className="flex items-start gap-3 lg:w-72">
+          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-success-soft text-success-ink">
+            <DollarSign className="size-6" />
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-[13px] text-muted">Meta económica (ingreso DuMo)</p>
@@ -31,7 +31,7 @@ export function EconomicGoalCard({ goal }: { goal: EconomicGoal }) {
           </div>
         </div>
 
-        <div className="grid flex-1 grid-cols-2 gap-6 sm:grid-cols-3">
+        <div className="grid flex-1 grid-cols-2 gap-4 sm:grid-cols-3">
           <Stat label="Ingreso DuMo del mes" value={money.format(goal.current)} tone="success" />
           <Stat label="Avance" value={`${goal.progress}%`} tone="brand" />
           <Stat label="Faltan" value={money.format(goal.remaining)} tone="danger" />
