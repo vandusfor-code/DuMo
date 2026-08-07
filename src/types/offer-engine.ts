@@ -1,4 +1,4 @@
-/** Tipo de venta del motor de oferta (subset comercial). */
+/** Tipo de venta del motor comercial (subset WOM). */
 export type OfferSaleType = "portability" | "new_line";
 
 export const OFFER_SALE_TYPE_LABELS: Record<OfferSaleType, string> = {
@@ -6,37 +6,50 @@ export const OFFER_SALE_TYPE_LABELS: Record<OfferSaleType, string> = {
   new_line: "Línea Nueva",
 };
 
-/** Resumen de estado por tarjeta de plan. */
-export type OfferPlanCardStatus = "Aprobada" | "No viable";
-
-export type OfferEligibleEquipment = {
+export type OfferEquipmentRef = {
   id: string;
   commercialName: string;
   brand: string;
   model: string;
   installmentValue: number;
+  isPieCero: boolean;
 };
 
-/** Una alternativa comercial evaluada automáticamente por plan. */
-export type OfferPlanAlternative = {
+/** Tarjeta comercial por plan evaluado automáticamente. */
+export type PlanCommercialOffer = {
+  rank: number;
   planId: string;
   planName: string;
+  /** Solo informativo — nunca se usa en cálculos. */
+  promotionalPrice: number | null;
+  lines: number;
   mainLineFixedCharge: number;
-  additionalLinesCount: number;
   additionalLineUnitPrice: number;
+  additionalLinesCount: number;
   additionalLinesTotal: number;
-  totalMonthlyFixed: number;
+  planMonthlyTotal: number;
   lineCredit: number;
-  consumedCredit: number;
-  remainingCredit: number;
-  viable: boolean;
-  statusLabel: OfferPlanCardStatus;
-  notViableReason?: string;
+  lineConsumed: number;
+  lineRemaining: number;
+  equipmentCredit: number;
   wantsEquipment: boolean;
   maxEquipmentInstallment: number;
-  equipmentViable: boolean;
+  eligibleEquipment: OfferEquipmentRef[];
   equipmentOnlyWithoutDevice: boolean;
-  eligibleEquipment: OfferEligibleEquipment[];
+  note?: string;
+};
+
+export type DiscardedPlan = {
+  planId: string;
+  planName: string;
+  reason: string;
+};
+
+export type DiscardedEquipment = {
+  id: string;
+  label: string;
+  installmentValue: number;
+  reason: string;
 };
 
 export type OfferSimulationRequest = {
@@ -48,14 +61,19 @@ export type OfferSimulationRequest = {
   wantsEquipment: boolean;
 };
 
-/** Resultado completo del motor — una tarjeta por plan del catálogo. */
 export type OfferGenerationResult = {
   saleType: OfferSaleType;
   requestedLines: number;
+  evaluatedLines: number;
   lineCredit: number;
   equipmentCredit: number;
   wantsEquipment: boolean;
-  alternatives: OfferPlanAlternative[];
+  optimized: boolean;
+  optimizationMessage?: string;
+  equipmentCreditZeroMessage?: string;
+  offers: PlanCommercialOffer[];
+  discardedPlans: DiscardedPlan[];
+  discardedEquipment: DiscardedEquipment[];
   viableCount: number;
 };
 

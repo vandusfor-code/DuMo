@@ -25,7 +25,7 @@ import {
 import { formatCurrency, formatShortDate } from "@/lib/format";
 import {
   OFFER_SALE_TYPE_LABELS,
-  type OfferPlanAlternative,
+  type PlanCommercialOffer,
   type OfferSaleType,
   type OfferSimulationRecord,
 } from "@/types/offer-engine";
@@ -40,8 +40,8 @@ import { OfferEngineDetailModal } from "./offer-engine-detail-modal";
 const LOADING_MESSAGES = [
   "Analizando capacidad comercial...",
   "Consultando catálogo de planes...",
-  "Validando cupos...",
-  "Generando alternativas...",
+  "Evaluando equipos activos...",
+  "Generando ofertas viables...",
 ];
 
 const LINE_OPTIONS = [1, 2, 3, 4, 5] as const;
@@ -104,14 +104,11 @@ export function OfferEngineTab({ conversationId }: { conversationId: string }) {
       });
       setResult(res);
     } catch {
-      /* error shown below */
+      /* error below */
     }
   };
 
   const canSubmit = parseMoney(form.lineCredit) > 0 && !simulate.isPending;
-
-  const viableAlternatives = result?.alternatives.filter((a) => a.viable) ?? [];
-  const nonViableAlternatives = result?.alternatives.filter((a) => !a.viable) ?? [];
 
   return (
     <div className="space-y-5">
@@ -163,7 +160,7 @@ export function OfferEngineTab({ conversationId }: { conversationId: string }) {
               <MoneyInput
                 value={form.lineCredit}
                 onChange={(v) => setForm((f) => ({ ...f, lineCredit: v }))}
-                placeholder="80.000"
+                placeholder="80000"
               />
             </Field>
 
@@ -171,7 +168,7 @@ export function OfferEngineTab({ conversationId }: { conversationId: string }) {
               <MoneyInput
                 value={form.equipmentCredit}
                 onChange={(v) => setForm((f) => ({ ...f, equipmentCredit: v }))}
-                placeholder="15.000"
+                placeholder="15000"
               />
             </Field>
 
@@ -222,7 +219,7 @@ export function OfferEngineTab({ conversationId }: { conversationId: string }) {
           </SectionCardBody>
         </SectionCard>
 
-        <div className="min-w-0 space-y-5">
+        <div className="min-w-0 space-y-4">
           {simulate.isPending ? (
             <SectionCard>
               <SectionCardBody className="flex min-h-[280px] flex-col items-center justify-center gap-4 py-12">
@@ -231,56 +228,16 @@ export function OfferEngineTab({ conversationId }: { conversationId: string }) {
               </SectionCardBody>
             </SectionCard>
           ) : result ? (
-            <div className="space-y-4">
-              <div className="rounded-xl border border-line bg-card/40 px-4 py-3">
-                <p className="text-[14px] text-ink">
-                  <span className="font-semibold">{result.viableCount}</span> alternativa
-                  {result.viableCount === 1 ? "" : "s"} comercial
-                  {result.viableCount === 1 ? "" : "es"} viable
-                  {result.viableCount === 1 ? "" : "s"} de{" "}
-                  <span className="font-semibold">{result.alternatives.length}</span> planes
-                  evaluados.
-                </p>
-              </div>
-
-              {viableAlternatives.length > 0 ? (
-                <div className="space-y-4">
-                  {viableAlternatives.map((alt) => (
-                    <PlanAlternativeCard key={alt.planId} alternative={alt} />
-                  ))}
-                </div>
-              ) : (
-                <SectionCard>
-                  <SectionCardBody className="py-8 text-center">
-                    <XCircle className="mx-auto size-10 text-danger-ink/60" />
-                    <p className="mt-3 text-[15px] font-medium text-ink">
-                      Ningún plan es viable con los cupos ingresados.
-                    </p>
-                    <p className="mt-1 text-[13px] text-muted">
-                      Revisa el cupo línea o reduce la cantidad de líneas solicitadas.
-                    </p>
-                  </SectionCardBody>
-                </SectionCard>
-              )}
-
-              {nonViableAlternatives.length > 0 ? (
-                <div className="space-y-3">
-                  <p className="text-[13px] font-medium text-muted">Planes no viables</p>
-                  {nonViableAlternatives.map((alt) => (
-                    <PlanAlternativeCard key={alt.planId} alternative={alt} compact />
-                  ))}
-                </div>
-              ) : null}
-            </div>
+            <OfferResultsPanel result={result} />
           ) : (
             <SectionCard>
               <SectionCardBody className="flex min-h-[280px] flex-col items-center justify-center gap-3 py-12 text-center">
                 <Sparkles className="size-10 text-brand/40" />
                 <p className="max-w-sm text-[15px] font-medium text-ink">
-                  Ingresa los cupos y presiona Generar Oferta
+                  Ingresa los cupos del sistema comercial y presiona Generar Oferta
                 </p>
                 <p className="max-w-sm text-[13px] text-muted">
-                  El motor evaluará automáticamente Plan W, Plan O, Plan M y el resto del catálogo.
+                  El motor evaluará automáticamente todos los planes y equipos del catálogo.
                 </p>
               </SectionCardBody>
             </SectionCard>
@@ -304,125 +261,185 @@ export function OfferEngineTab({ conversationId }: { conversationId: string }) {
   );
 }
 
-function PlanAlternativeCard({
-  alternative,
-  compact = false,
-}: {
-  alternative: OfferPlanAlternative;
-  compact?: boolean;
-}) {
-  const approved = alternative.viable;
-
+function OfferResultsPanel({ result }: { result: OfferSimulationRecord }) {
   return (
-    <SectionCard
-      className={cn(
-        approved ? "border-success/25" : "border-line opacity-90",
-        compact && "scale-[0.98]",
+    <div className="space-y-4">
+      {result.optimizationMessage ? (
+        <div className="rounded-xl border border-warning/25 bg-warning-soft/60 px-4 py-3 text-[14px] text-warning-ink">
+          {result.optimizationMessage}
+        </div>
+      ) : null}
+
+      {result.equipmentCreditZeroMessage ? (
+        <div className="rounded-xl border border-line bg-card/50 px-4 py-3 text-[13px] text-ink">
+          {result.equipmentCreditZeroMessage}
+        </div>
+      ) : null}
+
+      {result.evaluatedLines !== result.requestedLines ? (
+        <p className="text-[13px] text-muted">
+          Evaluado con {result.evaluatedLines} línea{result.evaluatedLines === 1 ? "" : "s"} (solicitadas:{" "}
+          {result.requestedLines}).
+        </p>
+      ) : null}
+
+      {result.offers.length > 0 ? (
+        <div className="space-y-4">
+          <p className="text-[14px] font-semibold text-ink">
+            {result.viableCount} oferta{result.viableCount === 1 ? "" : "s"} viable
+            {result.viableCount === 1 ? "" : "s"} — ordenadas por mayor margen disponible
+          </p>
+          {result.offers.map((offer) => (
+            <PlanCommercialOfferCard key={offer.planId} offer={offer} />
+          ))}
+        </div>
+      ) : (
+        <SectionCard>
+          <SectionCardBody className="py-8 text-center">
+            <XCircle className="mx-auto size-10 text-danger-ink/60" />
+            <p className="mt-3 text-[15px] font-medium text-ink">
+              No hay ofertas comerciales viables con estos cupos.
+            </p>
+          </SectionCardBody>
+        </SectionCard>
       )}
-    >
+
+      {result.discardedPlans.length > 0 ? (
+        <DiscardedSection title="Planes no disponibles">
+          {result.discardedPlans.map((p) => (
+            <DiscardedRow key={p.planId} label={p.planName} reason={p.reason} />
+          ))}
+        </DiscardedSection>
+      ) : null}
+
+      {result.discardedEquipment.length > 0 ? (
+        <DiscardedSection title="Equipos no disponibles">
+          {result.discardedEquipment.map((e) => (
+            <DiscardedRow
+              key={e.id}
+              label={`${e.label} — Cuota ${formatCurrency(e.installmentValue)}`}
+              reason={e.reason}
+            />
+          ))}
+        </DiscardedSection>
+      ) : null}
+    </div>
+  );
+}
+
+function PlanCommercialOfferCard({ offer }: { offer: PlanCommercialOffer }) {
+  return (
+    <SectionCard className="border-success/20">
       <SectionCardBody className="space-y-4 pt-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 className="text-[20px] font-bold text-ink">{alternative.planName}</h3>
-            {!approved && alternative.notViableReason ? (
-              <p className="mt-1 text-[13px] text-danger-ink">{alternative.notViableReason}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+              Oferta #{offer.rank}
+            </p>
+            <h3 className="text-[20px] font-bold text-ink">{offer.planName}</h3>
+            {offer.promotionalPrice ? (
+              <p className="mt-0.5 text-[12px] text-muted">
+                Promo referencial {formatCurrency(offer.promotionalPrice)} — cálculo con cargo fijo real{" "}
+                {formatCurrency(offer.mainLineFixedCharge)}
+              </p>
             ) : null}
           </div>
-          <span
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-semibold",
-              approved
-                ? "border-success/20 bg-success-soft text-success-ink"
-                : "border-line bg-card text-muted",
-            )}
-          >
-            {approved ? (
-              <CheckCircle2 className="size-3.5" />
-            ) : (
-              <XCircle className="size-3.5" />
-            )}
-            {alternative.statusLabel}
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-success/20 bg-success-soft px-3 py-1 text-[12px] font-semibold text-success-ink">
+            <CheckCircle2 className="size-3.5" />
+            Aprobada
           </span>
         </div>
 
-        {approved ? (
-          <>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <Metric label="Cargo fijo línea principal" value={formatCurrency(alternative.mainLineFixedCharge)} />
-              <Metric
-                label={
-                  alternative.additionalLinesCount > 0
-                    ? `Líneas adicionales (${alternative.additionalLinesCount} × ${formatCurrency(alternative.additionalLineUnitPrice)})`
-                    : "Líneas adicionales"
-                }
-                value={
-                  alternative.additionalLinesCount > 0
-                    ? formatCurrency(alternative.additionalLinesTotal)
-                    : "—"
-                }
-              />
-              <Metric
-                label="Cargo fijo total mensual"
-                value={formatCurrency(alternative.totalMonthlyFixed)}
-                highlight
-              />
-              <Metric label="Cupo consumido" value={formatCurrency(alternative.consumedCredit)} />
-              <Metric label="Cupo restante" value={formatCurrency(alternative.remainingCredit)} />
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <Metric label="Líneas" value={String(offer.lines)} />
+          <Metric label="Cargo fijo principal" value={formatCurrency(offer.mainLineFixedCharge)} />
+          <Metric
+            label={
+              offer.additionalLinesCount > 0
+                ? `Adicionales (${offer.additionalLinesCount} × ${formatCurrency(offer.additionalLineUnitPrice)})`
+                : "Líneas adicionales"
+            }
+            value={
+              offer.additionalLinesCount > 0
+                ? formatCurrency(offer.additionalLinesTotal)
+                : "—"
+            }
+          />
+          <Metric label="Cargo fijo total" value={formatCurrency(offer.planMonthlyTotal)} highlight />
+          <Metric label="Cupo línea" value={formatCurrency(offer.lineCredit)} />
+          <Metric label="Consumo" value={formatCurrency(offer.lineConsumed)} />
+          <Metric label="Disponible" value={formatCurrency(offer.lineRemaining)} highlight />
+        </div>
+
+        {offer.wantsEquipment ? (
+          <div className="rounded-xl border border-brand/15 bg-brand-soft/25 p-4">
+            <div className="flex items-center gap-2 text-brand">
+              <Smartphone className="size-4" />
+              <p className="text-[13px] font-semibold">Equipos compatibles</p>
             </div>
-
-            {alternative.wantsEquipment ? (
-              <div className="rounded-xl border border-brand/15 bg-brand-soft/30 p-4">
-                <div className="flex items-center gap-2 text-brand">
-                  <Smartphone className="size-4" />
-                  <p className="text-[13px] font-semibold">Equipos compatibles</p>
-                </div>
-                {alternative.equipmentOnlyWithoutDevice ? (
-                  <p className="mt-2 text-[13px] text-ink">
-                    Esta oferta solo es viable sin equipo.
-                  </p>
-                ) : (
-                  <>
-                    <p className="mt-2 text-[13px] leading-relaxed text-ink">
-                      Con esta oferta puedes ofrecer cualquier equipo cuya cuota mensual sea
-                      menor o igual a{" "}
-                      <span className="font-semibold text-brand">
-                        {formatCurrency(alternative.maxEquipmentInstallment)}
+            {offer.equipmentOnlyWithoutDevice || offer.eligibleEquipment.length === 0 ? (
+              <p className="mt-2 text-[13px] text-ink">
+                {offer.note ?? "Esta oferta solo es viable sin equipo."}
+              </p>
+            ) : (
+              <>
+                <p className="mt-2 text-[13px] leading-relaxed text-ink">
+                  Con esta oferta puedes ofrecer cualquier equipo cuya cuota mensual sea menor o
+                  igual a{" "}
+                  <span className="font-semibold text-brand">
+                    {formatCurrency(offer.maxEquipmentInstallment)}
+                  </span>
+                  .
+                </p>
+                <ul className="mt-3 space-y-1.5">
+                  {offer.eligibleEquipment.map((eq) => (
+                    <li
+                      key={eq.id}
+                      className="flex justify-between gap-3 rounded-lg bg-white/70 px-3 py-2 text-[13px]"
+                    >
+                      <span className="font-medium text-ink">
+                        {eq.commercialName || `${eq.brand} ${eq.model}`.trim()}
                       </span>
-                      .
-                    </p>
-                    {alternative.eligibleEquipment.length > 0 ? (
-                      <ul className="mt-3 space-y-1.5">
-                        {alternative.eligibleEquipment.map((eq) => (
-                          <li
-                            key={eq.id}
-                            className="flex justify-between gap-3 rounded-lg bg-white/70 px-3 py-2 text-[13px]"
-                          >
-                            <span className="font-medium text-ink">
-                              {eq.commercialName || `${eq.brand} ${eq.model}`.trim()}
-                            </span>
-                            <span className="shrink-0 text-muted">
-                              Cuota {formatCurrency(eq.installmentValue)}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="mt-2 text-[13px] text-muted">
-                        Ningún equipo del catálogo cumple el cupo disponible.
-                      </p>
-                    )}
-                  </>
-                )}
-              </div>
-            ) : null}
-
-            <Button type="button" disabled title="Disponible próximamente" className="h-10 w-full opacity-50">
-              Aplicar esta oferta
-            </Button>
-          </>
+                      <span className="shrink-0 text-muted">
+                        Cuota {formatCurrency(eq.installmentValue)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
         ) : null}
+
+        <Button type="button" disabled title="Disponible próximamente" className="h-10 w-full opacity-50">
+          Aplicar esta oferta
+        </Button>
       </SectionCardBody>
     </SectionCard>
+  );
+}
+
+function DiscardedSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <SectionCard>
+      <SectionCardHeader title={title} />
+      <SectionCardBody className="space-y-2 pt-0">{children}</SectionCardBody>
+    </SectionCard>
+  );
+}
+
+function DiscardedRow({ label, reason }: { label: string; reason: string }) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-line/70 bg-card/30 px-3 py-2.5 text-[13px]">
+      <span className="font-medium text-ink">{label}</span>
+      <span className="text-muted">{reason}</span>
+    </div>
   );
 }
 
@@ -458,7 +475,7 @@ function OfferHistoryPanel({
               <thead>
                 <tr className="border-b border-line text-muted">
                   <th className="pb-2 pr-3 font-medium">Fecha</th>
-                  <th className="pb-2 pr-3 font-medium">Tipo Venta</th>
+                  <th className="pb-2 pr-3 font-medium">Tipo</th>
                   <th className="pb-2 pr-3 font-medium">Solicitado</th>
                   <th className="pb-2 pr-3 font-medium">Resultado</th>
                   <th className="pb-2 font-medium" />
@@ -467,7 +484,7 @@ function OfferHistoryPanel({
               <tbody>
                 {items.map((item) => (
                   <tr key={item.id} className="border-b border-line/60">
-                    <td className="py-2.5 pr-3 text-ink">{formatShortDate(item.createdAt)}</td>
+                    <td className="py-2.5 pr-3">{formatShortDate(item.createdAt)}</td>
                     <td className="py-2.5 pr-3">{OFFER_SALE_TYPE_LABELS[item.saleType]}</td>
                     <td className="py-2.5 pr-3">{item.requestedSummary}</td>
                     <td className="py-2.5 pr-3">{item.resultSummary}</td>

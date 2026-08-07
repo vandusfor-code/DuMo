@@ -1,6 +1,6 @@
 import "server-only";
 
-import { generateOfferAlternatives } from "@/lib/offer-engine/offer-engine";
+import { generateCommercialOffers } from "@/lib/offer-engine/offer-engine";
 import { getOfferSimulationRepository } from "@/repositories/offer-simulation.repository";
 import { getCommercialConfigurationRepository } from "@/repositories/commercial-configuration.repository";
 import { getEquipmentRepository } from "@/repositories/equipment.repository";
@@ -34,8 +34,8 @@ export const offerEngineService = {
       getEquipmentRepository().listAll(),
     ]);
 
-    const result = generateOfferAlternatives(input, plans, equipmentCatalog);
-    if (result.alternatives.length === 0) {
+    const result = generateCommercialOffers(input, plans, equipmentCatalog);
+    if (result.offers.length === 0 && result.discardedPlans.length === 0) {
       throw new Error("No hay planes activos en el catálogo comercial.");
     }
 

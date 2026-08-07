@@ -28,8 +28,8 @@ function summarizeRequested(input: OfferSimulationRequest): string {
 }
 
 function summarizeResult(result: OfferGenerationResult): string {
-  if (result.viableCount === 0) return "Sin alternativas viables";
-  return `${result.viableCount} plan${result.viableCount === 1 ? "" : "es"} viable${result.viableCount === 1 ? "" : "s"}`;
+  if (result.viableCount === 0) return "Sin ofertas viables";
+  return `${result.viableCount} oferta${result.viableCount === 1 ? "" : "s"} viable${result.viableCount === 1 ? "" : "s"}`;
 }
 
 function rowToRecord(row: Record<string, unknown>): OfferSimulationRecord {
@@ -104,7 +104,7 @@ class PostgresOfferSimulationRepository implements OfferSimulationRepository {
 
     const id = `sim-${Date.now()}`;
     const now = new Date().toISOString();
-    const firstViable = result.alternatives.find((a) => a.viable);
+    const topOffer = result.offers[0];
 
     await withDbRetry(() =>
       sql`
@@ -119,15 +119,15 @@ class PostgresOfferSimulationRepository implements OfferSimulationRepository {
         ) VALUES (
           ${id}, ${input.leadId}, ${meta.companyId}, ${meta.createdBy},
           ${meta.createdByName}, ${now},
-          ${input.saleType}, ${input.requestedLines}, ${firstViable ? input.requestedLines : 0},
-          ${input.wantsEquipment}, ${Boolean(firstViable?.equipmentViable)},
+          ${input.saleType}, ${input.requestedLines}, ${result.evaluatedLines},
+          ${input.wantsEquipment}, ${Boolean(topOffer?.eligibleEquipment.length)},
           ${JSON.stringify({ requestedLines: input.requestedLines, wantsEquipment: input.wantsEquipment })}::jsonb,
-          ${JSON.stringify(firstViable ?? null)}::jsonb,
+          ${JSON.stringify(topOffer ?? null)}::jsonb,
           ${input.lineCredit}, ${input.equipmentCredit},
-          ${firstViable?.totalMonthlyFixed ?? 0}, ${firstViable?.totalMonthlyFixed ?? 0},
-          ${firstViable?.remainingCredit ?? 0},
-          ${"NONE"}, ${result.viableCount > 0 ? "APPROVED" : "REJECTED"},
-          ${summarizeResult(result)}, ${JSON.stringify(result)}::jsonb
+          ${topOffer?.planMonthlyTotal ?? 0}, ${topOffer?.planMonthlyTotal ?? 0},
+          ${topOffer?.lineRemaining ?? 0},
+          ${result.optimized ? "REDUCE_LINES" : "NONE"}, ${result.viableCount > 0 ? "APPROVED" : "REJECTED"},
+          ${result.optimizationMessage ?? summarizeResult(result)}, ${JSON.stringify(result)}::jsonb
         )
       `,
     );

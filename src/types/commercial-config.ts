@@ -84,8 +84,12 @@ export interface CommercialPlan {
   name: string;
   operator: string;
   saleType: CommercialSaleType;
-  /** Precio mensual al cliente (WOM). */
+  /** Precio mensual al cliente (WOM) — cargo fijo real para cálculos. */
   womValue: number;
+  /** Precio promocional — solo informativo; nunca usar en el motor comercial. */
+  promotionalPrice?: number | null;
+  /** Orden comercial para presentación (menor = primero). */
+  commercialOrder?: number | null;
   /** Valor mensual por línea adicional — derivado de offer.additionalLinePrice. */
   additionalLineValue: number;
   /** Cantidad máxima de líneas (principal + adicionales). */
@@ -115,6 +119,8 @@ export interface UpsertCommercialPlanInput {
   operator: string;
   saleType: CommercialSaleType;
   womValue: number;
+  promotionalPrice?: number | null;
+  commercialOrder?: number | null;
   additionalLineValue: number;
   maxLines: number;
   dumoValue: number;

@@ -39,7 +39,7 @@ export function OfferEngineDetailModal({
           </button>
         </div>
 
-        <div className="space-y-5 p-5">
+        <div className="space-y-4 p-5">
           {isLoading || !record ? (
             <div className="flex items-center justify-center gap-2 py-12 text-muted">
               <Loader2 className="size-5 animate-spin" />
@@ -49,53 +49,34 @@ export function OfferEngineDetailModal({
             <>
               <MetaRow label="Fecha" value={formatDateTime(record.createdAt)} />
               <MetaRow label="Tipo venta" value={OFFER_SALE_TYPE_LABELS[record.saleType]} />
-              <MetaRow label="Asesor" value={record.createdByName || record.createdBy} />
               <MetaRow label="Líneas solicitadas" value={String(record.requestedLines)} />
+              <MetaRow label="Líneas evaluadas" value={String(record.evaluatedLines)} />
               <MetaRow label="Cupo Línea" value={formatCurrency(record.lineCredit)} />
               <MetaRow label="Cupo Equipo" value={formatCurrency(record.equipmentCredit)} />
-              <MetaRow
-                label="Desea equipo"
-                value={record.wantsEquipment ? "Sí" : "No"}
-              />
 
-              <div className="space-y-4">
-                {record.alternatives.map((alt) => (
-                  <div
-                    key={alt.planId}
-                    className="rounded-xl border border-line p-4"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-semibold text-ink">{alt.planName}</p>
-                      <span className="text-[12px] font-medium text-muted">{alt.statusLabel}</span>
-                    </div>
-                    {alt.viable ? (
-                      <div className="mt-3 space-y-1 text-[13px]">
-                        <DetailRow
-                          label="Cargo fijo total"
-                          value={formatCurrency(alt.totalMonthlyFixed)}
-                        />
-                        <DetailRow
-                          label="Cupo restante"
-                          value={formatCurrency(alt.remainingCredit)}
-                        />
-                        {alt.wantsEquipment && alt.maxEquipmentInstallment > 0 ? (
-                          <DetailRow
-                            label="Cuota máx. equipo"
-                            value={formatCurrency(alt.maxEquipmentInstallment)}
-                          />
-                        ) : null}
-                        {alt.eligibleEquipment.length > 0 ? (
-                          <p className="pt-1 text-muted">
-                            {alt.eligibleEquipment.length} equipo(s) compatible(s)
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <p className="mt-2 text-[13px] text-danger-ink">{alt.notViableReason}</p>
-                    )}
+              {record.optimizationMessage ? (
+                <p className="rounded-lg bg-warning-soft/50 px-3 py-2 text-[13px] text-warning-ink">
+                  {record.optimizationMessage}
+                </p>
+              ) : null}
+
+              {record.offers.map((offer) => (
+                <div key={offer.planId} className="rounded-xl border border-line p-4">
+                  <p className="font-semibold text-ink">
+                    #{offer.rank} {offer.planName}
+                  </p>
+                  <div className="mt-2 space-y-1 text-[13px]">
+                    <Row label="Cargo fijo total" value={formatCurrency(offer.planMonthlyTotal)} />
+                    <Row label="Margen línea" value={formatCurrency(offer.lineRemaining)} />
+                    {offer.eligibleEquipment.length > 0 ? (
+                      <Row
+                        label="Equipos compatibles"
+                        value={String(offer.eligibleEquipment.length)}
+                      />
+                    ) : null}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </>
           )}
         </div>
@@ -104,7 +85,7 @@ export function OfferEngineDetailModal({
   );
 }
 
-function DetailRow({ label, value }: { label: string; value: string }) {
+function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-3">
       <span className="text-muted">{label}</span>
