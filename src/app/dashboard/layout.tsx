@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { AdvisorMessageNotifications } from "@/components/messaging/message-notification-listener";
-import { SessionSync } from "@/components/auth/session-sync";
 
 /** Shell del área asesora: sidebar fijo + contenido con separación lateral. */
 export default function DashboardLayout({
@@ -30,7 +29,6 @@ export default function DashboardLayout({
 
   return (
     <div className={fullBleed ? "h-dvh overflow-hidden bg-canvas" : "min-h-screen bg-canvas"}>
-      <SessionSync />
       <AdvisorMessageNotifications />
       <Sidebar />
       <main

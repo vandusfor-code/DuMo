@@ -2,30 +2,17 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "@/lib/api-client";
-import { saveClientToken } from "@/lib/auth/client-token";
 import type { User } from "@/types/user";
 
 export const userKeys = {
   me: ["user", "me"] as const,
 };
 
-type MeResponse = User & { sessionToken?: string };
-
-/**
- * Usuario conectado. Sincroniza el token de respaldo en localStorage con el
- * servidor en cada carga — evita desincronización tras recargas o navegación.
- */
+/** Usuario conectado (solo lectura; la cookie se establece únicamente en login). */
 export function useCurrentUser() {
   return useQuery({
     queryKey: userKeys.me,
-    queryFn: async () => {
-      const data = await apiGet<MeResponse>("/api/users/me");
-      if (data.sessionToken) {
-        saveClientToken(data.sessionToken);
-      }
-      const { sessionToken: _token, ...user } = data;
-      return user;
-    },
+    queryFn: () => apiGet<User>("/api/users/me"),
     retry: 1,
     staleTime: 60_000,
   });
