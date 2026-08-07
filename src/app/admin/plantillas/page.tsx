@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, Star, Trash2 } from "lucide-react";
+import { Pin, Plus, Trash2 } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { ErrorState } from "@/components/shared/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,8 +13,10 @@ import {
   useDeleteQuickReplyTemplate,
   useQuickReplyCategories,
   useQuickReplyTemplates,
+  useToggleQuickReplyPin,
 } from "@/hooks/use-quick-replies";
-import type { CreateQuickReplyTemplateInput } from "@/types/quick-reply";
+import type { CreateQuickReplyTemplateInput, QuickReplyTemplate } from "@/types/quick-reply";
+import { cn } from "@/lib/utils";
 
 export default function AdminPlantillasPage() {
   const [search, setSearch] = useState("");
@@ -27,9 +29,19 @@ export default function AdminPlantillasPage() {
   const createCategory = useCreateQuickReplyCategory();
   const createTemplate = useCreateQuickReplyTemplate();
   const deleteTemplate = useDeleteQuickReplyTemplate();
+  const togglePin = useToggleQuickReplyPin();
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const filtered = useMemo(() => templates.filter((t) => !t.deletedAt), [templates]);
+  const filtered = useMemo(() => {
+    return templates
+      .filter((t) => !t.deletedAt)
+      .sort((a, b) => {
+        if (a.favorite !== b.favorite) return a.favorite ? -1 : 1;
+        return a.name.localeCompare(b.name, "es");
+      });
+  }, [templates]);
+
+  const pinnedCount = filtered.filter((t) => t.favorite).length;
 
   if (isLoading || loadingCats) {
     return (
@@ -85,33 +97,24 @@ export default function AdminPlantillasPage() {
             Crear plantilla
           </Button>
         </div>
+        {pinnedCount > 0 ? (
+          <p className="mt-3 text-[13px] text-muted">
+            {pinnedCount} plantilla{pinnedCount === 1 ? "" : "s"} fijada{pinnedCount === 1 ? "" : "s"} — visible{pinnedCount === 1 ? "" : "s"} arriba del chat en Leads.
+          </p>
+        ) : null}
       </Card>
 
       <div className="grid gap-3">
         {filtered.map((t) => (
-          <Card key={t.id} className="flex items-center justify-between gap-4 p-4">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                {t.favorite ? <Star className="size-4 fill-brand text-brand" /> : null}
-                <p className="truncate text-[15px] font-semibold text-ink">{t.name}</p>
-                <span className="rounded-full bg-canvas px-2 py-0.5 text-[11px] text-muted">
-                  {t.shortcut}
-                </span>
-              </div>
-              <p className="mt-1 text-[13px] text-muted">
-                {t.category?.name ?? "Sin categoría"} · v{t.activeVersion?.versionNumber ?? 1} ·{" "}
-                {t.activeVersion?.items?.length ?? 0} ítems
-              </p>
-            </div>
-            <button
-              type="button"
-              aria-label="Eliminar"
-              onClick={() => deleteTemplate.mutate(t.id)}
-              className="grid size-9 place-items-center rounded-lg text-danger-ink hover:bg-danger-soft"
-            >
-              <Trash2 className="size-4" />
-            </button>
-          </Card>
+          <TemplateRow
+            key={t.id}
+            template={t}
+            pinLoading={togglePin.isPending}
+            onTogglePin={() =>
+              togglePin.mutate({ id: t.id, favorite: !t.favorite })
+            }
+            onDelete={() => deleteTemplate.mutate(t.id)}
+          />
         ))}
         {filtered.length === 0 ? (
           <Card className="p-8 text-center text-[14px] text-muted">
@@ -134,6 +137,77 @@ export default function AdminPlantillasPage() {
   );
 }
 
+function TemplateRow({
+  template,
+  pinLoading,
+  onTogglePin,
+  onDelete,
+}: {
+  template: QuickReplyTemplate;
+  pinLoading: boolean;
+  onTogglePin: () => void;
+  onDelete: () => void;
+}) {
+  const preview =
+    template.activeVersion?.items?.find((i) => i.itemKind === "text")?.textBody?.slice(0, 120) ??
+    "";
+
+  return (
+    <Card
+      className={cn(
+        "flex items-start justify-between gap-4 p-4 transition-colors",
+        template.favorite && "border-brand/30 bg-brand-soft/20",
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="truncate text-[15px] font-semibold text-ink">{template.name}</p>
+          <span className="rounded-full bg-canvas px-2 py-0.5 text-[11px] text-muted">
+            {template.shortcut}
+          </span>
+          {template.favorite ? (
+            <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-medium text-brand">
+              Fijada en chat
+            </span>
+          ) : null}
+        </div>
+        <p className="mt-1 text-[13px] text-muted">
+          {template.category?.name ?? "Sin categoría"} · v{template.activeVersion?.versionNumber ?? 1} ·{" "}
+          {template.activeVersion?.items?.length ?? 0} ítems
+        </p>
+        {preview ? (
+          <p className="mt-2 line-clamp-2 text-[13px] text-ink/80">{preview}</p>
+        ) : null}
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          aria-label={template.favorite ? "Quitar del chat" : "Fijar en chat"}
+          title={template.favorite ? "Quitar del chat" : "Fijar en chat"}
+          disabled={pinLoading}
+          onClick={onTogglePin}
+          className={cn(
+            "grid size-9 place-items-center rounded-lg transition-colors",
+            template.favorite
+              ? "bg-brand text-white hover:bg-brand-hover"
+              : "text-muted hover:bg-brand-soft hover:text-brand",
+          )}
+        >
+          <Pin className={cn("size-4", template.favorite && "fill-current")} />
+        </button>
+        <button
+          type="button"
+          aria-label="Eliminar"
+          onClick={onDelete}
+          className="grid size-9 place-items-center rounded-lg text-danger-ink hover:bg-danger-soft"
+        >
+          <Trash2 className="size-4" />
+        </button>
+      </div>
+    </Card>
+  );
+}
+
 function QuickCreateDialog({
   categories,
   onClose,
@@ -147,6 +221,7 @@ function QuickCreateDialog({
   const [shortcut, setShortcut] = useState("");
   const [categoryId, setCategoryId] = useState(categories[0]?.id ?? "");
   const [textBody, setTextBody] = useState("");
+  const [pinByDefault, setPinByDefault] = useState(true);
   const [saving, setSaving] = useState(false);
 
   return (
@@ -183,6 +258,15 @@ function QuickCreateDialog({
             placeholder="Contenido… Usa {{asesor}} y {{cliente}}"
             className="min-h-[120px] w-full rounded-xl border border-line px-4 py-3 text-[14px]"
           />
+          <label className="flex cursor-pointer items-center gap-2 text-[14px] text-ink">
+            <input
+              type="checkbox"
+              checked={pinByDefault}
+              onChange={(e) => setPinByDefault(e.target.checked)}
+              className="size-4 accent-brand"
+            />
+            Fijar en el chat al crear
+          </label>
         </div>
         <div className="mt-5 flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>
@@ -197,6 +281,7 @@ function QuickCreateDialog({
                   name: name.trim(),
                   shortcut,
                   categoryId,
+                  favorite: pinByDefault,
                   items: [{ sortOrder: 1, itemKind: "text", textBody: textBody.trim() }],
                 });
               } finally {

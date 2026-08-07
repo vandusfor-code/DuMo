@@ -117,6 +117,18 @@ export function useUploadTemplateMedia() {
   });
 }
 
+export function useToggleQuickReplyPin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, favorite }: { id: string; favorite: boolean }) =>
+      apiPut<QuickReplyTemplate>("/api/admin/plantillas", { id, action: "favorite", favorite }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "plantillas"] });
+      qc.invalidateQueries({ queryKey: ["leads", "plantillas"] });
+    },
+  });
+}
+
 export function useAdvisorQuickReplies() {
   return useQuery({
     queryKey: ["leads", "plantillas"],
@@ -141,6 +153,8 @@ export function useSendQuickReplyTemplate() {
     onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: leadKeys.messages(variables.conversationId) });
       qc.invalidateQueries({ queryKey: leadKeys.conversations });
+      qc.invalidateQueries({ queryKey: ["admin", "leads", "messages", variables.conversationId] });
+      qc.invalidateQueries({ queryKey: ["admin", "leads", "conversations"] });
       qc.invalidateQueries({ queryKey: ["leads", "plantillas"] });
     },
   });

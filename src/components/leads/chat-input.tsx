@@ -13,15 +13,9 @@ import {
   MediaAttachmentPreview,
   useMediaAttachment,
 } from "@/components/messaging/chat-composer";
-import { QuickReplyChip } from "@/components/leads/premium/quick-reply-chip";
+import { PinnedQuickReplies } from "@/components/leads/premium/pinned-quick-replies";
 import type { ChatUiTheme } from "@/components/leads/premium/chat-theme";
 import { cn } from "@/lib/utils";
-
-const QUICK_REPLIES = [
-  { label: "👋 Saludo", text: "¡Hola! ¿En qué puedo ayudarte hoy?" },
-  { label: "📖 Info de producto", text: "Te comparto la información del plan que consultaste." },
-  { label: "💳 Métodos de pago", text: "Puedes pagar con transferencia, tarjeta o en sucursal." },
-];
 
 /**
  * Composer del chat. Envía texto e imágenes por la Cloud API; el mensaje
@@ -50,7 +44,7 @@ export function ChatInput({
   const send = variant === "admin" ? adminSend : advisorSend;
   const sendMedia = variant === "admin" ? adminSendMedia : advisorSendMedia;
   const enableTemplates = variant === "advisor" && !premium;
-  const showQuickReplies = premium && variant === "advisor";
+  const showPinnedReplies = premium;
   const media = useMediaAttachment();
   const picker = useTemplatePickerState();
   const templateSend = useTemplateSend({
@@ -112,11 +106,6 @@ export function ChatInput({
     if (enableTemplates) picker.onValueChange(next);
   };
 
-  const sendQuickReply = (text: string) => {
-    if (isSending) return;
-    send.mutate({ to, text });
-  };
-
   return (
     <div
       className={cn(
@@ -152,17 +141,15 @@ export function ChatInput({
         />
       ) : null}
 
-      {showQuickReplies && !media.attachment ? (
-        <div className="mb-3 flex flex-wrap gap-2">
-          {QUICK_REPLIES.map((chip) => (
-            <QuickReplyChip
-              key={chip.label}
-              label={chip.label}
-              disabled={isSending}
-              onClick={() => sendQuickReply(chip.text)}
-            />
-          ))}
-        </div>
+      {showPinnedReplies && !media.attachment ? (
+        <PinnedQuickReplies
+          conversationId={conversationId}
+          to={to}
+          customerName={customerName}
+          disabled={isSending}
+          onInsertText={(text) => setValue(text)}
+          onSent={() => setValue("")}
+        />
       ) : null}
 
       <ChatComposerControls

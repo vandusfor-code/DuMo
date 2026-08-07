@@ -2,17 +2,16 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Card } from "@/components/ui/card";
+import { Trash2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyConversation } from "@/components/leads/empty-conversation";
+import { SectionCard } from "@/components/leads/premium/section-card";
 import { shouldShowFatalQueryError } from "@/components/shared/query-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { AdminConversationList } from "@/components/admin/leads/admin-conversation-list";
 import { AdminChatPanel } from "@/components/admin/leads/admin-chat-panel";
 import { AdminLeadFormPanel } from "@/components/admin/leads/admin-lead-form-panel";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { Button } from "@/components/ui/button";
-import { Trash2 } from "lucide-react";
 import {
   useAdminAdvisors,
   useAdminConversations,
@@ -24,6 +23,9 @@ import {
   useDeleteConversation,
   useSetAutoAssign,
 } from "@/hooks/use-admin-leads";
+import { cn } from "@/lib/utils";
+
+const LIST_COLLAPSED_KEY = "dumo-admin-leads-list-collapsed";
 
 export default function AdminLeadsPage() {
   return (
@@ -42,11 +44,34 @@ function AdminLeadsPageContent() {
   const { data: autoAssign } = useAutoAssignSettings();
   const setAutoAssign = useSetAutoAssign();
   const [selectedId, setSelectedId] = useState<string | null>(conversationFromUrl);
+  const [listCollapsed, setListCollapsed] = useState(false);
   const assign = useAssignAdvisor();
+
+  const deleteOne = useDeleteConversation();
+  const deleteAll = useDeleteAllConversations();
+  const [confirmDeleteOne, setConfirmDeleteOne] = useState<string | null>(null);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
 
   useEffect(() => {
     if (conversationFromUrl) setSelectedId(conversationFromUrl);
   }, [conversationFromUrl]);
+
+  useEffect(() => {
+    try {
+      setListCollapsed(localStorage.getItem(LIST_COLLAPSED_KEY) === "1");
+    } catch {
+      /* storage no disponible */
+    }
+  }, []);
+
+  const handleListCollapsed = (collapsed: boolean) => {
+    setListCollapsed(collapsed);
+    try {
+      localStorage.setItem(LIST_COLLAPSED_KEY, collapsed ? "1" : "0");
+    } catch {
+      /* storage no disponible */
+    }
+  };
 
   const selected = useMemo(
     () => conversations?.find((c) => c.id === selectedId) ?? null,
@@ -55,12 +80,7 @@ function AdminLeadsPageContent() {
 
   const detail = useAdminLeadDetail(selectedId);
   const messages = useAdminMessages(selectedId);
-
-  // Borrado de chats (solo admin). Ambas acciones piden confirmación.
-  const deleteOne = useDeleteConversation();
-  const deleteAll = useDeleteAllConversations();
-  const [confirmDeleteOne, setConfirmDeleteOne] = useState<string | null>(null);
-  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const list = conversations ?? [];
 
   if (shouldShowFatalQueryError(convQuery)) {
     return (
@@ -71,13 +91,28 @@ function AdminLeadsPageContent() {
   }
 
   return (
-    <div className="-mx-6 -mb-12 h-[calc(100dvh-0px)] sm:-mx-8 lg:-mx-10">
-      <div className="grid h-full grid-cols-1 lg:grid-cols-[24fr_41fr_35fr]">
-        <Card className="flex min-h-0 flex-col overflow-hidden rounded-none border-y-0 border-l-0 shadow-none">
+    <div className="leads-crm -mx-6 flex h-[calc(100dvh-4rem)] min-h-0 flex-col overflow-hidden bg-canvas sm:-mx-8 lg:-mx-10 lg:h-[calc(100dvh-5rem)]">
+      <div
+        className={cn(
+          "grid min-h-0 flex-1 gap-4 overflow-hidden p-4 lg:p-5 transition-[grid-template-columns] duration-200 ease-out",
+          listCollapsed
+            ? "lg:grid-cols-[72px_minmax(300px,540px)_minmax(440px,1fr)] xl:grid-cols-[72px_minmax(320px,560px)_minmax(480px,1fr)]"
+            : "lg:grid-cols-[minmax(280px,340px)_minmax(300px,540px)_minmax(440px,1fr)] xl:grid-cols-[360px_minmax(320px,560px)_minmax(480px,1fr)]",
+        )}
+      >
+        <SectionCard className="flex min-h-0 flex-col overflow-hidden">
+          {convQuery.isError && list.length > 0 && !listCollapsed ? (
+            <div className="border-b border-line bg-warning-soft px-5 py-2.5 text-[12px] text-warning-ink">
+              No se pudo sincronizar. Mostrando la última versión.{" "}
+              <button type="button" onClick={() => refetch()} className="font-semibold underline">
+                Reintentar
+              </button>
+            </div>
+          ) : null}
           <AdminConversationList
-            conversations={conversations ?? []}
+            conversations={list}
             advisors={advisors}
-            isLoading={isLoading}
+            isLoading={isLoading && list.length === 0}
             selectedId={selectedId}
             autoAssignEnabled={autoAssign?.enabled ?? false}
             autoAssignLoading={setAutoAssign.isPending}
@@ -86,8 +121,10 @@ function AdminLeadsPageContent() {
               assign.mutate({ conversationId, advisorId })
             }
             onToggleAutoAssign={(enabled) => setAutoAssign.mutate(enabled)}
+            collapsed={listCollapsed}
+            onCollapsedChange={handleListCollapsed}
           />
-          {(conversations?.length ?? 0) > 0 && (
+          {list.length > 0 && !listCollapsed ? (
             <div className="shrink-0 border-t border-line p-3">
               <button
                 type="button"
@@ -98,18 +135,18 @@ function AdminLeadsPageContent() {
                 Borrar todos los chats
               </button>
             </div>
-          )}
-        </Card>
+          ) : null}
+        </SectionCard>
 
         {selected ? (
           <>
-            <Card className="relative flex min-h-0 flex-col overflow-hidden rounded-none border-y-0 shadow-none">
+            <SectionCard className="relative flex min-h-0 flex-col overflow-hidden p-0">
               <button
                 type="button"
                 aria-label="Eliminar chat"
                 title="Eliminar este chat y su historial"
                 onClick={() => setConfirmDeleteOne(selected.id)}
-                className="absolute right-3 top-3 z-10 grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-danger-soft hover:text-danger-ink"
+                className="absolute right-3 top-3 z-10 grid size-9 place-items-center rounded-lg bg-card/90 text-muted shadow-sm backdrop-blur transition-colors hover:bg-danger-soft hover:text-danger-ink"
               >
                 <Trash2 className="size-[18px]" />
               </button>
@@ -123,8 +160,8 @@ function AdminLeadsPageContent() {
                 }
                 onRetry={() => messages.refetch()}
               />
-            </Card>
-            <Card className="flex min-h-0 flex-col overflow-hidden rounded-none border-y-0 border-r-0 shadow-none">
+            </SectionCard>
+            <SectionCard className="flex min-h-0 flex-col overflow-hidden">
               {detail.isLoading && !detail.data ? (
                 <div className="flex flex-1 flex-col gap-3 p-6">
                   <Skeleton className="h-8 w-2/3" />
@@ -140,12 +177,12 @@ function AdminLeadsPageContent() {
                   timeline={detail.data.timeline}
                 />
               ) : null}
-            </Card>
+            </SectionCard>
           </>
         ) : (
-          <Card className="flex min-h-0 flex-col overflow-hidden rounded-none border-y-0 border-r-0 shadow-none lg:col-span-2">
+          <SectionCard className="flex min-h-0 flex-col overflow-hidden lg:col-span-2">
             <EmptyConversation />
-          </Card>
+          </SectionCard>
         )}
       </div>
 
