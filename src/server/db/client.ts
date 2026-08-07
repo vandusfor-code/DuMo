@@ -452,7 +452,8 @@ export function ensureSchema(): Promise<void> {
   if (!schemaPromise) {
     schemaPromise = withQueryTimeout(
       withDbRetry(async () => {
-        if (await isSchemaMarkedComplete(sql)) return;
+        // Siempre verificar columnas requeridas — el flag schema_complete no
+        // debe saltar DDL cuando se añaden tablas nuevas (p. ej. offer_simulations).
         if (await schemaIsComplete(sql)) {
           await markSchemaComplete(sql);
           return;

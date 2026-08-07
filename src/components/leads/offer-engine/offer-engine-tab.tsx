@@ -22,7 +22,7 @@ import {
   useOfferSimulationHistory,
   useSimulateOffer,
 } from "@/hooks/use-offer-engine";
-import { formatCurrency, formatShortDate } from "@/lib/format";
+import { formatCurrency, formatMoneyInput, formatShortDate, parseMoneyInput } from "@/lib/format";
 import {
   OFFER_SALE_TYPE_LABELS,
   type PlanCommercialOffer,
@@ -63,8 +63,7 @@ const DEFAULT_FORM: FormState = {
 };
 
 function parseMoney(value: string): number {
-  const n = Number(value.replace(/\D/g, ""));
-  return Number.isFinite(n) ? n : 0;
+  return parseMoneyInput(value);
 }
 
 export function OfferEngineTab({ conversationId }: { conversationId: string }) {
@@ -531,8 +530,8 @@ function MoneyInput({
       type="text"
       inputMode="numeric"
       value={value}
-      placeholder={placeholder}
-      onChange={(e) => onChange(e.target.value.replace(/[^\d.,]/g, ""))}
+      placeholder={placeholder ? formatMoneyInput(placeholder) : undefined}
+      onChange={(e) => onChange(formatMoneyInput(e.target.value))}
       className="h-11 w-full rounded-xl border border-line bg-white px-4 text-[14px] text-ink outline-none focus:border-brand focus:shadow-[0_0_0_3px_rgba(109,40,255,0.12)]"
     />
   );

@@ -73,6 +73,21 @@ export function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
+/** Formato entero con separador de miles chileno: 15000 → "15.000". */
+export function formatMoneyInput(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  if (!digits) return "";
+  return Number(digits).toLocaleString("es-CL");
+}
+
+/** Parsea valor con puntos de miles: "15.000" → 15000. */
+export function parseMoneyInput(value: string): number {
+  const digits = value.replace(/\D/g, "");
+  if (!digits) return 0;
+  const n = Number(digits);
+  return Number.isFinite(n) ? n : 0;
+}
+
 /** Initials for avatar chips: "Juan Sebastián Pérez" -> "JS". */
 export function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
