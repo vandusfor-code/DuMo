@@ -2,16 +2,27 @@ import type { SalesScriptStep } from "@/types/sales-script";
 import type { ScriptBlockField } from "./types";
 import { fieldLabelFromPath } from "./template-utils";
 
+/** Solo texto hablado — nunca notas internas ni metadatos de flujo. */
 const ADVISOR_NOTE_PATTERN = /advisorNote/i;
+const NON_SPEECH_BRANCH_KEYS = new Set(["referral"]);
 const SKIP_KEYS = new Set(["id", "sectionLabel", "title"]);
+
+function isEditableSpeechPath(path: string, parentKey?: string): boolean {
+  if (!path || ADVISOR_NOTE_PATTERN.test(path)) return false;
+  if (parentKey && NON_SPEECH_BRANCH_KEYS.has(parentKey) && path.includes("advisorNote")) {
+    return false;
+  }
+  return true;
+}
 
 function collectEditableFields(
   value: unknown,
   path: string,
   out: ScriptBlockField[],
+  parentKey?: string,
 ): void {
   if (typeof value === "string") {
-    if (path && !ADVISOR_NOTE_PATTERN.test(path)) {
+    if (isEditableSpeechPath(path, parentKey)) {
       out.push({ fieldKey: path, label: fieldLabelFromPath(path) });
     }
     return;
@@ -22,7 +33,7 @@ function collectEditableFields(
   for (const [key, child] of Object.entries(value)) {
     if (SKIP_KEYS.has(key)) continue;
     const nextPath = path ? `${path}.${key}` : key;
-    collectEditableFields(child, nextPath, out);
+    collectEditableFields(child, nextPath, out, key);
   }
 }
 

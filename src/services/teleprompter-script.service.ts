@@ -3,7 +3,7 @@ import type { ScriptBlockFieldState, ScriptFlowKey, ScriptOverrideMap } from "@/
 import {
   buildDefaultTemplateForField,
   buildFlowCatalog,
-  SCRIPT_FLOW_CATALOG,
+  getScriptFlowCatalog,
 } from "@/lib/sales-script/cms/default-templates";
 import { overridesFromRecords } from "@/lib/sales-script/cms/override-applicator";
 import {
@@ -11,7 +11,7 @@ import {
   interpolateTemplate,
   validateScriptTemplate,
 } from "@/lib/sales-script/cms/template-utils";
-import { CMS_PREVIEW_VARS } from "@/lib/sales-script/cms/mock-context";
+import { previewVarsForFlow } from "@/lib/sales-script/cms/mock-context";
 import {
   hasTeleprompterScriptDatabase,
   teleprompterScriptRepository,
@@ -19,7 +19,7 @@ import {
 
 export const teleprompterScriptService = {
   listFlows() {
-    return SCRIPT_FLOW_CATALOG.map(({ flowKey, title, blocks }) => ({
+    return getScriptFlowCatalog().map(({ flowKey, title, blocks }) => ({
       flowKey,
       title,
       blockCount: blocks.length,
@@ -138,8 +138,8 @@ export const teleprompterScriptService = {
     return teleprompterScriptRepository.listVersions(input.companyId, input.overrideId);
   },
 
-  previewTemplate(templateText: string) {
-    return interpolateTemplate(templateText, CMS_PREVIEW_VARS);
+  previewTemplate(templateText: string, flowKey: ScriptFlowKey) {
+    return interpolateTemplate(templateText, previewVarsForFlow(flowKey));
   },
 
   async getOverridesForFlow(companyId: string, flowKey: ScriptFlowKey): Promise<ScriptOverrideMap> {

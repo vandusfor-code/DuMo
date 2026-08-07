@@ -10,7 +10,7 @@ import { getLeadRepository } from "@/repositories/leads.repository";
 import { equipmentService } from "@/services/equipment.service";
 import { teleprompterScriptService } from "@/services/teleprompter-script.service";
 import { DEFAULT_COMPANY_ID } from "@/types/tenant";
-import type { ScriptFlowKey } from "@/lib/sales-script/cms/types";
+import { isScriptFlowKey } from "@/lib/sales-script/cms/flow-registry";
 
 export const salesScriptService = {
   async generateAndSave(input: {
@@ -39,10 +39,12 @@ export const salesScriptService = {
     let overrides;
     if (ctx) {
       const flow = resolveScriptFlow(ctx);
-      overrides = await teleprompterScriptService.getOverridesForFlow(
-        DEFAULT_COMPANY_ID,
-        flow.key as ScriptFlowKey,
-      );
+      if (isScriptFlowKey(flow.key)) {
+        overrides = await teleprompterScriptService.getOverridesForFlow(
+          DEFAULT_COMPANY_ID,
+          flow.key,
+        );
+      }
     }
 
     const script = buildSalesScript({

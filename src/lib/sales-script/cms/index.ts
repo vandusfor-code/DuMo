@@ -1,3 +1,4 @@
+export * from "./flow-registry";
 export * from "./types";
 export * from "./token-registry";
 export * from "./template-utils";

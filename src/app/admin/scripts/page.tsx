@@ -93,7 +93,7 @@ export default function AdminScriptsPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Scripts"
-        subtitle="Edita el copy del teleprompter sin modificar código — los builders siguen siendo la fuente de verdad."
+        subtitle="Edita solo el texto hablado del teleprompter por flujo. No modifica ramas, lógica, notas internas ni las Plantillas de WhatsApp."
       />
 
       <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
@@ -274,10 +274,14 @@ export default function AdminScriptsPage() {
                 <Button
                   variant="secondary"
                   onClick={async () => {
-                    const result = await previewTemplate.mutateAsync(draft);
+                    if (!flowKey) return;
+                    const result = await previewTemplate.mutateAsync({
+                      templateText: draft,
+                      flowKey,
+                    });
                     setPreviewText(result.preview);
                   }}
-                  disabled={previewTemplate.isPending}
+                  disabled={previewTemplate.isPending || !flowKey}
                 >
                   <Eye className="size-4" />
                   Vista previa

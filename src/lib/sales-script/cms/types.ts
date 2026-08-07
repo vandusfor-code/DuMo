@@ -1,6 +1,8 @@
 export type ScriptFlowKey =
   | "PORTABILIDAD_SIN_EQUIPO"
-  | "LINEA_NUEVA_SIN_EQUIPO";
+  | "PORTABILIDAD_CON_EQUIPO"
+  | "LINEA_NUEVA_SIN_EQUIPO"
+  | "LINEA_NUEVA_CON_EQUIPO";
 
 export type ScriptBlockField = {
   fieldKey: string;

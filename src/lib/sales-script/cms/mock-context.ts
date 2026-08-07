@@ -1,10 +1,13 @@
 import { COMMERCIAL_PLANS_MOCK } from "@/data/mock/commercial-config.mock";
+import { EQUIPMENT_CATALOG_MOCK } from "@/data/mock/equipment.mock";
 import { DEFAULT_DELIVERY_TELEPROMPTER_CONFIG } from "@/data/defaults/delivery-stores.default";
 import { buildScriptContext } from "@/lib/sales-script/context";
 import { buildLineaNuevaScriptContext } from "@/lib/sales-script/linea-nueva/linea-nueva-context";
 import type { SaveLeadInput } from "@/types/lead";
 import type { ScriptBuildContext } from "@/lib/sales-script/context";
 import type { LineaNuevaEngineInput, LineaNuevaScriptContext } from "@/lib/sales-script/linea-nueva/linea-nueva-types";
+import type { ScriptFlowKey } from "./types";
+import { flowHasEquipment, isLineaNuevaFlow } from "./flow-registry";
 
 export const CMS_PREVIEW_VARS: Record<string, string> = {
   saludo: "Buenas tardes",
@@ -67,9 +70,49 @@ export const CMS_PREVIEW_VARS: Record<string, string> = {
 };
 
 const CMS_PLANS = COMMERCIAL_PLANS_MOCK.filter((p) => p.id === "plan-o");
+const CMS_EQUIPMENT = EQUIPMENT_CATALOG_MOCK[0];
 const CMS_ADVISOR = { id: "adv-cms", name: "Carolina Pérez", email: "carolina.perez@ventas.wom.cl" };
 
-function portabilidadGestion(): SaveLeadInput {
+function equipmentLineFields(withEquipment: boolean): Pick<
+  SaveLeadInput["lines"][number],
+  | "equipment"
+  | "equipmentMode"
+  | "equipmentCatalogId"
+  | "equipmentModel"
+  | "equipmentValue"
+  | "equipmentDownPayment"
+  | "equipmentInstallments"
+  | "equipmentInstallmentValue"
+  | "equipmentCommercialText"
+> {
+  if (!withEquipment || !CMS_EQUIPMENT) {
+    return {
+      equipment: "",
+      equipmentMode: "none",
+      equipmentCatalogId: "",
+      equipmentModel: "",
+      equipmentValue: "",
+      equipmentDownPayment: "",
+      equipmentInstallments: "",
+      equipmentInstallmentValue: "",
+      equipmentCommercialText: "",
+    };
+  }
+
+  return {
+    equipment: CMS_EQUIPMENT.commercialName,
+    equipmentMode: "with",
+    equipmentCatalogId: CMS_EQUIPMENT.id,
+    equipmentModel: `${CMS_EQUIPMENT.brand} ${CMS_EQUIPMENT.model}`,
+    equipmentValue: String(CMS_EQUIPMENT.totalValue),
+    equipmentDownPayment: String(CMS_EQUIPMENT.downPayment),
+    equipmentInstallments: String(CMS_EQUIPMENT.installmentsCount),
+    equipmentInstallmentValue: String(CMS_EQUIPMENT.installmentValue),
+    equipmentCommercialText: CMS_EQUIPMENT.commercialText,
+  };
+}
+
+function portabilidadGestion(withEquipment: boolean): SaveLeadInput {
   return {
     conversationId: "conv-cms-port",
     phone: "56912345678",
@@ -82,28 +125,20 @@ function portabilidadGestion(): SaveLeadInput {
         phone: "56987654321",
         saleType: "portability",
         planId: "plan-o",
-        equipment: "",
-        equipmentMode: "none",
         currentOperator: "movistar",
         deliveryType: "home",
         email: CMS_PREVIEW_VARS.correo,
         deliveryAddress: CMS_PREVIEW_VARS.direccion,
         region: "metropolitana",
         comuna: CMS_PREVIEW_VARS.comuna,
-        equipmentCatalogId: "",
-        equipmentModel: "",
-        equipmentValue: "",
-        equipmentDownPayment: "",
-        equipmentInstallments: "",
-        equipmentInstallmentValue: "",
-        equipmentCommercialText: "",
         accountType: "postpaid",
+        ...equipmentLineFields(withEquipment),
       },
     ],
   };
 }
 
-function lineaNuevaGestion(): SaveLeadInput {
+function lineaNuevaGestion(withEquipment: boolean): SaveLeadInput {
   return {
     conversationId: "conv-cms-ln",
     phone: "56912345678",
@@ -116,31 +151,25 @@ function lineaNuevaGestion(): SaveLeadInput {
         phone: "56911112222",
         saleType: "new_line",
         planId: "plan-o",
-        equipment: "",
-        equipmentMode: "none",
         currentOperator: "",
         deliveryType: "home",
+        deliveryCarrier: "ALAS",
         email: CMS_PREVIEW_VARS.correo,
         deliveryAddress: CMS_PREVIEW_VARS.direccion,
         region: "metropolitana",
         comuna: CMS_PREVIEW_VARS.comuna,
-        equipmentCatalogId: "",
-        equipmentModel: "",
-        equipmentValue: "",
-        equipmentDownPayment: "",
-        equipmentInstallments: "",
-        equipmentInstallmentValue: "",
-        equipmentCommercialText: "",
         accountType: "postpaid",
+        ...equipmentLineFields(withEquipment),
       },
     ],
   };
 }
 
-export function buildCmsPortabilidadContext(): ScriptBuildContext {
+export function buildCmsPortabilidadContext(withEquipment = false): ScriptBuildContext {
   const ctx = buildScriptContext({
-    gestion: portabilidadGestion(),
+    gestion: portabilidadGestion(withEquipment),
     commercialPlans: CMS_PLANS,
+    equipmentCatalog: withEquipment ? EQUIPMENT_CATALOG_MOCK : undefined,
     advisor: CMS_ADVISOR,
     deliveryConfig: DEFAULT_DELIVERY_TELEPROMPTER_CONFIG,
   });
@@ -150,28 +179,45 @@ export function buildCmsPortabilidadContext(): ScriptBuildContext {
   return ctx;
 }
 
-export function buildCmsLineaNuevaInput(): LineaNuevaEngineInput {
+export function buildCmsLineaNuevaInput(withEquipment = false): LineaNuevaEngineInput {
   return {
-    gestionId: "gest-cms-ln",
-    gestion: lineaNuevaGestion(),
+    gestionId: withEquipment ? "gest-cms-ln-ce" : "gest-cms-ln",
+    gestion: lineaNuevaGestion(withEquipment),
     commercialPlans: CMS_PLANS,
     advisor: CMS_ADVISOR,
     deliveryConfig: DEFAULT_DELIVERY_TELEPROMPTER_CONFIG,
   };
 }
 
-export function buildCmsLineaNuevaContext(): LineaNuevaScriptContext {
-  return buildLineaNuevaScriptContext(buildCmsLineaNuevaInput());
+export function buildCmsLineaNuevaContext(withEquipment = false): LineaNuevaScriptContext {
+  return buildLineaNuevaScriptContext(buildCmsLineaNuevaInput(withEquipment));
 }
 
 export function previewVarsFromContext(ctx: ScriptBuildContext): Record<string, string> {
   return { ...CMS_PREVIEW_VARS, ...ctx.vars };
 }
 
-export function previewVarsForLineaNueva(): Record<string, string> {
+export function previewVarsForLineaNueva(withEquipment = false): Record<string, string> {
+  const ctx = buildCmsLineaNuevaContext(withEquipment);
   return {
     ...CMS_PREVIEW_VARS,
+    ...ctx.templateVars,
     tipo_venta: "Línea Nueva",
     numero_nuevo: CMS_PREVIEW_VARS.numero_nuevo,
+    nombre_cliente: ctx.cliente.nombre,
+    cliente_primer_nombre: ctx.cliente.nombre.split(" ")[0] ?? ctx.cliente.nombre,
   };
+}
+
+export function previewVarsForFlow(flowKey: ScriptFlowKey): Record<string, string> {
+  if (flowKey === "PORTABILIDAD_SIN_EQUIPO") {
+    return previewVarsFromContext(buildCmsPortabilidadContext(false));
+  }
+  if (flowKey === "PORTABILIDAD_CON_EQUIPO") {
+    return previewVarsFromContext(buildCmsPortabilidadContext(true));
+  }
+  if (isLineaNuevaFlow(flowKey)) {
+    return previewVarsForLineaNueva(flowHasEquipment(flowKey));
+  }
+  return CMS_PREVIEW_VARS;
 }

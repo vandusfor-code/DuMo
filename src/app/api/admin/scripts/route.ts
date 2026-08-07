@@ -2,15 +2,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireAdministratorSession } from "@/lib/require-administrator";
 import { getTenantScope } from "@/lib/tenant-scope";
 import { teleprompterScriptService } from "@/services/teleprompter-script.service";
+import { isScriptFlowKey } from "@/lib/sales-script/cms/flow-registry";
 import type { ScriptFlowKey } from "@/lib/sales-script/cms/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function parseFlowKey(value: string | null): ScriptFlowKey | null {
-  if (value === "PORTABILIDAD_SIN_EQUIPO" || value === "LINEA_NUEVA_SIN_EQUIPO") {
-    return value;
-  }
+  if (value && isScriptFlowKey(value)) return value;
   return null;
 }
 
@@ -113,8 +112,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     if (body.action === "preview" && typeof body.templateText === "string") {
+      const flowKey = parseFlowKey(String(body.flowKey ?? ""));
+      if (!flowKey) {
+        return NextResponse.json({ error: "flowKey es obligatorio para vista previa." }, { status: 400 });
+      }
       return NextResponse.json({
-        preview: teleprompterScriptService.previewTemplate(body.templateText),
+        preview: teleprompterScriptService.previewTemplate(body.templateText, flowKey),
       });
     }
 

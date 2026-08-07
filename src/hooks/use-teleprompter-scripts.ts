@@ -118,11 +118,11 @@ export function useRestoreScriptField() {
 
 export function usePreviewScriptTemplate() {
   return useMutation({
-    mutationFn: (templateText: string) =>
+    mutationFn: (input: { templateText: string; flowKey: ScriptFlowKey }) =>
       fetchJson<{ preview: string }>("/api/admin/scripts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "preview", templateText }),
+        body: JSON.stringify({ action: "preview", ...input }),
       }),
   });
 }
