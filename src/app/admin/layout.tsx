@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminNotificationsMount } from "@/components/admin/admin-notifications-mount";
 import { getTokenPayload } from "@/lib/require-admin";
+import { AdminShell } from "./admin-shell";
 
 export const dynamic = "force-dynamic";
 
@@ -22,12 +23,10 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen bg-canvas">
+    <>
       <AdminNotificationsMount />
       <AdminSidebar />
-      <div className="lg:pl-[260px]">
-        <div className="w-full px-6 sm:px-8 lg:px-10 pb-16">{children}</div>
-      </div>
-    </div>
+      <AdminShell>{children}</AdminShell>
+    </>
   );
 }

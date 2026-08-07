@@ -91,7 +91,7 @@ function AdminLeadsPageContent() {
   }
 
   return (
-    <div className="leads-crm -mx-6 flex h-[calc(100dvh-4rem)] min-h-0 flex-col overflow-hidden bg-canvas sm:-mx-8 lg:-mx-10 lg:h-[calc(100dvh-5rem)]">
+    <div className="leads-crm flex h-full min-h-0 flex-col overflow-hidden bg-canvas p-4 lg:p-5">
       <div
         className={cn(
           "grid min-h-0 flex-1 gap-4 overflow-hidden p-4 lg:p-5 transition-[grid-template-columns] duration-200 ease-out",
