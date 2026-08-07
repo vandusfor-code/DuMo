@@ -33,8 +33,18 @@ export function getSql(): Sql | null {
 
   const isLocal = url.includes("localhost") || url.includes("127.0.0.1");
 
+  /** Avisos esperados de migraciones idempotentes (IF NOT EXISTS). No son errores. */
+  const IGNORED_NOTICE_CODES = new Set(["42P07", "42701", "42P06"]);
+
   sqlSingleton = postgres(url, {
     ssl: isLocal ? false : "require",
+    onnotice: (notice) => {
+      const code = (notice as { code?: string }).code;
+      if (code && IGNORED_NOTICE_CODES.has(code)) return;
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[postgres notice]", notice);
+      }
+    },
     // Varias conexiones por instancia: la app hace consultas concurrentes
     // (polling de conversaciones + mensajes + markRead + perfil). Con max:1 se
     // encolaban todas en una sola conexión y bajo latencia de Neon se
@@ -355,20 +365,29 @@ export function ensureAuthSchema(): Promise<void> {
   if (!authSchemaPromise) {
     authSchemaPromise = withQueryTimeout(
       withDbRetry(async () => {
+        const [{ exists }] = await sql<{ exists: boolean }[]>`
+          SELECT EXISTS (
+            SELECT 1 FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_name = 'users'
+          ) AS exists
+        `;
+
         await sql.begin(async (tx) => {
-          await tx`
-            CREATE TABLE IF NOT EXISTS users (
-              id text PRIMARY KEY,
-              username text UNIQUE NOT NULL,
-              email text UNIQUE NOT NULL,
-              password_hash text NOT NULL,
-              name text NOT NULL,
-              role text NOT NULL,
-              active boolean NOT NULL DEFAULT true,
-              avatar_url text NOT NULL DEFAULT '',
-              created_at timestamptz NOT NULL DEFAULT now()
-            )
-          `;
+          if (!exists) {
+            await tx`
+              CREATE TABLE users (
+                id text PRIMARY KEY,
+                username text UNIQUE NOT NULL,
+                email text UNIQUE NOT NULL,
+                password_hash text NOT NULL,
+                name text NOT NULL,
+                role text NOT NULL,
+                active boolean NOT NULL DEFAULT true,
+                avatar_url text NOT NULL DEFAULT '',
+                created_at timestamptz NOT NULL DEFAULT now()
+              )
+            `;
+          }
           await tx`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at timestamptz`;
           await tx`ALTER TABLE users ADD COLUMN IF NOT EXISTS company_id text`;
           await tx`ALTER TABLE users ADD COLUMN IF NOT EXISTS monthly_sales_goal integer`;
