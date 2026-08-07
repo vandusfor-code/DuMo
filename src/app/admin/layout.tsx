@@ -1,6 +1,8 @@
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminNotificationsMount } from "@/components/admin/admin-notifications-mount";
 
+export const dynamic = "force-dynamic";
+
 /** Shell del área de administración: sidebar admin + contenido a ancho completo. */
 export default function AdminLayout({
   children,
