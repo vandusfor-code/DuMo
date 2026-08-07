@@ -18,6 +18,7 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
   return (
     <Link
       href={item.href}
+      prefetch={false}
       aria-current={active ? "page" : undefined}
       className={cn(
         "group relative flex items-center gap-3 rounded-[14px] px-3.5 py-3 text-[14px] font-medium transition-all duration-200 ease-[var(--ease-out-soft)]",

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent, type ReactNode } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { Label } from "@/components/ui/label";
@@ -77,7 +77,6 @@ function LoginField({
 }
 
 export function LoginFormPanel() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
@@ -101,8 +100,10 @@ export function LoginFormPanel() {
       // manda el destino por rol (evita que un admin caiga en /dashboard).
       const dest =
         next && next.startsWith(res.redirectTo) ? next : res.redirectTo;
-      router.push(dest);
-      router.refresh();
+      // Navegación completa: garantiza que la cookie Set-Cookie del login
+      // viaje en la primera petición al área protegida (evita cierre de sesión).
+      window.location.assign(dest);
+      return;
     } catch (err) {
       setError(
         err instanceof ApiError

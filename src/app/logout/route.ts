@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 /** Cierra sesión (borra cookie) y redirige al login. */
 export async function GET(request: NextRequest) {
-  const res = NextResponse.redirect(new URL("/login", request.url));
+  const res = NextResponse.redirect(new URL("/login?signedOut=1", request.url));
   clearSessionCookie(res);
   return res;
 }

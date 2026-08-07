@@ -1,8 +1,7 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminNotificationsMount } from "@/components/admin/admin-notifications-mount";
-import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth/session-cookie";
+import { getTokenPayload } from "@/lib/require-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -12,9 +11,7 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const jar = await cookies();
-  const token = jar.get(SESSION_COOKIE)?.value;
-  const payload = token ? verifySessionToken(token) : null;
+  const payload = await getTokenPayload();
 
   if (!payload) {
     redirect("/login");

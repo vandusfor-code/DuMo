@@ -10,15 +10,37 @@ export type AdminSession = {
   role: AuthRole;
 };
 
+/** Lee `dumo_session` del header Cookie crudo (respaldo si cookies() viene vacío en RSC). */
+export function readSessionTokenFromCookieHeader(raw: string | null): string | null {
+  if (!raw) return null;
+  for (const part of raw.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq === -1) continue;
+    const name = part.slice(0, eq).trim();
+    if (name !== SESSION_COOKIE) continue;
+    const value = part.slice(eq + 1).trim();
+    if (!value) return null;
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  }
+  return null;
+}
+
 /**
- * Token de sesión: cookie (principal) o cabecera Authorization: Bearer
- * (respaldo para navegadores que no guardan la cookie).
+ * Token de sesión: cookie (principal), header Cookie crudo o Authorization: Bearer.
  */
 export async function getSessionToken(): Promise<string | null> {
   const jar = await cookies();
   const cookieToken = jar.get(SESSION_COOKIE)?.value;
   if (cookieToken) return cookieToken;
+
   const headerList = await headers();
+  const fromCookieHeader = readSessionTokenFromCookieHeader(headerList.get("cookie"));
+  if (fromCookieHeader) return fromCookieHeader;
+
   const bearer = headerList.get("authorization");
   const headerToken = bearer?.replace(/^Bearer\s+/i, "").trim();
   return headerToken || null;

@@ -16,6 +16,7 @@ function NavLink({ item, active }: { item: AdminNavItem; active: boolean }) {
   return (
     <Link
       href={item.href}
+      prefetch={false}
       aria-current={active ? "page" : undefined}
       className={cn(
         "group flex items-center gap-3 rounded-[14px] px-3.5 py-2.5 text-[14px] font-medium transition-all duration-200 ease-[var(--ease-out-soft)]",
@@ -54,6 +55,7 @@ export function AdminSidebar() {
       <div className="border-t border-line p-4">
         <Link
           href={ADMIN_SIGN_OUT.href}
+          prefetch={false}
           className="group flex items-center gap-3 rounded-[14px] px-3.5 py-2.5 text-[14px] font-medium text-muted transition-colors hover:bg-brand-soft hover:text-brand"
         >
           <SignOutIcon className="size-[19px] text-muted group-hover:text-brand" />

@@ -1,15 +1,22 @@
 "use client";
 
 import { useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { clearClientToken } from "@/lib/auth/client-token";
 
 /**
- * Al llegar al login se limpia el token de respaldo: así "Cerrar sesión"
- * (que pasa por /logout y termina en /login) borra ambos mecanismos.
+ * Solo limpia el token de respaldo tras un cierre de sesión explícito
+ * (/logout → /login?signedOut=1). No borrar en redirecciones por fallo
+ * transitorio de auth evita perder el Bearer de respaldo.
  */
 export function LogoutCleanup() {
+  const searchParams = useSearchParams();
+
   useEffect(() => {
-    clearClientToken();
-  }, []);
+    if (searchParams.get("signedOut") === "1") {
+      clearClientToken();
+    }
+  }, [searchParams]);
+
   return null;
 }

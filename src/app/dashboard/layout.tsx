@@ -1,6 +1,5 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth/session-cookie";
+import { getTokenPayload } from "@/lib/require-admin";
 import { DashboardShell } from "./dashboard-shell";
 
 export const dynamic = "force-dynamic";
@@ -11,9 +10,7 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const jar = await cookies();
-  const token = jar.get(SESSION_COOKIE)?.value;
-  const payload = token ? verifySessionToken(token) : null;
+  const payload = await getTokenPayload();
 
   if (!payload) {
     redirect("/login");
