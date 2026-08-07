@@ -1,6 +1,7 @@
 import "server-only";
 import { getAuthRepository } from "@/repositories/auth.repository";
 import { getAdminSalesRepository } from "@/repositories/admin-sales.repository";
+import { getCommercialConfigurationRepository } from "@/repositories/commercial-configuration.repository";
 import type { AdvisorsResult } from "@/types/admin-advisor";
 
 export const adminUsersService = {
@@ -38,15 +39,18 @@ export const profileService = {
 
 export const adminAdvisorsService = {
   async list(): Promise<AdvisorsResult> {
-    const advisors = await getAuthRepository().listByRole("asesora");
-    const salesResult = await getAdminSalesRepository().list({
-      search: "",
-      status: "all",
-      advisor: "all",
-      type: "all",
-      page: 1,
-      pageSize: 10000,
-    });
+    const [advisors, salesResult, config] = await Promise.all([
+      getAuthRepository().listByRole("asesora"),
+      getAdminSalesRepository().list({
+        search: "",
+        status: "all",
+        advisor: "all",
+        type: "all",
+        page: 1,
+        pageSize: 10000,
+      }),
+      getCommercialConfigurationRepository().getSnapshot(),
+    ]);
 
     const rows = advisors.map((a) => {
       const advisorSales = salesResult.rows.filter((s) => s.advisor === a.name);
@@ -66,6 +70,7 @@ export const adminAdvisorsService = {
         finalizedSales: finalized.length,
         inDeliverySales: inDelivery.length,
         conversionRate,
+        monthlySalesGoal: a.monthlySalesGoal ?? null,
       };
     });
 
@@ -75,10 +80,24 @@ export const adminAdvisorsService = {
       rows.length > 0
         ? Math.round(rows.reduce((s, r) => s + r.conversionRate, 0) / rows.length)
         : 0;
+    const assignedGoalsTotal = rows
+      .filter((r) => r.active && r.monthlySalesGoal != null && r.monthlySalesGoal > 0)
+      .reduce((s, r) => s + (r.monthlySalesGoal ?? 0), 0);
 
     return {
-      summary: { total: rows.length, active, totalSalesMonth, avgConversion },
+      summary: {
+        total: rows.length,
+        active,
+        totalSalesMonth,
+        avgConversion,
+        teamMonthlyGoal: config.settings.monthlyGoal,
+        assignedGoalsTotal,
+      },
       rows,
     };
+  },
+
+  setSalesGoal(advisorId: string, monthlySalesGoal: number | null) {
+    return getAuthRepository().setAdvisorSalesGoal(advisorId, monthlySalesGoal);
   },
 };

@@ -57,7 +57,6 @@ export default function DashboardPage() {
               count={dashboard.dailySales.count}
               goal={dashboard.dailySales.goal}
               series={dashboard.dailySales.series}
-              yTicks={[5, 10, 15, 20]}
               gradientId="dailyGradient"
             />
             <SalesTrendCard
@@ -66,7 +65,6 @@ export default function DashboardPage() {
               count={dashboard.monthlySales.count}
               goal={dashboard.monthlySales.goal}
               series={dashboard.monthlySales.series}
-              yTicks={[75, 150, 225, 300]}
               gradientId="monthlyGradient"
             />
             <CommissionCard

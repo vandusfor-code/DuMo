@@ -1,5 +1,6 @@
 import { Calendar } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { buildChartYTicks } from "@/lib/chart-utils";
 import type { ChartPoint } from "@/types/common";
 import { MiniAreaChart } from "./mini-area-chart";
 
@@ -10,7 +11,6 @@ export function SalesTrendCard({
   count,
   goal,
   series,
-  yTicks,
   gradientId,
 }: {
   title: string;
@@ -18,9 +18,10 @@ export function SalesTrendCard({
   count: number;
   goal: number;
   series: ChartPoint[];
-  yTicks: number[];
   gradientId: string;
 }) {
+  const yTicks = buildChartYTicks(goal, series);
+
   return (
     <Card className="flex flex-col p-7">
       <div className="flex items-center justify-between">

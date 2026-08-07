@@ -97,6 +97,7 @@ const MIGRATION_LOCK_KEY = 828171;
 const REQUIRED_COLUMNS = [
   "app_config.key",
   "users.last_seen_at",
+  "users.monthly_sales_goal",
   "lead_conversations.dumo_phone_id",
   "lead_conversations.assigned_advisor_id",
   "lead_conversations.assigned_advisor_name",
@@ -221,6 +222,7 @@ async function runMigrations(sql: Sql) {
     await tx`UPDATE lead_conversations SET admin_status = 'nuevo' WHERE admin_status IS NULL`;
     await tx`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS last_message_direction text DEFAULT 'in'`;
     await tx`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at timestamptz`;
+    await tx`ALTER TABLE users ADD COLUMN IF NOT EXISTS monthly_sales_goal integer`;
     await tx`
       CREATE TABLE IF NOT EXISTS lead_notes (
         id text PRIMARY KEY,

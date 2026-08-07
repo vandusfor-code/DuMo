@@ -154,7 +154,7 @@ export function CommercialSettingsForm({
     {
       key: "monthlyGoal" as const,
       label: "Meta de ventas (cantidad al mes)",
-      hint: "Total del equipo. Ej: 120 ventas — con 2 asesoras, 60 c/u.",
+      hint: "Total del equipo (ej. 120). Asigna la meta de cada asesora en Admin → Asesoras.",
     },
     {
       key: "economicGoal" as const,

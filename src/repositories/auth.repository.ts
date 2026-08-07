@@ -27,6 +27,7 @@ export interface AuthRepository {
   changePasswordWithCurrent(id: string, input: ChangePasswordInput): Promise<void>;
   updateProfile(id: string, input: UpdateProfileInput): Promise<AuthUser>;
   touchLastSeen(id: string): Promise<void>;
+  setAdvisorSalesGoal(id: string, monthlySalesGoal: number | null): Promise<AuthUser>;
 }
 
 function mapRow(r: {
@@ -38,6 +39,7 @@ function mapRow(r: {
   active: boolean;
   avatar_url: string;
   company_id?: string | null;
+  monthly_sales_goal?: number | null;
 }): AuthUser {
   return {
     id: r.id,
@@ -48,6 +50,10 @@ function mapRow(r: {
     active: r.active,
     avatarUrl: r.avatar_url ?? "",
     companyId: r.company_id ?? DEFAULT_COMPANY_ID,
+    monthlySalesGoal:
+      r.monthly_sales_goal != null && r.monthly_sales_goal > 0
+        ? Number(r.monthly_sales_goal)
+        : null,
   };
 }
 
@@ -92,7 +98,7 @@ class PostgresAuthRepository implements AuthRepository {
     const sql = requireSql();
     const q = login.trim().toLowerCase();
     const rows = await sql`
-      SELECT id, username, email, password_hash, name, role, active, avatar_url, company_id
+      SELECT id, username, email, password_hash, name, role, active, avatar_url, company_id, monthly_sales_goal
       FROM users
       WHERE active = true
         AND (lower(email) = ${q} OR lower(username) = ${q})
@@ -118,7 +124,7 @@ class PostgresAuthRepository implements AuthRepository {
     await this.ensureSeedAdmin();
     const sql = requireSql();
     const rows = await sql`
-      SELECT id, username, email, name, role, active, avatar_url, company_id
+      SELECT id, username, email, name, role, active, avatar_url, company_id, monthly_sales_goal
       FROM users WHERE id = ${id} LIMIT 1
     `;
     const row = rows[0];
@@ -130,7 +136,7 @@ class PostgresAuthRepository implements AuthRepository {
     await this.ensureSeedAdmin();
     const sql = requireSql();
     const rows = await withDbRetry(() => sql`
-      SELECT id, username, email, name, role, active, avatar_url, company_id
+      SELECT id, username, email, name, role, active, avatar_url, company_id, monthly_sales_goal
       FROM users
       ORDER BY name ASC
     `);
@@ -279,6 +285,21 @@ class PostgresAuthRepository implements AuthRepository {
     } catch {
       /* no bloquear la sesión si falla */
     }
+  }
+
+  async setAdvisorSalesGoal(id: string, monthlySalesGoal: number | null): Promise<AuthUser> {
+    await ensureSchema();
+    const sql = requireSql();
+    const user = await this.findById(id);
+    if (!user || user.role !== "asesora") {
+      throw new Error("Solo se puede asignar meta a usuarios con rol Asesora.");
+    }
+    const value =
+      monthlySalesGoal != null && monthlySalesGoal > 0 ? Math.round(monthlySalesGoal) : null;
+    await sql`UPDATE users SET monthly_sales_goal = ${value} WHERE id = ${id}`;
+    const updated = await this.findById(id);
+    if (!updated) throw new Error("Usuario no encontrado.");
+    return updated;
   }
 }
 

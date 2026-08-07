@@ -16,6 +16,8 @@ export interface AuthUser {
   active: boolean;
   avatarUrl: string;
   companyId: string;
+  /** Meta de ventas del mes asignada por el admin (null = reparto automático del equipo). */
+  monthlySalesGoal?: number | null;
 }
 
 export interface LoginResult {

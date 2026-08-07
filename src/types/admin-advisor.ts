@@ -9,6 +9,8 @@ export interface AdvisorPerformance {
   finalizedSales: number;
   inDeliverySales: number;
   conversionRate: number;
+  /** Meta de ventas del mes asignada por el admin. */
+  monthlySalesGoal: number | null;
 }
 
 export interface AdvisorsSummary {
@@ -16,6 +18,8 @@ export interface AdvisorsSummary {
   active: number;
   totalSalesMonth: number;
   avgConversion: number;
+  teamMonthlyGoal: number;
+  assignedGoalsTotal: number;
 }
 
 export interface AdvisorsResult {

@@ -25,6 +25,17 @@ export function perAdvisorSalesGoal(totalSales: number, activeAdvisorCount: numb
   return Math.max(1, Math.round(totalSales / n));
 }
 
+/** Meta del mes para una asesora: la asignada por admin o reparto equitativo del equipo. */
+export function resolveAdvisorSalesGoal(
+  advisor: { monthlySalesGoal?: number | null } | null | undefined,
+  teamMonthlyGoal: number,
+  activeAdvisorCount: number,
+): number {
+  const assigned = advisor?.monthlySalesGoal;
+  if (assigned != null && assigned > 0) return assigned;
+  return perAdvisorSalesGoal(teamMonthlyGoal, activeAdvisorCount);
+}
+
 /** Meta económica individual por asesora (ingreso DuMo objetivo). */
 export function perAdvisorEconomicGoal(totalEconomic: number, activeAdvisorCount: number): number {
   const n = Math.max(1, activeAdvisorCount);

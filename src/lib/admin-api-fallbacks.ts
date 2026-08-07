@@ -47,7 +47,7 @@ export function emptyAccountingResult(): AccountingResult {
 export function emptyAdvisorsResult(): AdvisorsResult {
   return {
     rows: [],
-    summary: { total: 0, active: 0, totalSalesMonth: 0, avgConversion: 0 },
+    summary: { total: 0, active: 0, totalSalesMonth: 0, avgConversion: 0, teamMonthlyGoal: 0, assignedGoalsTotal: 0 },
   };
 }
 

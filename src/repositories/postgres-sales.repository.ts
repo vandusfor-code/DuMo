@@ -27,6 +27,7 @@ import {
   economicProgress,
   perAdvisorEconomicGoal,
   perAdvisorSalesGoal,
+  resolveAdvisorSalesGoal,
   salesProgress,
 } from "@/lib/commercial-settings";
 import { ADMIN_DASHBOARD_MOCK } from "@/data/mock/admin-dashboard.mock";
@@ -634,7 +635,12 @@ export class PostgresSalesStore {
     }
 
     const activeAdvisorCount = advisors.filter((a) => a.active).length || 1;
-    const personalSalesGoal = perAdvisorSalesGoal(config.settings.monthlyGoal, activeAdvisorCount);
+    const advisorUser = scope ? advisors.find((a) => a.id === scope.id) : null;
+    const personalSalesGoal = resolveAdvisorSalesGoal(
+      advisorUser,
+      config.settings.monthlyGoal,
+      activeAdvisorCount,
+    );
     const personalEconomicGoal = perAdvisorEconomicGoal(
       config.settings.economicGoal,
       activeAdvisorCount,

@@ -79,6 +79,18 @@ export function useAdminAdvisors() {
   });
 }
 
+export function useUpdateAdvisorGoal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; monthlySalesGoal: number | null }) =>
+      apiPatch("/api/admin/advisors", input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "advisors"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}
+
 export function useProfile() {
   return useQuery({
     queryKey: ["profile"],

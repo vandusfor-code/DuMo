@@ -23,10 +23,12 @@ export function MiniAreaChart({
   yTicks: number[];
   gradientId: string;
 }) {
+  const yMax = yTicks[yTicks.length - 1] ?? 1;
+
   return (
     <div className="h-[180px] w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 8, right: 6, left: -18, bottom: 0 }}>
+        <AreaChart data={data} margin={{ top: 8, right: 8, left: 4, bottom: 0 }}>
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#6D28D9" stopOpacity={0.22} />
@@ -47,8 +49,9 @@ export function MiniAreaChart({
             tickLine={false}
             tick={{ fill: "#9ca3af", fontSize: 12 }}
             ticks={yTicks}
-            domain={[0, yTicks[yTicks.length - 1]]}
-            width={44}
+            domain={[0, yMax]}
+            width={52}
+            allowDecimals={false}
           />
           <Tooltip
             cursor={{ stroke: "#ECECF3", strokeWidth: 1 }}
