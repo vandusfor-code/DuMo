@@ -1,65 +1,92 @@
 import "server-only";
 import type {
   AdminSale,
+  AdminSaleStatus,
   AdminSalesFilters,
   AdminSalesResult,
-  AdminSalesSummary,
 } from "@/types/admin-sale";
+import type { SaleDetail } from "@/types/sale";
 import { ADMIN_SALES_MOCK } from "@/data/mock/admin-sales.mock";
+import { filterAdminSales, parseAdminDisplayDate, summarizeAdminSales } from "@/lib/admin-sales-filter";
+import { toAdvisorStatus, adminTypeToCanonical } from "@/server/db/sales-mappers";
 import { withLatency } from "@/lib/mock";
 
 export interface AdminSalesRepository {
   list(filters: AdminSalesFilters): Promise<AdminSalesResult>;
-}
-
-function summarize(rows: AdminSale[]): AdminSalesSummary {
-  const s: AdminSalesSummary = {
-    total: rows.length,
-    registrada: 0,
-    en_reparto: 0,
-    finalizada: 0,
-    rechazada: 0,
-    cancelada: 0,
-  };
-  for (const r of rows) s[r.status] += 1;
-  return s;
+  getById(id: string): Promise<SaleDetail | null>;
+  updateStatuses(ids: string[], status: AdminSaleStatus): Promise<void>;
+  deleteSales(ids: string[]): Promise<void>;
 }
 
 class MockAdminSalesRepository implements AdminSalesRepository {
-  list(filters: AdminSalesFilters): Promise<AdminSalesResult> {
-    const q = filters.search.trim().toLowerCase();
-    const filtered = ADMIN_SALES_MOCK.filter((r) => {
-      if (filters.status !== "all" && r.status !== filters.status) return false;
-      if (filters.advisor !== "all" && r.advisor !== filters.advisor) return false;
-      if (filters.type !== "all" && r.type !== filters.type) return false;
-      if (
-        q &&
-        !(
-          r.customerName.toLowerCase().includes(q) ||
-          r.rut.toLowerCase().includes(q) ||
-          r.id.toLowerCase().includes(q) ||
-          r.plan.toLowerCase().includes(q)
-        )
-      )
-        return false;
-      return true;
-    });
+  private rows = [...ADMIN_SALES_MOCK];
 
-    const summary = summarize(filtered);
+  list(filters: AdminSalesFilters): Promise<AdminSalesResult> {
+    const filtered = filterAdminSales(this.rows, filters);
+    const summary = summarizeAdminSales(filtered);
     const start = (filters.page - 1) * filters.pageSize;
-    const rows = filtered.slice(start, start + filters.pageSize);
-    return withLatency({ rows, total: filtered.length, summary });
+    return withLatency({
+      rows: filtered.slice(start, start + filters.pageSize),
+      total: filtered.length,
+      summary,
+    });
   }
+
+  getById(id: string): Promise<SaleDetail | null> {
+    const row = this.rows.find((r) => r.id === id || r.id.replace("#", "") === id);
+    if (!row) return withLatency(null);
+    return withLatency(mockSaleDetail(row));
+  }
+
+  updateStatuses(ids: string[], status: AdminSaleStatus): Promise<void> {
+    const keys = new Set(ids.map((id) => id.replace("#", "")));
+    this.rows = this.rows.map((r) =>
+      keys.has(r.id.replace("#", "")) ? { ...r, status } : r,
+    );
+    return withLatency(undefined);
+  }
+
+  deleteSales(ids: string[]): Promise<void> {
+    const keys = new Set(ids.map((id) => id.replace("#", "")));
+    this.rows = this.rows.filter((r) => !keys.has(r.id.replace("#", "")));
+    return withLatency(undefined);
+  }
+}
+
+function mockSaleDetail(row: AdminSale): SaleDetail {
+  return {
+    id: row.id.replace("#", ""),
+    customer: {
+      name: row.customerName,
+      rut: row.rut,
+      phone: "",
+      email: "",
+    },
+    advisor: row.advisor,
+    status: toAdvisorStatus(row.status),
+    createdAt: parseAdminDisplayDate(row.date) || row.date,
+    notes: "",
+    lines: Array.from({ length: row.lines }, (_, i) => ({
+      phoneNumber: `569000000${i}`,
+      saleType: adminTypeToCanonical(row.type),
+      status: toAdvisorStatus(row.status),
+    })),
+    history: [{ title: "Venta registrada", user: row.advisor, datetime: new Date().toISOString() }],
+  };
 }
 
 import { getPostgresSalesStore } from "@/repositories/postgres-sales.repository";
 import { hasDatabase } from "@/server/db/client";
 
-/** Fábrica — Supabase/Postgres cuando DATABASE_URL está configurada. */
 export function getAdminSalesRepository(): AdminSalesRepository {
   if (hasDatabase()) {
     const store = getPostgresSalesStore();
-    return { list: (filters) => store.listAdminSales(filters) };
+    return {
+      list: (filters) => store.listAdminSales(filters),
+      getById: (id) => store.getSaleDetail(id),
+      updateStatuses: (ids, status) => store.updateSaleStatuses(ids, status),
+      deleteSales: (ids) => store.deleteSales(ids),
+    };
   }
   return new MockAdminSalesRepository();
 }

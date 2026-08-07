@@ -37,7 +37,15 @@ import { SaleStatusBadge } from "@/components/shared/sale-status-badge";
 import { formatDateTime, formatLongDate } from "@/lib/format";
 import { SALE_TYPE_LABELS, type SaleDetail } from "@/types/sale";
 
-export function SaleDetailView({ sale }: { sale: SaleDetail }) {
+export function SaleDetailView({
+  sale,
+  backHref = "/dashboard/mis-ventas",
+  backLabel = "Volver a Mis ventas",
+}: {
+  sale: SaleDetail;
+  backHref?: string;
+  backLabel?: string;
+}) {
   const deviceCount = sale.lines.filter((l) => l.deviceName).length;
 
   return (
@@ -45,11 +53,11 @@ export function SaleDetailView({ sale }: { sale: SaleDetail }) {
       {/* Header */}
       <div>
         <Link
-          href="/dashboard/mis-ventas"
+          href={backHref}
           className="inline-flex items-center gap-2 text-[14px] font-semibold text-brand transition-colors hover:text-brand-hover"
         >
           <ArrowLeft className="size-4" />
-          Volver a Mis ventas
+          {backLabel}
         </Link>
 
         <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

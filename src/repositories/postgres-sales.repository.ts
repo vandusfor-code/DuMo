@@ -5,11 +5,15 @@ import type {
   AdminCommissionResult,
   AdminCommissionStatus,
 } from "@/types/admin-commission";
+import {
+  filterAdminSales,
+  summarizeAdminSales,
+} from "@/lib/admin-sales-filter";
 import type {
   AdminSale,
+  AdminSaleStatus,
   AdminSalesFilters,
   AdminSalesResult,
-  AdminSalesSummary,
 } from "@/types/admin-sale";
 import type { AdminDashboardData } from "@/types/admin-dashboard";
 import type { Commission } from "@/types/commission";
@@ -178,19 +182,6 @@ function rowToAdminSale(
 async function loadPlanValueIndex() {
   const config = await getCommercialConfigurationRepository().getSnapshot();
   return buildPlanValueIndex(config.plans);
-}
-
-function summarizeAdmin(rows: AdminSale[]): AdminSalesSummary {
-  const s: AdminSalesSummary = {
-    total: rows.length,
-    registrada: 0,
-    en_reparto: 0,
-    finalizada: 0,
-    rechazada: 0,
-    cancelada: 0,
-  };
-  for (const r of rows) s[r.status] += 1;
-  return s;
 }
 
 async function fetchSalesWithLineCounts(
@@ -371,34 +362,45 @@ export class PostgresSalesStore {
   async listAdminSales(filters: AdminSalesFilters): Promise<AdminSalesResult> {
     const planIndex = await loadPlanValueIndex();
     const rows = await fetchSalesWithLineCounts();
-    const q = filters.search.trim().toLowerCase();
-    const filtered = rows
-      .map((r) => rowToAdminSale(r, planIndex))
-      .filter((r) => {
-        if (filters.status !== "all" && r.status !== filters.status) return false;
-        if (filters.advisor !== "all" && r.advisor !== filters.advisor) return false;
-        if (filters.type !== "all" && r.type !== filters.type) return false;
-        if (
-          q &&
-          !(
-            r.customerName.toLowerCase().includes(q) ||
-            r.rut.toLowerCase().includes(q) ||
-            r.id.toLowerCase().includes(q) ||
-            r.plan.toLowerCase().includes(q)
-          )
-        ) {
-          return false;
-        }
-        return true;
-      });
-
-    const summary = summarizeAdmin(filtered);
+    const mapped = rows.map((r) => rowToAdminSale(r, planIndex));
+    const filtered = filterAdminSales(mapped, filters);
+    const summary = summarizeAdminSales(filtered);
     const start = (filters.page - 1) * filters.pageSize;
     return {
       rows: filtered.slice(start, start + filters.pageSize),
       total: filtered.length,
       summary,
     };
+  }
+
+  async updateSaleStatuses(ids: string[], status: AdminSaleStatus): Promise<void> {
+    await ensureSchema();
+    const sql = getSql();
+    if (!sql) throw new Error("Base de datos no configurada");
+    if (ids.length === 0) return;
+
+    const normalized = [...new Set(ids.map((id) => id.replace(/^#/, "")))];
+    await withDbRetry(async () => {
+      for (const id of normalized) {
+        await sql`UPDATE sales SET status = ${status} WHERE id = ${id}`;
+        await sql`UPDATE sale_lines SET status = ${status} WHERE sale_id = ${id}`;
+      }
+    });
+  }
+
+  async deleteSales(ids: string[]): Promise<void> {
+    await ensureSchema();
+    const sql = getSql();
+    if (!sql) throw new Error("Base de datos no configurada");
+    if (ids.length === 0) return;
+
+    const normalized = [...new Set(ids.map((id) => id.replace(/^#/, "")))];
+    await withDbRetry(async () => {
+      for (const id of normalized) {
+        await sql`DELETE FROM sale_lines WHERE sale_id = ${id}`;
+        await sql`DELETE FROM sales WHERE id = ${id}`;
+      }
+    });
   }
 
   async listAdminCommissions(filters: AdminCommissionFilters): Promise<AdminCommissionResult> {

@@ -19,23 +19,23 @@ import {
   type AdminSaleType,
 } from "@/types/admin-sale";
 
-export const ADVISOR_OPTIONS = [
-  "María López",
-  "Laura Torres",
-  "Andrea Ruiz",
-  "Carolina Díaz",
-  "Paula Gómez",
-  "Sofía Hernández",
-];
-
 export interface AppliedFilters {
   search: string;
   status: AdminSaleStatus | "all";
   advisor: string | "all";
   type: AdminSaleType | "all";
+  dateFrom: string;
+  dateTo: string;
 }
 
-const EMPTY: AppliedFilters = { search: "", status: "all", advisor: "all", type: "all" };
+export const EMPTY_FILTERS: AppliedFilters = {
+  search: "",
+  status: "all",
+  advisor: "all",
+  type: "all",
+  dateFrom: "",
+  dateTo: "",
+};
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -47,13 +47,15 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export function AdminSalesFilters({
+  advisors,
   onApply,
   onClear,
 }: {
+  advisors: { id: string; name: string }[];
   onApply: (f: AppliedFilters) => void;
   onClear: () => void;
 }) {
-  const [draft, setDraft] = useState<AppliedFilters>(EMPTY);
+  const [draft, setDraft] = useState<AppliedFilters>(EMPTY_FILTERS);
   const set = (patch: Partial<AppliedFilters>) => setDraft((d) => ({ ...d, ...patch }));
 
   return (
@@ -64,11 +66,11 @@ export function AdminSalesFilters({
           Filtros
         </h3>
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="default">
+          <Button variant="outline" size="default" disabled title="Próximamente">
             <Download className="size-[18px]" />
             Exportar
           </Button>
-          <Button size="default">
+          <Button size="default" disabled title="Próximamente">
             <Plus className="size-[18px]" />
             Nueva venta
           </Button>
@@ -89,10 +91,20 @@ export function AdminSalesFilters({
         </Field>
 
         <Field label="Fecha desde">
-          <Input type="date" defaultValue="2025-07-01" className="h-11 text-[14px]" />
+          <Input
+            type="date"
+            value={draft.dateFrom}
+            onChange={(e) => set({ dateFrom: e.target.value })}
+            className="h-11 text-[14px]"
+          />
         </Field>
         <Field label="Fecha hasta">
-          <Input type="date" defaultValue="2025-08-03" className="h-11 text-[14px]" />
+          <Input
+            type="date"
+            value={draft.dateTo}
+            onChange={(e) => set({ dateTo: e.target.value })}
+            className="h-11 text-[14px]"
+          />
         </Field>
 
         <Field label="Estado">
@@ -116,8 +128,8 @@ export function AdminSalesFilters({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas las asesoras</SelectItem>
-              {ADVISOR_OPTIONS.map((a) => (
-                <SelectItem key={a} value={a}>{a}</SelectItem>
+              {advisors.map((a) => (
+                <SelectItem key={a.id} value={a.name}>{a.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -142,7 +154,7 @@ export function AdminSalesFilters({
         <Button
           variant="secondary"
           onClick={() => {
-            setDraft(EMPTY);
+            setDraft(EMPTY_FILTERS);
             onClear();
           }}
         >

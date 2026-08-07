@@ -48,6 +48,8 @@ export interface AdminSalesFilters {
   status: AdminSaleStatus | "all";
   advisor: string | "all";
   type: AdminSaleType | "all";
+  dateFrom?: string;
+  dateTo?: string;
   page: number;
   pageSize: number;
 }

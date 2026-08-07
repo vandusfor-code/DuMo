@@ -72,4 +72,4 @@ function buildAll(): AdminSale[] {
   return rows;
 }
 
-export const ADMIN_SALES_MOCK: AdminSale[] = [];
+export const ADMIN_SALES_MOCK: AdminSale[] = buildAll();

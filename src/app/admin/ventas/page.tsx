@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import {
   AdminSalesFilters,
+  EMPTY_FILTERS,
   type AppliedFilters,
 } from "@/components/admin/admin-sales-filters";
 import { AdminSalesKpis } from "@/components/admin/admin-sales-kpis";
@@ -11,15 +12,22 @@ import { AdminSalesTable } from "@/components/admin/admin-sales-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/shared/error-state";
 import { useAdminSales } from "@/hooks/use-admin-sales";
+import { useAdminAdvisors } from "@/hooks/use-admin-users";
 import type { AdminSalesFilters as Filters } from "@/types/admin-sale";
 
-const DEFAULT: AppliedFilters = { search: "", status: "all", advisor: "all", type: "all" };
-
 export default function AdminVentasPage() {
-  const [applied, setApplied] = useState<AppliedFilters>(DEFAULT);
+  const [applied, setApplied] = useState<AppliedFilters>(EMPTY_FILTERS);
   const [page, setPage] = useState(1);
+  const { data: advisorsResult } = useAdminAdvisors();
+  const advisors = advisorsResult?.rows ?? [];
 
-  const filters: Filters = { ...applied, page, pageSize: 10 };
+  const filters: Filters = {
+    ...applied,
+    dateFrom: applied.dateFrom || undefined,
+    dateTo: applied.dateTo || undefined,
+    page,
+    pageSize: 10,
+  };
   const { data, isLoading, isError, refetch } = useAdminSales(filters);
 
   const apply = (f: AppliedFilters) => {
@@ -27,7 +35,7 @@ export default function AdminVentasPage() {
     setPage(1);
   };
   const clear = () => {
-    setApplied(DEFAULT);
+    setApplied(EMPTY_FILTERS);
     setPage(1);
   };
 
@@ -39,7 +47,7 @@ export default function AdminVentasPage() {
       />
 
       <div className="space-y-5">
-        <AdminSalesFilters onApply={apply} onClear={clear} />
+        <AdminSalesFilters advisors={advisors} onApply={apply} onClear={clear} />
 
         {isError && !data ? (
           <ErrorState title="No se pudieron cargar las ventas" onRetry={() => refetch()} />
