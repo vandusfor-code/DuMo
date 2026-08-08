@@ -78,7 +78,44 @@ async function notifyDuMo(session, body) {
   }
 }
 
-async function startBaileys(session) {
+function digitsFromJid(jid) {
+  if (!jid || typeof jid !== "string") return "";
+  return (jid.split("@")[0] ?? "").replace(/\D/g, "");
+}
+
+/** Teléfono real + JID para responder (Baileys usa @lid cuando oculta el número). */
+function extractInboundSender(msg) {
+  const key = msg.key ?? {};
+  const remoteJid = key.remoteJid ?? "";
+  const remoteJidAlt = key.remoteJidAlt ?? "";
+  const senderPn = key.senderPn ?? "";
+
+  let senderJid = remoteJid;
+  let fromDigits = digitsFromJid(remoteJid);
+
+  if (remoteJidAlt.includes("@s.whatsapp.net")) {
+    const altDigits = digitsFromJid(remoteJidAlt);
+    if (altDigits.length >= 8 && altDigits.length <= 13) {
+      fromDigits = altDigits;
+    }
+    if (remoteJid.endsWith("@lid")) {
+      senderJid = remoteJid;
+    } else {
+      senderJid = remoteJidAlt;
+    }
+  } else if (String(senderPn).includes("@s.whatsapp.net")) {
+    const pnDigits = digitsFromJid(senderPn);
+    if (pnDigits.length >= 8 && pnDigits.length <= 13) {
+      fromDigits = pnDigits;
+      senderJid = senderPn;
+    }
+  }
+
+  if (!senderJid && remoteJid) senderJid = remoteJid;
+
+  return { from: fromDigits, senderJid: senderJid || undefined };
+}
+
   const dir = path.join(SESSIONS_DIR, session.channelId);
   fs.mkdirSync(dir, { recursive: true });
 
@@ -140,8 +177,8 @@ async function startBaileys(session) {
     if (type !== "notify") return;
     for (const msg of messages) {
       if (msg.key.fromMe) continue;
-      const from = msg.key.remoteJid?.replace("@s.whatsapp.net", "").replace(/\D/g, "");
-      if (!from) continue;
+      const { from, senderJid } = extractInboundSender(msg);
+      if (!from && !senderJid) continue;
 
       const text =
         msg.message?.conversation ??
@@ -154,6 +191,7 @@ async function startBaileys(session) {
         payload: {
           channelId: session.channelId,
           from,
+          senderJid,
           messageId: msg.key.id ?? `qr-${Date.now()}`,
           timestamp: Number(msg.messageTimestamp ?? Math.floor(Date.now() / 1000)),
           type: msg.message?.imageMessage ? "image" : "text",
@@ -228,15 +266,30 @@ app.delete("/sessions/:sessionId", auth, async (req, res) => {
   res.json({ ok: true });
 });
 
+function resolveTargetJid({ to, jid }) {
+  if (typeof jid === "string" && jid.includes("@")) return jid;
+  const digits = String(to ?? jid ?? "").replace(/\D/g, "");
+  if (!digits) throw new Error("Destino inválido");
+  if (digits.length >= 14) return `${digits}@lid`;
+  return `${digits}@s.whatsapp.net`;
+}
+
 app.post("/send", auth, async (req, res) => {
-  const { channelId, to, text } = req.body ?? {};
+  const { channelId, to, jid, text } = req.body ?? {};
   const sessionId = `bridge-${channelId}`;
   const session = sessions.get(sessionId);
   if (!session?.sock) return res.status(503).json({ error: "Sesión no conectada" });
 
-  const jid = `${String(to).replace(/\D/g, "")}@s.whatsapp.net`;
-  const sent = await session.sock.sendMessage(jid, { text: text ?? "" });
-  res.json({ id: sent?.key?.id ?? `out-${Date.now()}` });
+  try {
+    const targetJid = resolveTargetJid({ to, jid });
+    const sent = await session.sock.sendMessage(targetJid, { text: text ?? "" });
+    res.json({ id: sent?.key?.id ?? `out-${Date.now()}`, jid: targetJid });
+  } catch (err) {
+    log.error({ err, channelId, to, jid }, "sendMessage falló");
+    res.status(502).json({
+      error: err instanceof Error ? err.message : "No se pudo enviar por WhatsApp Web",
+    });
+  }
 });
 
 app.get("/health", (_req, res) => {

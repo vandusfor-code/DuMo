@@ -78,12 +78,13 @@ export async function bridgeDisconnectSession(sessionId: string): Promise<void> 
 
 export async function bridgeSendText(input: {
   channelId: string;
-  to: string;
+  to?: string;
+  jid?: string;
   text: string;
 }): Promise<{ id: string }> {
   return bridgeFetch("/send", {
     method: "POST",
-    body: JSON.stringify({ ...input, type: "text" }),
+    body: JSON.stringify(input),
   });
 }
 

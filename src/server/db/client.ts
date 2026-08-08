@@ -144,6 +144,7 @@ const REQUIRED_COLUMNS = [
   "lead_conversations.assigned_advisor_name",
   "lead_conversations.admin_status",
   "lead_conversations.last_message_direction",
+  "lead_conversations.wa_chat_jid",
   "lead_messages.conversation_id",
   "connected_numbers.access_token",
   "lead_notes.conversation_id",
@@ -338,6 +339,7 @@ async function runMigrations(sql: Sql) {
     await tx`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS admin_status text DEFAULT 'nuevo'`;
     await tx`UPDATE lead_conversations SET admin_status = 'nuevo' WHERE admin_status IS NULL`;
     await tx`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS last_message_direction text DEFAULT 'in'`;
+    await tx`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS wa_chat_jid text`;
     await tx`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at timestamptz`;
     await tx`ALTER TABLE users ADD COLUMN IF NOT EXISTS monthly_sales_goal integer`;
     await tx`

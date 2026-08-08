@@ -3,8 +3,10 @@ import type { ChatMessage, Conversation, ConversationStatus } from "@/types/conv
 import { CONVERSATIONS_MOCK, getMockMessages } from "@/data/mock/leads.mock";
 import { withLatency } from "@/lib/mock";
 import { formatChatTime } from "@/lib/format";
-import { isMessengerConversation } from "@/lib/messenger/conversation-id";
 import { resolveConversationChannel } from "@/lib/conversation-channel";
+import { isMessengerConversation } from "@/lib/messenger/conversation-id";
+import { isWebQrConversation } from "@/lib/web-qr/conversation-id";
+import { formatWhatsAppDisplayPhone, isLikelyWhatsAppLid } from "@/lib/whatsapp/phone";
 import { ensureSchema, getSql, hasDatabase, withDbRetry, withQueryTimeout } from "@/server/db/client";
 
 /** Un mensaje entrante/saliente a persistir. */
@@ -21,6 +23,8 @@ export interface IncomingMessage {
   messageType?: "text" | "image";
   mediaAssetId?: string;
   caption?: string;
+  /** JID de WhatsApp Web para responder (solo canal WEB_QR). */
+  waChatJid?: string;
   companyId?: string;
 }
 
@@ -41,6 +45,8 @@ export interface ConversationRepository {
   markRead(conversationId: string): Promise<void>;
   /** phone_number_id de DuMo por el que se debe responder esa conversación. */
   getSendFromPhoneId(conversationId: string): Promise<string | null>;
+  getWaChatJid(conversationId: string): Promise<string | null>;
+  findConversationIdByWaChatJid(waChatJid: string): Promise<string | null>;
   /** Token de envío registrado para un phone_number_id conectado. */
   getAccessTokenForPhoneId(phoneNumberId: string): Promise<string | null>;
   /** phone_number_id registrados como conectados a DuMo (números activos). */
@@ -64,6 +70,12 @@ class MockConversationRepository implements ConversationRepository {
     return Promise.resolve();
   }
   getSendFromPhoneId() {
+    return Promise.resolve(null);
+  }
+  getWaChatJid() {
+    return Promise.resolve(null);
+  }
+  findConversationIdByWaChatJid() {
     return Promise.resolve(null);
   }
   getAccessTokenForPhoneId() {
@@ -133,19 +145,26 @@ class PostgresConversationRepository implements ConversationRepository {
       ),
       8000,
     );
-    return (rows as unknown as ConvRow[]).map((r) => ({
-      id: r.id,
-      customerName: r.customer_name || r.phone,
-      phone: r.phone,
-      rut: "",
-      channel: resolveConversationChannel(r.id),
-      lastMessage: r.last_message,
-      lastMessageTime: formatChatTime(r.last_message_at),
-      lastMessageDirection: r.last_message_direction === "out" ? "out" : "in",
-      unread: Number(r.unread) || 0,
-      status: toStatus(r.status),
-      online: Boolean(r.online),
-    }));
+    return (rows as unknown as ConvRow[]).map((r) => {
+      const formattedPhone = formatWhatsAppDisplayPhone(r.phone);
+      const displayName =
+        r.customer_name?.trim() ||
+        formattedPhone ||
+        (isWebQrConversation(r.id) && isLikelyWhatsAppLid(r.phone) ? "Contacto WhatsApp" : r.phone);
+      return {
+        id: r.id,
+        customerName: displayName,
+        phone: formattedPhone || r.phone,
+        rut: "",
+        channel: resolveConversationChannel(r.id),
+        lastMessage: r.last_message,
+        lastMessageTime: formatChatTime(r.last_message_at),
+        lastMessageDirection: r.last_message_direction === "out" ? "out" : "in",
+        unread: Number(r.unread) || 0,
+        status: toStatus(r.status),
+        online: Boolean(r.online),
+      };
+    });
   }
 
   async getMessages(conversationId: string): Promise<ChatMessage[]> {
@@ -188,21 +207,32 @@ class PostgresConversationRepository implements ConversationRepository {
 
     await sql`
       INSERT INTO lead_conversations
-        (id, phone, customer_name, last_message, last_message_at, unread, status, online, dumo_phone_id, last_message_direction)
+        (id, phone, customer_name, last_message, last_message_at, unread, status, online, dumo_phone_id, last_message_direction, wa_chat_jid)
       VALUES (
         ${msg.conversationId}, ${msg.phone}, ${msg.customerName},
         ${msg.body}, ${msg.createdAt}, ${incUnread}, 'new', ${msg.direction === "in"},
-        ${msg.dumoPhoneId ?? null}, ${msg.direction}
+        ${msg.dumoPhoneId ?? null}, ${msg.direction}, ${msg.waChatJid ?? null}
       )
       ON CONFLICT (id) DO UPDATE SET
         last_message = EXCLUDED.last_message,
         last_message_at = EXCLUDED.last_message_at,
         last_message_direction = EXCLUDED.last_message_direction,
         unread = lead_conversations.unread + ${incUnread},
-        online = ${msg.direction === "in"},
+        online = CASE
+          WHEN ${msg.direction === "in"} THEN true
+          ELSE lead_conversations.online END,
         customer_name = CASE
-          WHEN lead_conversations.customer_name = '' THEN EXCLUDED.customer_name
+          WHEN lead_conversations.customer_name = '' OR lead_conversations.customer_name IS NULL
+            THEN EXCLUDED.customer_name
           ELSE lead_conversations.customer_name END,
+        phone = CASE
+          WHEN length(regexp_replace(EXCLUDED.phone, '\\D', '', 'g')) <= 13
+            AND length(regexp_replace(lead_conversations.phone, '\\D', '', 'g')) >= 14
+            THEN EXCLUDED.phone
+          WHEN lead_conversations.phone = '' OR lead_conversations.phone IS NULL
+            THEN EXCLUDED.phone
+          ELSE lead_conversations.phone END,
+        wa_chat_jid = COALESCE(EXCLUDED.wa_chat_jid, lead_conversations.wa_chat_jid),
         dumo_phone_id = COALESCE(lead_conversations.dumo_phone_id, EXCLUDED.dumo_phone_id)
     `;
 
@@ -234,6 +264,34 @@ class PostgresConversationRepository implements ConversationRepository {
       SELECT dumo_phone_id FROM lead_conversations WHERE id = ${conversationId}
     `) as unknown as { dumo_phone_id: string | null }[];
     return rows[0]?.dumo_phone_id ?? null;
+  }
+
+  async getWaChatJid(conversationId: string): Promise<string | null> {
+    await ensureSchema();
+    const sql = getSql()!;
+    try {
+      const rows = (await sql`
+        SELECT wa_chat_jid FROM lead_conversations WHERE id = ${conversationId}
+      `) as unknown as { wa_chat_jid: string | null }[];
+      return rows[0]?.wa_chat_jid?.trim() || null;
+    } catch {
+      return null;
+    }
+  }
+
+  async findConversationIdByWaChatJid(waChatJid: string): Promise<string | null> {
+    await ensureSchema();
+    const sql = getSql()!;
+    try {
+      const rows = (await sql`
+        SELECT id FROM lead_conversations
+        WHERE wa_chat_jid = ${waChatJid}
+        LIMIT 1
+      `) as unknown as { id: string }[];
+      return rows[0]?.id ?? null;
+    } catch {
+      return null;
+    }
   }
 
   async getAccessTokenForPhoneId(phoneNumberId: string): Promise<string | null> {

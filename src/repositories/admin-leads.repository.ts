@@ -16,6 +16,8 @@ import { getAuthRepository } from "@/repositories/auth.repository";
 import { getConversationRepository } from "@/repositories/conversation.repository";
 import { formatChatTime } from "@/lib/format";
 import { resolveConversationChannel } from "@/lib/conversation-channel";
+import { isWebQrConversation } from "@/lib/web-qr/conversation-id";
+import { formatWhatsAppDisplayPhone, isLikelyWhatsAppLid } from "@/lib/whatsapp/phone";
 import { withLatency } from "@/lib/mock";
 import { getConfig, setConfig } from "@/server/db/app-config";
 import { ensureSchema, getSql, hasDatabase, withDbRetry, withQueryTimeout } from "@/server/db/client";
@@ -77,10 +79,16 @@ function toAdminStatus(value: string): AdminLeadStatus {
 }
 
 function mapConversation(r: ConvRow): AdminConversation {
+  const formattedPhone = formatWhatsAppDisplayPhone(r.phone);
+  const displayName =
+    r.customer_name?.trim() ||
+    formattedPhone ||
+    (isWebQrConversation(r.id) && isLikelyWhatsAppLid(r.phone) ? "Contacto WhatsApp" : r.phone);
+
   return {
     id: r.id,
-    customerName: r.customer_name || r.phone,
-    phone: r.phone,
+    customerName: displayName,
+    phone: formattedPhone || r.phone,
     rut: "",
     channel: resolveConversationChannel(r.id),
     lastMessage: r.last_message,

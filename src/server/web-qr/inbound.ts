@@ -1,31 +1,64 @@
 import "server-only";
 import { webQrConversationId } from "@/lib/web-qr/conversation-id";
+import { isLikelyWhatsAppLid } from "@/lib/whatsapp/phone";
+import { getConversationRepository } from "@/repositories/conversation.repository";
 import { leadsService } from "@/services/leads.service";
 import type { BridgeInboundPayload } from "@/server/web-qr/types";
 
-export async function persistWebQrInbound(payload: BridgeInboundPayload): Promise<void> {
-  const phone = payload.from.replace(/\D/g, "");
-  if (!phone) return;
+async function resolveWebQrConversationId(
+  phone: string,
+  senderJid?: string,
+): Promise<{ conversationId: string; phone: string }> {
+  const repo = getConversationRepository();
+  const digits = phone.replace(/\D/g, "");
 
-  const conversationId = webQrConversationId(phone);
+  if (senderJid?.trim()) {
+    const existing = await repo.findConversationIdByWaChatJid(senderJid.trim());
+    if (existing) {
+      return {
+        conversationId: existing,
+        phone: digits && !isLikelyWhatsAppLid(digits) ? digits : phone,
+      };
+    }
+  }
+
+  if (digits && !isLikelyWhatsAppLid(digits)) {
+    return { conversationId: webQrConversationId(digits), phone: digits };
+  }
+
+  const fallback = digits || senderJid?.split("@")[0]?.replace(/\D/g, "") || "";
+  return { conversationId: webQrConversationId(fallback), phone: fallback };
+}
+
+export async function persistWebQrInbound(payload: BridgeInboundPayload): Promise<void> {
+  const { conversationId, phone } = await resolveWebQrConversationId(
+    payload.from,
+    payload.senderJid,
+  );
+  if (!conversationId.replace(/^webqr:/, "")) return;
+
   const createdAt = new Date(payload.timestamp * 1000).toISOString();
 
   let body = payload.text?.trim() ?? "";
   let messageType: "text" | "image" = "text";
 
+  const baseMessage = {
+    waMessageId: payload.messageId,
+    conversationId,
+    phone,
+    customerName: payload.customerName ?? "",
+    direction: "in" as const,
+    createdAt,
+    dumoPhoneId: payload.channelId,
+    waChatJid: payload.senderJid?.trim() || undefined,
+  };
+
   if (payload.type === "image" && payload.mediaUrl) {
     messageType = "image";
     body = payload.caption?.trim() || "📷 Imagen";
-    // Imagen vía URL del bridge — persistimos preview; media completa en fase 2
     await leadsService.receiveMessage({
-      waMessageId: payload.messageId,
-      conversationId,
-      phone,
-      customerName: payload.customerName ?? "",
+      ...baseMessage,
       body,
-      direction: "in",
-      createdAt,
-      dumoPhoneId: payload.channelId,
       messageType,
     });
     return;
@@ -37,14 +70,8 @@ export async function persistWebQrInbound(payload: BridgeInboundPayload): Promis
   if (!body) return;
 
   await leadsService.receiveMessage({
-    waMessageId: payload.messageId,
-    conversationId,
-    phone,
-    customerName: payload.customerName ?? "",
+    ...baseMessage,
     body,
-    direction: "in",
-    createdAt,
-    dumoPhoneId: payload.channelId,
     messageType: "text",
   });
 }
