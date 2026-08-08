@@ -38,14 +38,23 @@ export async function POST(request: NextRequest) {
 
   if (body.type === "session.connected" && body.channelId && body.phoneNumber) {
     await webQrRepository.updateChannelStatus(body.channelId, "CONNECTED", body.phoneNumber);
+    await webQrRepository.updateSessionBridge({
+      channelId: body.channelId,
+      bridgeSessionId: `bridge-${body.channelId}`,
+    });
     if (body.sessionData) {
       await webQrRepository.saveSessionData(body.channelId, body.sessionData);
     }
     return NextResponse.json({ ok: true });
   }
 
-  if (body.type === "session.disconnected" && body.channelId) {
+  if (body.type === "session.loggedOut" && body.channelId) {
     await webQrRepository.clearWebQrSession(body.channelId);
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body.type === "session.disconnected" && body.channelId) {
+    await webQrRepository.updateChannelStatus(body.channelId, "DISCONNECTED");
     return NextResponse.json({ ok: true });
   }
 

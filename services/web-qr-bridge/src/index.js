@@ -184,11 +184,24 @@ async function waitForConnected(session, maxSeconds = 20) {
 }
 
 async function startBaileys(session) {
-  const dir = path.join(SESSIONS_DIR, session.channelId);
-  fs.mkdirSync(dir, { recursive: true });
+  if (session.starting) return;
+  session.starting = true;
 
-  const { state, saveCreds } = await useMultiFileAuthState(dir);
-  const { version } = await fetchLatestBaileysVersion();
+  try {
+    if (session.sock) {
+      try {
+        session.sock.end(undefined);
+      } catch {
+        /* socket previo ya cerrado */
+      }
+      session.sock = null;
+    }
+
+    const dir = path.join(SESSIONS_DIR, session.channelId);
+    fs.mkdirSync(dir, { recursive: true });
+
+    const { state, saveCreds } = await useMultiFileAuthState(dir);
+    const { version } = await fetchLatestBaileysVersion();
 
   const sock = makeWASocket({
     version,
@@ -234,9 +247,9 @@ async function startBaileys(session) {
       session.sock = null;
       session.qrDataUrl = null;
       session.phoneNumber = null;
-      await notifyDuMo(session, { type: "session.disconnected", channelId: session.channelId });
 
       if (code === DisconnectReason.loggedOut) {
+        await notifyDuMo(session, { type: "session.loggedOut", channelId: session.channelId });
         log.info({ channelId: session.channelId }, "sesión cerrada desde el teléfono — borrando credenciales");
         sessions.delete(session.sessionId);
         try {
@@ -247,10 +260,10 @@ async function startBaileys(session) {
         return;
       }
 
-      if (code !== DisconnectReason.loggedOut) {
-        log.info({ channelId: session.channelId, code }, "reconectando Baileys…");
-        setTimeout(() => startBaileys(session).catch((e) => log.error(e)), 3000);
-      }
+      await notifyDuMo(session, { type: "session.disconnected", channelId: session.channelId });
+
+      log.info({ channelId: session.channelId, code }, "reconectando Baileys…");
+      setTimeout(() => startBaileys(session).catch((e) => log.error(e)), 3000);
     }
   });
 
@@ -282,6 +295,9 @@ async function startBaileys(session) {
       });
     }
   });
+  } finally {
+    session.starting = false;
+  }
 }
 
 const app = express();

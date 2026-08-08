@@ -21,18 +21,14 @@ async function ensureBridgeSession(input: {
   webhookSecret: string;
 }) {
   const existing = await webQrRepository.getSessionByChannel(input.channelId);
-  let bridgeSessionId = existing?.bridgeSessionId ?? null;
+  let bridgeSessionId = existing?.bridgeSessionId ?? `bridge-${input.channelId}`;
 
-  if (bridgeSessionId) {
-    const live = await bridgeGetSessionStatusOrNull(bridgeSessionId);
-    if (live) return { bridgeSessionId, status: live };
-    // Bridge reinició — recrear sesión
-    bridgeSessionId = null;
-    await webQrRepository.updateSessionBridge({
-      channelId: input.channelId,
-      bridgeSessionId: "",
-      sessionData: {},
-    });
+  const live = await bridgeGetSessionStatusOrNull(bridgeSessionId);
+  if (live?.status === "CONNECTED" || live?.status === "QR_PENDING" || live?.status === "INITIALIZING") {
+    if (!existing?.bridgeSessionId) {
+      await webQrRepository.updateSessionBridge({ channelId: input.channelId, bridgeSessionId });
+    }
+    return { bridgeSessionId, status: live };
   }
 
   const created = await bridgeCreateSession({
@@ -128,15 +124,17 @@ export async function GET(_request: Request, { params }: RouteCtx) {
   }
 
   const dbSession = await webQrRepository.getSessionByChannel(channelId);
-  if (!dbSession?.bridgeSessionId) {
+  const bridgeSessionId = dbSession?.bridgeSessionId ?? `bridge-${channelId}`;
+
+  if (!webQrConfigured()) {
     return NextResponse.json({
       channelId,
-      status: channel.status === "CONNECTED" ? "CONNECTED" : "DISCONNECTED",
+      status: channel.status,
       qrDataUrl: null,
     });
   }
 
-  const status = await bridgeGetSessionStatusOrNull(dbSession.bridgeSessionId);
+  const status = await bridgeGetSessionStatusOrNull(bridgeSessionId);
   if (!status) {
     await webQrRepository.updateChannelStatus(channelId, "DISCONNECTED");
     return NextResponse.json({
@@ -148,6 +146,7 @@ export async function GET(_request: Request, { params }: RouteCtx) {
   }
   if (status.status === "CONNECTED" && status.phoneNumber) {
     await webQrRepository.updateChannelStatus(channelId, "CONNECTED", status.phoneNumber);
+    await webQrRepository.updateSessionBridge({ channelId, bridgeSessionId });
   } else if (status.status === "DISCONNECTED") {
     await webQrRepository.updateChannelStatus(channelId, "DISCONNECTED");
   } else if (status.status === "QR_PENDING" || status.status === "INITIALIZING") {
@@ -156,7 +155,7 @@ export async function GET(_request: Request, { params }: RouteCtx) {
 
   return NextResponse.json({
     channelId,
-    bridgeSessionId: dbSession.bridgeSessionId,
+    bridgeSessionId,
     bridgeUrl: webQrBridgeUrl(),
     ...status,
   });
