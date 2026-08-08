@@ -2,6 +2,7 @@ import "server-only";
 import { webQrConversationId } from "@/lib/web-qr/conversation-id";
 import { resolveWhatsAppWebSendJid } from "@/lib/whatsapp/phone";
 import { bridgeSendText } from "@/server/web-qr/bridge-client";
+import { ensureWebQrBridgeReady } from "@/server/web-qr/ensure-session";
 import { getConversationRepository } from "@/repositories/conversation.repository";
 
 export async function sendWebQrText(input: {
@@ -17,6 +18,8 @@ export async function sendWebQrText(input: {
     webQrConversationId(input.to).replace(/^webqr:/, "") ||
     input.to.replace(/\D/g, "");
   const jid = resolveWhatsAppWebSendJid(phone, storedJid);
+
+  await ensureWebQrBridgeReady(input.channelId);
 
   const sent = await bridgeSendText({
     channelId: input.channelId,

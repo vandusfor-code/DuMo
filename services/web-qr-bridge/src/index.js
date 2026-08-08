@@ -116,6 +116,73 @@ function extractInboundSender(msg) {
   return { from: fromDigits, senderJid: senderJid || undefined };
 }
 
+function hasPersistedCreds(channelId) {
+  return fs.existsSync(path.join(SESSIONS_DIR, channelId, "creds.json"));
+}
+
+function createSessionRuntime(channelId, overrides = {}) {
+  const sessionId = `bridge-${channelId}`;
+  return {
+    sessionId,
+    channelId,
+    label: overrides.label ?? channelId,
+    webhookUrl: overrides.webhookUrl ?? process.env.DUMO_WEBHOOK_URL ?? "",
+    webhookSecret: overrides.webhookSecret ?? process.env.DUMO_WEBHOOK_SECRET ?? "",
+    status: "INITIALIZING",
+    qrDataUrl: null,
+    phoneNumber: null,
+    sock: null,
+    lastError: null,
+  };
+}
+
+function bootstrapSession(channelId, overrides = {}) {
+  const sessionId = `bridge-${channelId}`;
+  let session = sessions.get(sessionId);
+  if (!session) {
+    session = createSessionRuntime(channelId, overrides);
+    sessions.set(sessionId, session);
+  }
+  if (!session.sock) {
+    startBaileys(session).catch((err) => {
+      session.lastError = err instanceof Error ? err.message : String(err);
+      log.error({ err, channelId }, "startBaileys falló");
+    });
+  }
+  return session;
+}
+
+function listPersistedChannelIds() {
+  try {
+    return fs
+      .readdirSync(SESSIONS_DIR, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .filter((channelId) => hasPersistedCreds(channelId));
+  } catch {
+    return [];
+  }
+}
+
+function restorePersistedSessions() {
+  const channelIds = listPersistedChannelIds();
+  if (channelIds.length === 0) return;
+  log.info({ count: channelIds.length, channelIds }, "restaurando sesiones QR desde disco");
+  for (const channelId of channelIds) {
+    bootstrapSession(channelId);
+  }
+}
+
+async function waitForConnected(session, maxSeconds = 20) {
+  if (session.sock && session.status === "CONNECTED") return true;
+  for (let i = 0; i < maxSeconds; i++) {
+    await new Promise((r) => setTimeout(r, 1000));
+    if (session.sock && session.status === "CONNECTED") return true;
+    if (session.status === "QR_PENDING") return false;
+  }
+  return session.sock && session.status === "CONNECTED";
+}
+
 async function startBaileys(session) {
   const dir = path.join(SESSIONS_DIR, session.channelId);
   fs.mkdirSync(dir, { recursive: true });
@@ -215,19 +282,18 @@ app.post("/sessions", auth, async (req, res) => {
   let session = sessions.get(sessionId);
   if (!session) {
     log.info({ channelId }, "nueva sesión Baileys");
-    session = {
-      sessionId,
-      channelId,
+    session = createSessionRuntime(channelId, {
       label: label ?? channelId,
       webhookUrl: webhookUrl ?? process.env.DUMO_WEBHOOK_URL ?? "",
       webhookSecret: webhookSecret ?? process.env.DUMO_WEBHOOK_SECRET ?? "",
-      status: "INITIALIZING",
-      qrDataUrl: null,
-      phoneNumber: null,
-      sock: null,
-      lastError: null,
-    };
+    });
     sessions.set(sessionId, session);
+    startBaileys(session).catch((err) => {
+      session.lastError = err instanceof Error ? err.message : String(err);
+      log.error({ err, channelId }, "startBaileys falló");
+    });
+  } else if (!session.sock && session.status !== "QR_PENDING") {
+    log.info({ channelId }, "reiniciando sesión Baileys en memoria");
     startBaileys(session).catch((err) => {
       session.lastError = err instanceof Error ? err.message : String(err);
       log.error({ err, channelId }, "startBaileys falló");
@@ -277,9 +343,34 @@ function resolveTargetJid({ to, jid }) {
 
 app.post("/send", auth, async (req, res) => {
   const { channelId, to, jid, text } = req.body ?? {};
+  if (!channelId) return res.status(400).json({ error: "channelId requerido" });
+
   const sessionId = `bridge-${channelId}`;
-  const session = sessions.get(sessionId);
-  if (!session?.sock) return res.status(503).json({ error: "Sesión no conectada" });
+  let session = sessions.get(sessionId);
+
+  if (!session && hasPersistedCreds(channelId)) {
+    session = bootstrapSession(channelId);
+  }
+
+  if (session && !session.sock && session.status !== "QR_PENDING") {
+    startBaileys(session).catch((err) => {
+      session.lastError = err instanceof Error ? err.message : String(err);
+      log.error({ err, channelId }, "startBaileys en /send falló");
+    });
+  }
+
+  if (session && session.status !== "CONNECTED") {
+    const connected = await waitForConnected(session, 20);
+    if (!connected && session.status === "QR_PENDING") {
+      return res.status(503).json({
+        error: "Sesión requiere escanear QR de nuevo",
+      });
+    }
+  }
+
+  if (!session?.sock) {
+    return res.status(503).json({ error: "Sesión no conectada" });
+  }
 
   try {
     const targetJid = resolveTargetJid({ to, jid });
@@ -322,4 +413,5 @@ io.on("connection", (socket) => {
 
 httpServer.listen(PORT, () => {
   log.info(`Web QR Bridge escuchando en :${PORT}`);
+  restorePersistedSessions();
 });
