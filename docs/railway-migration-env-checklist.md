@@ -37,6 +37,14 @@ Copiar de Vercel → Railway CRM (mismo valor, especialmente `AUTH_SECRET`).
 | `WEB_QR_WEBHOOK_SECRET` | = Railway `DUMO_WEBHOOK_SECRET` |
 | `NEXT_PUBLIC_APP_URL` | URL pública del CRM |
 
+### Volumen persistente (obligatorio)
+| Railway | Valor |
+|---------|--------|
+| Volumen montado en | `/data/sessions` |
+| Env `SESSIONS_DIR` | `/data/sessions` |
+
+Sin volumen, cada redeploy/reinicio borra las credenciales Baileys (`persistedSessions: 0` → hay que escanear QR de nuevo). Ver `docs/RAILWAY-VOLUME-PERSISTENCE.md`.
+
 ## App
 | Variable | Notas |
 |----------|--------|
