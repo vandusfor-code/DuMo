@@ -4,6 +4,7 @@ import { CONVERSATIONS_MOCK, getMockMessages } from "@/data/mock/leads.mock";
 import { withLatency } from "@/lib/mock";
 import { formatChatTime } from "@/lib/format";
 import { isMessengerConversation } from "@/lib/messenger/conversation-id";
+import { resolveConversationChannel } from "@/lib/conversation-channel";
 import { ensureSchema, getSql, hasDatabase, withDbRetry, withQueryTimeout } from "@/server/db/client";
 
 /** Un mensaje entrante/saliente a persistir. */
@@ -137,7 +138,7 @@ class PostgresConversationRepository implements ConversationRepository {
       customerName: r.customer_name || r.phone,
       phone: r.phone,
       rut: "",
-      channel: isMessengerConversation(r.id) ? "messenger" : "whatsapp",
+      channel: resolveConversationChannel(r.id),
       lastMessage: r.last_message,
       lastMessageTime: formatChatTime(r.last_message_at),
       lastMessageDirection: r.last_message_direction === "out" ? "out" : "in",

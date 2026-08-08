@@ -49,6 +49,8 @@ export function ConversationItem({
             {conversation.customerName}
             {conversation.channel === "messenger" ? (
               <span className="ml-1.5 text-[10px] font-medium text-brand">Messenger</span>
+            ) : conversation.channel === "web_qr" ? (
+              <span className="ml-1.5 text-[10px] font-medium text-warning-ink">Web</span>
             ) : null}
           </p>
           <span className="shrink-0 text-[11px] text-muted">{conversation.lastMessageTime}</span>

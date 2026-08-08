@@ -9,7 +9,7 @@ export const CONVERSATION_STATUS_LABELS: Record<ConversationStatus, string> = {
 };
 
 /** Canal de origen de la conversación. */
-export type ConversationChannel = "whatsapp" | "messenger";
+export type ConversationChannel = "whatsapp" | "messenger" | "web_qr";
 
 /** Resumen de una conversación en la bandeja. */
 export interface Conversation {

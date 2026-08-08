@@ -154,7 +154,7 @@ function AdminLeadsPageContent() {
                 conversation={selected}
                 messages={messages.data ?? []}
                 isLoading={messages.isLoading}
-                isError={messages.isError}
+                isError={messages.isError && !(messages.data?.length)}
                 errorMessage={
                   messages.error instanceof Error ? messages.error.message : undefined
                 }

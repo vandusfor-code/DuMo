@@ -25,6 +25,8 @@ import {
   isMessengerConversation,
   parseMessengerPsid,
 } from "@/lib/messenger/conversation-id";
+import { isWebQrConversation } from "@/lib/web-qr/conversation-id";
+import { sendWebQrText, resolveWebQrChannelId } from "@/server/web-qr/send";
 import { sendMessengerText } from "@/server/messenger/send";
 import { getMessengerIntegrationConfig } from "@/server/messenger/config";
 
@@ -222,6 +224,20 @@ export const leadsService = {
       return sent;
     }
 
+    if (isWebQrConversation(input.conversationId)) {
+      const channelId = await resolveWebQrChannelId(input.conversationId);
+      if (!channelId) {
+        throw new Error("No se encontró el canal WhatsApp Web de esta conversación.");
+      }
+      return sendWebQrText({
+        channelId,
+        conversationId: input.conversationId,
+        to: input.to,
+        text: input.text,
+        companyId: input.companyId,
+      });
+    }
+
     const version = graphVersion();
     const repo = getConversationRepository();
     const creds = await resolveSendCreds(input.conversationId);
@@ -272,6 +288,9 @@ export const leadsService = {
   async sendMediaMessage(input: SendMediaMessageInput): Promise<{ id: string }> {
     if (isMessengerConversation(input.conversationId)) {
       throw new Error("El envío de imágenes por Messenger aún no está disponible. Usa texto.");
+    }
+    if (isWebQrConversation(input.conversationId)) {
+      throw new Error("El envío de imágenes por WhatsApp Web estará disponible en la siguiente fase.");
     }
     const version = graphVersion();
     const repo = getConversationRepository();

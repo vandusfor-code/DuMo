@@ -4,6 +4,7 @@ import { SEED_ADMIN, seedAdminPasswordHash } from "@/lib/auth/seed-admin";
 import { DEFAULT_COMPANY_ID } from "@/types/tenant";
 import { QUICK_REPLY_REQUIRED_COLUMNS, runQuickReplyAndTenantMigrations } from "@/server/db/migrations/quick-reply-schema";
 import { runTeleprompterScriptMigrations } from "@/server/db/migrations/teleprompter-scripts-schema";
+import { runWebQrMigrations } from "@/server/db/migrations/web-qr-schema";
 
 let sqlSingleton: Sql | null = null;
 let schemaPromise: Promise<void> | null = null;
@@ -54,7 +55,7 @@ export function getSql(): Sql | null {
     // (polling de conversaciones + mensajes + markRead + perfil). Con max:1 se
     // encolaban todas en una sola conexión y bajo latencia de Neon se
     // congestionaban hasta el timeout. Requiere la URI con pooler de Neon.
-    max: Number(process.env.DB_POOL_MAX ?? 3) || 3,
+    max: Number(process.env.DB_POOL_MAX ?? 8) || 8,
     idle_timeout: 20,
     connect_timeout: 15,
     max_lifetime: 60 * 5,
@@ -225,6 +226,16 @@ async function ensureIncrementalMigrations(sql: Sql): Promise<void> {
     `;
     if (!teleprompterRows[0]?.exists) {
       await runTeleprompterScriptMigrations(sql);
+    }
+
+    const webQrRows = await sql<{ exists: boolean }[]>`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'whatsapp_channels'
+      ) AS exists
+    `;
+    if (!webQrRows[0]?.exists) {
+      await runWebQrMigrations(sql);
     }
   } catch (err) {
     console.error("[ensureIncrementalMigrations]", err);
@@ -432,6 +443,7 @@ async function runMigrations(sql: Sql) {
 
     await runQuickReplyAndTenantMigrations(tx);
     await runTeleprompterScriptMigrations(tx);
+    await runWebQrMigrations(tx);
 
     await tx`
       INSERT INTO users (id, username, email, password_hash, name, role, active, avatar_url, company_id)

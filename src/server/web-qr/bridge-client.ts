@@ -1,0 +1,66 @@
+import "server-only";
+import { webQrBridgeSecret, webQrBridgeUrl } from "@/server/web-qr/config";
+import type { BridgeInboundPayload, BridgeSessionStatus } from "@/server/web-qr/types";
+
+async function bridgeFetch<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  const base = webQrBridgeUrl();
+  const secret = webQrBridgeSecret();
+  if (!base || !secret) {
+    throw new Error(
+      "Módulo QR no configurado. Define WEB_QR_BRIDGE_URL y WEB_QR_BRIDGE_SECRET en Vercel.",
+    );
+  }
+
+  const res = await fetch(`${base.replace(/\/$/, "")}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      "X-Web-Qr-Bridge-Secret": secret,
+      ...(init?.headers as Record<string, string> | undefined),
+    },
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`Bridge QR respondió ${res.status}${detail ? `: ${detail.slice(0, 200)}` : ""}`);
+  }
+
+  return (await res.json()) as T;
+}
+
+export async function bridgeCreateSession(input: {
+  channelId: string;
+  label: string;
+  webhookUrl: string;
+  webhookSecret: string;
+}): Promise<{ sessionId: string }> {
+  return bridgeFetch("/sessions", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function bridgeGetSessionStatus(sessionId: string): Promise<BridgeSessionStatus> {
+  return bridgeFetch(`/sessions/${encodeURIComponent(sessionId)}`);
+}
+
+export async function bridgeDisconnectSession(sessionId: string): Promise<void> {
+  await bridgeFetch(`/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE" });
+}
+
+export async function bridgeSendText(input: {
+  channelId: string;
+  to: string;
+  text: string;
+}): Promise<{ id: string }> {
+  return bridgeFetch("/send", {
+    method: "POST",
+    body: JSON.stringify({ ...input, type: "text" }),
+  });
+}
+
+export type { BridgeInboundPayload };
