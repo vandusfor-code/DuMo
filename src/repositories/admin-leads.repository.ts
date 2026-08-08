@@ -20,7 +20,7 @@ import { isWebQrConversation } from "@/lib/web-qr/conversation-id";
 import { formatWhatsAppDisplayPhone, isLikelyWhatsAppLid } from "@/lib/whatsapp/phone";
 import { withLatency } from "@/lib/mock";
 import { getConfig, setConfig } from "@/server/db/app-config";
-import { ensureSchema, getSql, hasDatabase, withDbRetry, withQueryTimeout } from "@/server/db/client";
+import { ensureSchema, ensureSchemaForRead, getSql, hasDatabase, withDbRetry, withQueryTimeout } from "@/server/db/client";
 
 export interface AutoAssignSettings {
   enabled: boolean;
@@ -114,7 +114,7 @@ function requireSql() {
 
 class PostgresAdminLeadsRepository implements AdminLeadsRepository {
   private async fetchRows(advisorId?: string): Promise<ConvRow[]> {
-    await ensureSchema();
+    await ensureSchemaForRead();
     const sql = requireSql();
     return withQueryTimeout(
       withDbRetry(() =>

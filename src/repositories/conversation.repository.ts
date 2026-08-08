@@ -7,7 +7,7 @@ import { resolveConversationChannel } from "@/lib/conversation-channel";
 import { isMessengerConversation } from "@/lib/messenger/conversation-id";
 import { isWebQrConversation, webQrConversationId } from "@/lib/web-qr/conversation-id";
 import { formatWhatsAppDisplayPhone, isLikelyWhatsAppLid, normalizeWhatsAppPhoneDigits } from "@/lib/whatsapp/phone";
-import { ensureSchema, getSql, hasDatabase, withDbRetry, withQueryTimeout } from "@/server/db/client";
+import { ensureSchema, ensureSchemaForRead, getSql, hasDatabase, withDbRetry, withQueryTimeout } from "@/server/db/client";
 
 /** Un mensaje entrante/saliente a persistir. */
 export interface IncomingMessage {
@@ -147,7 +147,7 @@ function toStatus(value: string): ConversationStatus {
 
 class PostgresConversationRepository implements ConversationRepository {
   async getConversations(advisorId?: string): Promise<Conversation[]> {
-    await ensureSchema();
+    await ensureSchemaForRead();
     const sql = getSql()!;
     const rows = await withQueryTimeout(
       withDbRetry(() =>
@@ -186,7 +186,7 @@ class PostgresConversationRepository implements ConversationRepository {
   }
 
   async getMessages(conversationId: string): Promise<ChatMessage[]> {
-    await ensureSchema();
+    await ensureSchemaForRead();
     const sql = getSql()!;
     const rows = await withQueryTimeout(
       withDbRetry(() =>

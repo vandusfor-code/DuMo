@@ -55,7 +55,7 @@ export function getSql(): Sql | null {
     // (polling de conversaciones + mensajes + markRead + perfil). Con max:1 se
     // encolaban todas en una sola conexión y bajo latencia de Neon se
     // congestionaban hasta el timeout. Requiere la URI con pooler de Neon.
-    max: Number(process.env.DB_POOL_MAX ?? 8) || 8,
+    max: Number(process.env.DB_POOL_MAX ?? 3) || 3,
     idle_timeout: 20,
     connect_timeout: 15,
     max_lifetime: 60 * 5,
@@ -533,6 +533,36 @@ export function ensureSchema(): Promise<void> {
       });
   }
   return schemaPromise;
+}
+
+/**
+ * Ruta de lectura (bandeja de chats): no bloquea la UI esperando migraciones pesadas.
+ * En prod ya migrada marca el esquema listo en segundos; si la BD está lenta, falla
+ * abierto para que los SELECT sigan intentándose.
+ */
+export async function ensureSchemaForRead(): Promise<void> {
+  if (schemaReady) return;
+  const sql = getSql();
+  if (!sql) return;
+
+  try {
+    await withQueryTimeout(
+      (async () => {
+        if (await isSchemaMarkedComplete(sql)) {
+          schemaReady = true;
+          void ensureIncrementalMigrations(sql).catch((err) => {
+            console.error("[ensureSchemaForRead] incremental", err);
+          });
+          return;
+        }
+        await ensureSchema();
+      })(),
+      4_000,
+    );
+  } catch (err) {
+    console.warn("[ensureSchemaForRead] allowing reads after slow schema check", err);
+    schemaReady = true;
+  }
 }
 
 export async function pingDatabase(): Promise<{ ok: boolean; message: string }> {
