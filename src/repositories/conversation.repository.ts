@@ -42,6 +42,7 @@ export interface ConversationRepository {
   getConversations(advisorId?: string): Promise<Conversation[]>;
   getMessages(conversationId: string): Promise<ChatMessage[]>;
   saveMessage(msg: IncomingMessage): Promise<void>;
+  updateMessageBodyIfPlaceholder(waMessageId: string, body: string): Promise<boolean>;
   markRead(conversationId: string): Promise<void>;
   /** phone_number_id de DuMo por el que se debe responder esa conversación. */
   getSendFromPhoneId(conversationId: string): Promise<string | null>;
@@ -66,6 +67,9 @@ class MockConversationRepository implements ConversationRepository {
   }
   saveMessage() {
     return Promise.resolve();
+  }
+  updateMessageBodyIfPlaceholder() {
+    return Promise.resolve(false);
   }
   markRead() {
     return Promise.resolve();
@@ -253,6 +257,27 @@ class PostgresConversationRepository implements ConversationRepository {
       )
       ON CONFLICT (id) DO NOTHING
     `;
+  }
+
+  async updateMessageBodyIfPlaceholder(waMessageId: string, body: string): Promise<boolean> {
+    await ensureSchema();
+    const sql = getSql()!;
+    const placeholder = "📩 Mensaje recibido por WhatsApp Web";
+    const rows = (await sql`
+      UPDATE lead_messages
+      SET body = ${body}
+      WHERE id = ${waMessageId}
+        AND (body = ${placeholder} OR body = '')
+      RETURNING conversation_id
+    `) as unknown as { conversation_id: string }[];
+    if (!rows[0]?.conversation_id) return false;
+    await sql`
+      UPDATE lead_conversations
+      SET last_message = ${body}
+      WHERE id = ${rows[0].conversation_id}
+        AND last_message = ${placeholder}
+    `;
+    return true;
   }
 
   async markRead(conversationId: string): Promise<void> {

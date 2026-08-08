@@ -24,6 +24,9 @@ import {
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
+  extractMessageContent,
+  getContentType,
+  makeCacheableSignalKeyStore,
 } from "@whiskeysockets/baileys";
 
 const log = pino({ level: process.env.LOG_LEVEL ?? "info" });
@@ -99,6 +102,26 @@ async function notifyDuMo(session, body) {
   }
 }
 
+/** @type {Map<string, import('@whiskeysockets/baileys').proto.IMessage>} */
+const messageStore = new Map();
+
+function messageStoreKey(key) {
+  return `${key?.remoteJid ?? ""}|${key?.id ?? ""}`;
+}
+
+function rememberMessage(msg) {
+  if (!msg?.key?.id || !msg.message) return;
+  messageStore.set(messageStoreKey(msg.key), msg.message);
+  if (messageStore.size > 8000) {
+    const oldest = messageStore.keys().next().value;
+    if (oldest) messageStore.delete(oldest);
+  }
+}
+
+function isLikelyLidDigits(digits) {
+  return String(digits ?? "").replace(/\D/g, "").length >= 15;
+}
+
 function phoneFromJid(jid) {
   if (!jid || typeof jid !== "string") return "";
   const user = jid.split("@")[0] ?? "";
@@ -136,37 +159,82 @@ function extractInboundSender(msg) {
     if (altDigits.length >= 8 && altDigits.length <= 13) {
       fromDigits = altDigits;
     }
-    if (remoteJid.endsWith("@lid")) {
-      senderJid = remoteJid;
-    } else {
-      senderJid = remoteJidAlt;
-    }
+    senderJid = remoteJid.endsWith("@lid") ? remoteJid : remoteJidAlt;
   } else if (String(senderPn).includes("@s.whatsapp.net")) {
     const pnDigits = digitsFromJid(senderPn);
     if (pnDigits.length >= 8 && pnDigits.length <= 13) {
       fromDigits = pnDigits;
-      senderJid = senderPn;
+      senderJid = remoteJid.endsWith("@lid") ? remoteJid : senderPn;
     }
+  } else if (remoteJid.endsWith("@lid") && isLikelyLidDigits(fromDigits)) {
+    senderJid = remoteJid;
   }
 
   if (!senderJid && remoteJid) senderJid = remoteJid;
 
-  return { from: fromDigits, senderJid: senderJid || undefined };
+  const senderPhone =
+    fromDigits && !isLikelyLidDigits(fromDigits) ? fromDigits : undefined;
+
+  return { from: fromDigits, senderJid: senderJid || undefined, senderPhone };
 }
 
 function extractMessageText(msg) {
-  const m = msg.message;
-  if (!m) return "";
-  return (
-    m.conversation ??
-    m.extendedTextMessage?.text ??
-    m.imageMessage?.caption ??
-    m.videoMessage?.caption ??
-    m.documentMessage?.caption ??
-    m.buttonsResponseMessage?.selectedDisplayText ??
-    m.listResponseMessage?.title ??
-    m.templateButtonReplyMessage?.selectedDisplayText ??
-    ""
+  if (!msg?.message) return "";
+  const content = extractMessageContent(msg.message);
+  if (!content) return "";
+  const type = getContentType(content);
+  if (!type) return "";
+  if (type === "conversation") return content.conversation ?? "";
+  if (type === "extendedTextMessage") return content.extendedTextMessage?.text ?? "";
+  if (type === "imageMessage") return content.imageMessage?.caption ?? "";
+  if (type === "videoMessage") return content.videoMessage?.caption ?? "";
+  if (type === "documentMessage") return content.documentMessage?.caption ?? "";
+  if (type === "buttonsResponseMessage") return content.buttonsResponseMessage?.selectedDisplayText ?? "";
+  if (type === "listResponseMessage") {
+    return content.listResponseMessage?.title ?? content.listResponseMessage?.singleSelectReply?.selectedRowId ?? "";
+  }
+  if (type === "templateButtonReplyMessage") {
+    return content.templateButtonReplyMessage?.selectedDisplayText ?? "";
+  }
+  return "";
+}
+
+async function forwardInboundToDuMo(session, msg, upsertType) {
+  const remoteJid = msg.key?.remoteJid ?? "";
+  if (shouldSkipInboundJid(remoteJid)) return;
+
+  const { from, senderJid, senderPhone } = extractInboundSender(msg);
+  if (!from && !senderJid) {
+    log.warn({ channelId: session.channelId, remoteJid, upsertType }, "mensaje QR sin remitente");
+    return;
+  }
+
+  const text = extractMessageText(msg);
+  const isImage = Boolean(extractMessageContent(msg.message ?? {})?.imageMessage);
+  if (!text && !isImage) {
+    rememberMessage(msg);
+    return;
+  }
+
+  rememberMessage(msg);
+  const ts = Number(msg.messageTimestamp ?? Math.floor(Date.now() / 1000));
+
+  await notifyDuMo(session, {
+    type: "message.inbound",
+    payload: {
+      channelId: session.channelId,
+      from: senderPhone ?? from,
+      senderJid,
+      messageId: msg.key.id ?? `qr-${Date.now()}`,
+      timestamp: ts,
+      type: isImage ? "image" : "text",
+      text: text || undefined,
+      customerName: msg.pushName ?? "",
+    },
+  });
+  log.info(
+    { channelId: session.channelId, from, senderJid, messageId: msg.key.id, upsertType, text: text?.slice(0, 40) },
+    "mensaje QR reenviado a DuMo",
   );
 }
 
@@ -267,14 +335,31 @@ async function startBaileys(session) {
 
     const { state, saveCreds } = await useMultiFileAuthState(dir);
     const { version } = await fetchLatestBaileysVersion();
+    const baileysLogger = pino({ level: "silent" });
 
-  const sock = makeWASocket({
+  let sock;
+  sock = makeWASocket({
     version,
-    auth: state,
+    auth: {
+      creds: state.creds,
+      keys: makeCacheableSignalKeyStore(state.keys, baileysLogger),
+    },
     printQRInTerminal: false,
-    logger: pino({ level: "silent" }),
+    logger: baileysLogger,
     browser: ["DuMo CRM", "Chrome", "120.0.0"],
     connectTimeoutMs: 60_000,
+    markOnlineOnConnect: false,
+    syncFullHistory: false,
+    getMessage: async (key) => {
+      if (!key?.id) return undefined;
+      return messageStore.get(messageStoreKey(key));
+    },
+    patchMessageBeforeSending: async (message) => {
+      if (typeof sock?.uploadPreKeysToServerIfRequired === "function") {
+        await sock.uploadPreKeysToServerIfRequired();
+      }
+      return message;
+    },
   });
 
   session.sock = sock;
@@ -345,38 +430,18 @@ async function startBaileys(session) {
     for (const msg of messages) {
       if (msg.key.fromMe) continue;
 
-      const remoteJid = msg.key.remoteJid ?? "";
-      if (shouldSkipInboundJid(remoteJid)) continue;
-
       const ts = Number(msg.messageTimestamp ?? 0);
       if (type === "append" && ts && nowSec - ts > 120) continue;
 
-      const { from, senderJid } = extractInboundSender(msg);
-      if (!from && !senderJid) {
-        log.warn({ channelId: session.channelId, remoteJid, type }, "mensaje QR sin remitente");
-        continue;
-      }
+      await forwardInboundToDuMo(session, msg, type);
+    }
+  });
 
-      const text = extractMessageText(msg);
-      const isImage = Boolean(msg.message?.imageMessage);
-
-      await notifyDuMo(session, {
-        type: "message.inbound",
-        payload: {
-          channelId: session.channelId,
-          from,
-          senderJid,
-          messageId: msg.key.id ?? `qr-${Date.now()}`,
-          timestamp: ts || nowSec,
-          type: isImage ? "image" : "text",
-          text: text || undefined,
-          customerName: msg.pushName ?? "",
-        },
-      });
-      log.info(
-        { channelId: session.channelId, from, senderJid, messageId: msg.key.id, upsertType: type },
-        "mensaje QR reenviado a DuMo",
-      );
+  sock.ev.on("messages.update", async (updates) => {
+    for (const { key, update } of updates) {
+      if (!key || key.fromMe || !update?.message) continue;
+      const msg = { key, message: update.message, pushName: update.pushName };
+      await forwardInboundToDuMo(session, msg, "update");
     }
   });
   } finally {
@@ -486,10 +551,26 @@ app.delete("/sessions/:sessionId", auth, async (req, res) => {
 });
 
 function resolveTargetJid({ to, jid }) {
-  if (typeof jid === "string" && jid.includes("@")) return jid;
+  if (typeof jid === "string" && jid.includes("@")) return jid.trim();
   const digits = String(to ?? jid ?? "").replace(/\D/g, "");
   if (!digits) throw new Error("Destino inválido");
-  if (digits.length >= 14) return `${digits}@lid`;
+  if (digits.length >= 15) return `${digits}@lid`;
+  return `${digits}@s.whatsapp.net`;
+}
+
+async function resolveSendJid(session, { to, jid }) {
+  if (typeof jid === "string" && jid.includes("@")) return jid.trim();
+  const digits = String(to ?? "").replace(/\D/g, "");
+  if (!digits) throw new Error("Destino inválido");
+  if (digits.length >= 15) return `${digits}@lid`;
+  if (session.sock && typeof session.sock.onWhatsApp === "function") {
+    try {
+      const [result] = await session.sock.onWhatsApp(`${digits}@s.whatsapp.net`);
+      if (result?.exists && result.jid) return result.jid;
+    } catch (err) {
+      log.warn({ err, digits }, "onWhatsApp falló — usando JID por defecto");
+    }
+  }
   return `${digits}@s.whatsapp.net`;
 }
 
@@ -525,8 +606,9 @@ app.post("/send", auth, async (req, res) => {
   }
 
   try {
-    const targetJid = resolveTargetJid({ to, jid });
+    const targetJid = await resolveSendJid(session, { to, jid });
     const sent = await session.sock.sendMessage(targetJid, { text: text ?? "" });
+    if (sent?.message) rememberMessage(sent);
     res.json({ id: sent?.key?.id ?? `out-${Date.now()}`, jid: targetJid });
   } catch (err) {
     log.error({ err, channelId, to, jid }, "sendMessage falló");
