@@ -187,4 +187,14 @@ export const webQrRepository = {
       WHERE channel_id = ${channelId}
     `;
   },
+
+  /** Borra la línea QR y su fila de sesión (CASCADE). */
+  async deleteWebQrChannel(channelId: string): Promise<void> {
+    await ensureSchema();
+    const sql = getSql()!;
+    await sql`
+      DELETE FROM whatsapp_channels
+      WHERE id = ${channelId} AND channel_type = 'WEB_QR'
+    `;
+  },
 };

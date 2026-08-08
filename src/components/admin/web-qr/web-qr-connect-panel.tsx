@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, LogOut, QrCode, Smartphone, Wifi, WifiOff } from "lucide-react";
+import { Loader2, LogOut, QrCode, Smartphone, Trash2, Wifi, WifiOff } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import {
   useCreateWebQrChannel,
+  useDeleteWebQrChannel,
   useDisconnectWebQrSession,
   useStartWebQrSession,
   useWebQrChannels,
@@ -53,11 +54,12 @@ function ChannelCard({ channel }: { channel: WhatsAppChannel }) {
   const qc = useQueryClient();
   const start = useStartWebQrSession();
   const disconnect = useDisconnectWebQrSession();
+  const remove = useDeleteWebQrChannel();
   const [confirmLogout, setConfirmLogout] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
-  const hasSession = channel.status === "CONNECTED" || channel.phoneNumber !== "pending";
-  const session = useWebQrSession(channel.id, hasSession || channel.status !== "DISCONNECTED");
+  const session = useWebQrSession(channel.id, true);
 
   const liveStatus = resolveLiveStatus(channel, session.data?.status);
   const isConnected = liveStatus === "CONNECTED";
@@ -88,10 +90,23 @@ function ChannelCard({ channel }: { channel: WhatsAppChannel }) {
     }
   };
 
+  const handleDelete = async () => {
+    setLocalError(null);
+    try {
+      await remove.mutateAsync(channel.id);
+      setConfirmDelete(false);
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : "No se pudo eliminar la línea.");
+    }
+  };
+
   const qr = session.data?.qrDataUrl ?? start.data?.qrDataUrl;
-  const connectedPhone =
-    session.data?.phoneNumber ??
-    (channel.phoneNumber !== "pending" ? channel.phoneNumber : null);
+  const connectedPhone = isConnected
+    ? session.data?.phoneNumber ??
+      (channel.phoneNumber !== "pending" ? channel.phoneNumber : null)
+    : null;
+
+  const busy = disconnect.isPending || remove.isPending || start.isPending;
 
   return (
     <>
@@ -99,10 +114,11 @@ function ChannelCard({ channel }: { channel: WhatsAppChannel }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-fg">{channel.label}</p>
-            <p className="mt-0.5 font-mono text-[11px] text-muted">{channel.id}</p>
-            {connectedPhone ? (
-              <p className="mt-1 text-xs text-muted">+{connectedPhone}</p>
-            ) : null}
+            {isConnected && connectedPhone ? (
+              <p className="mt-1 text-xs font-medium text-fg">+{connectedPhone}</p>
+            ) : (
+              <p className="mt-1 text-xs text-muted">Sin número vinculado</p>
+            )}
           </div>
           <StatusBadge status={liveStatus} />
         </div>
@@ -112,21 +128,34 @@ function ChannelCard({ channel }: { channel: WhatsAppChannel }) {
             <p className="text-xs text-success-ink">
               Sesión activa. Los mensajes entrantes aparecerán en Leads con prefijo webqr.
             </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-2 text-danger-ink hover:bg-danger-soft hover:text-danger-ink"
-              onClick={() => setConfirmLogout(true)}
-              disabled={disconnect.isPending}
-            >
-              {disconnect.isPending ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <LogOut className="size-4" />
-              )}
-              Cerrar sesión
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-2 text-danger-ink hover:bg-danger-soft hover:text-danger-ink"
+                onClick={() => setConfirmLogout(true)}
+                disabled={busy}
+              >
+                {disconnect.isPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <LogOut className="size-4" />
+                )}
+                Cerrar sesión
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-2 text-danger-ink hover:bg-danger-soft hover:text-danger-ink"
+                onClick={() => setConfirmDelete(true)}
+                disabled={busy}
+              >
+                <Trash2 className="size-4" />
+                Eliminar línea
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="mt-4 flex flex-col items-center gap-3 rounded-xl border border-dashed border-line bg-canvas/60 p-4">
@@ -158,25 +187,27 @@ function ChannelCard({ channel }: { channel: WhatsAppChannel }) {
                 type="button"
                 size="sm"
                 onClick={handleConnect}
-                disabled={start.isPending}
+                disabled={busy}
                 className="gap-2"
               >
                 {start.isPending ? <Loader2 className="size-4 animate-spin" /> : <Smartphone className="size-4" />}
                 {qr ? "Actualizar QR" : "Generar código QR"}
               </Button>
-              {(hasSession || qr) && !isInitializing ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="gap-2 text-danger-ink"
-                  onClick={() => setConfirmLogout(true)}
-                  disabled={disconnect.isPending}
-                >
-                  <LogOut className="size-4" />
-                  Cerrar sesión
-                </Button>
-              ) : null}
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="gap-2 text-danger-ink hover:bg-danger-soft hover:text-danger-ink"
+                onClick={() => setConfirmDelete(true)}
+                disabled={busy}
+              >
+                {remove.isPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Trash2 className="size-4" />
+                )}
+                Eliminar línea
+              </Button>
             </div>
           </div>
         )}
@@ -189,11 +220,21 @@ function ChannelCard({ channel }: { channel: WhatsAppChannel }) {
       <ConfirmDialog
         open={confirmLogout}
         title="Cerrar sesión de WhatsApp Web"
-        description="Se cerrará la sesión en DuMo y en el bridge, y se borrarán las credenciales guardadas. Tendrás que escanear un QR nuevo para volver a conectar esta línea."
+        description="Se desvinculará el número y se borrarán las credenciales del bridge. La línea seguirá en DuMo para que puedas escanear un QR nuevo."
         confirmLabel="Cerrar sesión"
         isLoading={disconnect.isPending}
         onConfirm={() => void handleDisconnect()}
         onCancel={() => setConfirmLogout(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Eliminar línea QR"
+        description="Se borrará esta línea de DuMo y se purgará su sesión en el bridge. Esta acción no se puede deshacer."
+        confirmLabel="Eliminar línea"
+        isLoading={remove.isPending}
+        onConfirm={() => void handleDelete()}
+        onCancel={() => setConfirmDelete(false)}
       />
     </>
   );

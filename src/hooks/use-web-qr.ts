@@ -68,8 +68,22 @@ export function useDisconnectWebQrSession() {
         `/api/web-qr/channels/${channelId}/session`,
       ),
     onSuccess: (_data, channelId) => {
+      qc.removeQueries({ queryKey: webQrKeys.session(channelId) });
       qc.invalidateQueries({ queryKey: webQrKeys.channels });
-      qc.invalidateQueries({ queryKey: webQrKeys.session(channelId) });
+    },
+  });
+}
+
+export function useDeleteWebQrChannel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (channelId: string) =>
+      apiDelete<{ ok: boolean; channelId: string }>(
+        `/api/web-qr/channels/${channelId}`,
+      ),
+    onSuccess: (_data, channelId) => {
+      qc.removeQueries({ queryKey: webQrKeys.session(channelId) });
+      qc.invalidateQueries({ queryKey: webQrKeys.channels });
     },
   });
 }
