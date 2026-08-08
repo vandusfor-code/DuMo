@@ -1,10 +1,10 @@
-# Railway: Root Directory = services/web-qr-bridge (no la raíz del monorepo DuMo)
-# Volumen en /data/sessions + SESSIONS_DIR=/data/sessions
-# Node 20+ obligatorio (Baileys 7) — ver package.json engines, .nvmrc, nixpacks.toml
+# Railway: Root Directory = services/web-qr-bridge
+# Build: Dockerfile (Node 20) — alternativa Nixpacks vía .nvmrc + nixpacks.toml
+# Volumen: /data/sessions + SESSIONS_DIR=/data/sessions
 
 [build]
-builder = "nixpacks"
-buildCommand = "npm ci"
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
 
 [deploy]
 startCommand = "npm start"
