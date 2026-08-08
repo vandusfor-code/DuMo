@@ -8,7 +8,11 @@
     "start": "next start",
     "lint": "eslint",
     "db:migrate": "node scripts/migrate-db.mjs",
-    "db:backup": "node scripts/backup-db.mjs"
+    "db:backup": "node scripts/backup-db.mjs",
+    "railway:postgres:migrate": "node scripts/railway-postgres-migrate.mjs",
+    "railway:postgres:import": "node scripts/railway-postgres-import.mjs",
+    "railway:postgres:verify": "node scripts/railway-postgres-verify.mjs",
+    "railway:crm:env-sync": "node scripts/railway-crm-env-sync.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
