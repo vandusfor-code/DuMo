@@ -48,6 +48,25 @@ Opcional:
 
 El script abre 3 sockets (2 admin + 1 asesora), dispara un webhook QR simulado y verifica que las sesiones admin reciben el evento.
 
+## Evidencia (staging, 2026-08-08)
+
+Deploy `8abd685e` en `https://dumo-crm-production.up.railway.app`:
+
+```
+[realtime] Socket.io attached on /socket.io
+> DuMo CRM ready on http://0.0.0.0:8080 (HTTP + Socket.io)
+```
+
+Prueba `scripts/realtime-multi-session-test.mjs` — 3 sesiones simultáneas:
+
+| Sesión | Rol | Eventos recibidos |
+|--------|-----|-------------------|
+| admin-tab-1 | administrador | `leads:message:new` + `leads:conversation:updated` |
+| admin-tab-2 | supervisor | `leads:message:new` + `leads:conversation:updated` |
+| advisor-tab (ID real asignado) | asesora | `leads:conversation:updated` (tras auto-asignación) |
+
+Webhook inbound: `POST 200 {"ok":true}`. Asesora con ID ficticio recibe 0 eventos (permisos correctos).
+
 ## Manual (navegador)
 
 1. Abrir 2 pestañas en `/admin/leads` (admin) y 1 en `/dashboard` (asesora).
