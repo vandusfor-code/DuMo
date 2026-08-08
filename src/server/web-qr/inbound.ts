@@ -32,7 +32,7 @@ async function resolveWebQrConversationId(
     };
   }
 
-  if (canonicalId) {
+  if (canonicalId && realPhone) {
     return { conversationId: canonicalId, phone: realPhone };
   }
 
