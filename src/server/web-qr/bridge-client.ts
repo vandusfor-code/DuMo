@@ -48,6 +48,30 @@ export async function bridgeGetSessionStatus(sessionId: string): Promise<BridgeS
   return bridgeFetch(`/sessions/${encodeURIComponent(sessionId)}`);
 }
 
+/** null si el bridge reinició y perdió la sesión en memoria. */
+export async function bridgeGetSessionStatusOrNull(
+  sessionId: string,
+): Promise<BridgeSessionStatus | null> {
+  const base = webQrBridgeUrl();
+  const secret = webQrBridgeSecret();
+  if (!base || !secret) return null;
+
+  const res = await fetch(`${base.replace(/\/$/, "")}/sessions/${encodeURIComponent(sessionId)}`, {
+    headers: {
+      Accept: "application/json",
+      "X-Web-Qr-Bridge-Secret": secret,
+    },
+    cache: "no-store",
+  });
+
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`Bridge QR respondió ${res.status}${detail ? `: ${detail.slice(0, 200)}` : ""}`);
+  }
+  return (await res.json()) as BridgeSessionStatus;
+}
+
 export async function bridgeDisconnectSession(sessionId: string): Promise<void> {
   await bridgeFetch(`/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE" });
 }

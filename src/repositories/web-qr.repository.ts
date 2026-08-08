@@ -138,14 +138,25 @@ export const webQrRepository = {
   }): Promise<void> {
     await ensureSchema();
     const sql = getSql()!;
-    await sql`
-      UPDATE web_qr_sessions
-      SET bridge_session_id = ${input.bridgeSessionId},
-          session_data = COALESCE(${sql.json(input.sessionData as postgres.JSONValue)}, session_data),
-          last_reconnect_at = now(),
-          updated_at = now()
-      WHERE channel_id = ${input.channelId}
-    `;
+    const bridgeId = input.bridgeSessionId || null;
+    if (input.sessionData !== undefined) {
+      await sql`
+        UPDATE web_qr_sessions
+        SET bridge_session_id = ${bridgeId},
+            session_data = ${sql.json(input.sessionData as postgres.JSONValue)},
+            last_reconnect_at = now(),
+            updated_at = now()
+        WHERE channel_id = ${input.channelId}
+      `;
+    } else {
+      await sql`
+        UPDATE web_qr_sessions
+        SET bridge_session_id = ${bridgeId},
+            last_reconnect_at = now(),
+            updated_at = now()
+        WHERE channel_id = ${input.channelId}
+      `;
+    }
   },
 
   async saveSessionData(channelId: string, sessionData: Record<string, unknown>): Promise<void> {

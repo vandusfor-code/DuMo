@@ -31,6 +31,7 @@ function StatusBadge({ status }: { status: WhatsAppChannel["status"] }) {
 function ChannelCard({ channel }: { channel: WhatsAppChannel }) {
   const start = useStartWebQrSession();
   const [polling, setPolling] = useState(channel.status !== "CONNECTED");
+  const [localError, setLocalError] = useState<string | null>(null);
   const session = useWebQrSession(channel.id, polling);
 
   useEffect(() => {
@@ -40,10 +41,15 @@ function ChannelCard({ channel }: { channel: WhatsAppChannel }) {
 
   const handleConnect = async () => {
     setPolling(true);
-    await start.mutateAsync(channel.id);
+    setLocalError(null);
+    try {
+      await start.mutateAsync(channel.id);
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : "No se pudo conectar con el bridge.");
+    }
   };
 
-  const qr = session.data?.qrDataUrl;
+  const qr = session.data?.qrDataUrl ?? start.data?.qrDataUrl;
   const connectedPhone = session.data?.phoneNumber ?? channel.phoneNumber;
 
   return (
@@ -72,9 +78,18 @@ function ChannelCard({ channel }: { channel: WhatsAppChannel }) {
           ) : (
             <div className="flex flex-col items-center gap-2 py-6 text-muted">
               <QrCode className="size-10 opacity-40" />
-              <p className="text-xs">Genera un código QR para vincular esta línea</p>
+              <p className="text-xs">
+                {start.isPending || session.isFetching
+                  ? "Conectando con el bridge… el QR aparecerá en unos segundos."
+                  : "Pulsa el botón para generar el código QR."}
+              </p>
             </div>
           )}
+          {localError || start.error ? (
+            <p className="text-center text-xs text-danger-ink">
+              {localError ?? (start.error instanceof Error ? start.error.message : "Error al generar QR")}
+            </p>
+          ) : null}
           <Button
             type="button"
             size="sm"

@@ -91,6 +91,7 @@ async function startBaileys(session) {
     printQRInTerminal: false,
     logger: pino({ level: "silent" }),
     browser: ["DuMo CRM", "Chrome", "120.0.0"],
+    connectTimeoutMs: 60_000,
   });
 
   session.sock = sock;
@@ -104,6 +105,7 @@ async function startBaileys(session) {
     if (qr) {
       session.status = "QR_PENDING";
       session.qrDataUrl = await QRCode.toDataURL(qr, { margin: 1, width: 280 });
+      log.info({ channelId: session.channelId }, "QR generado");
       io.to(session.sessionId).emit("qr", { qrDataUrl: session.qrDataUrl });
     }
 
@@ -173,6 +175,7 @@ app.post("/sessions", auth, async (req, res) => {
   const sessionId = `bridge-${channelId}`;
   let session = sessions.get(sessionId);
   if (!session) {
+    log.info({ channelId }, "nueva sesión Baileys");
     session = {
       sessionId,
       channelId,
@@ -183,12 +186,22 @@ app.post("/sessions", auth, async (req, res) => {
       qrDataUrl: null,
       phoneNumber: null,
       sock: null,
+      lastError: null,
     };
     sessions.set(sessionId, session);
-    startBaileys(session).catch((err) => log.error(err));
+    startBaileys(session).catch((err) => {
+      session.lastError = err instanceof Error ? err.message : String(err);
+      log.error({ err, channelId }, "startBaileys falló");
+    });
   }
 
-  res.json({ sessionId });
+  res.json({
+    sessionId,
+    status: session.status,
+    qrDataUrl: session.qrDataUrl ?? undefined,
+    phoneNumber: session.phoneNumber ?? undefined,
+    lastError: session.lastError ?? undefined,
+  });
 });
 
 app.get("/sessions/:sessionId", auth, (req, res) => {
@@ -227,7 +240,16 @@ app.post("/send", auth, async (req, res) => {
 });
 
 app.get("/health", (_req, res) => {
-  res.json({ ok: true, sessions: sessions.size });
+  res.json({
+    ok: true,
+    sessions: sessions.size,
+    active: [...sessions.values()].map((s) => ({
+      channelId: s.channelId,
+      status: s.status,
+      hasQr: Boolean(s.qrDataUrl),
+      lastError: s.lastError ?? null,
+    })),
+  });
 });
 
 const httpServer = createServer(app);
