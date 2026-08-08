@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
 import { withAdminFallback } from "@/lib/admin-api-fallbacks";
 import { requireAdminSession } from "@/lib/require-admin";
 import { authService } from "@/services/auth.service";
@@ -67,8 +67,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(data);
     }
 
-    // Asignar pendientes antes de listar (misma razón que en la ruta de asesora).
-    await adminLeadsService.ensurePendingAssigned();
+    // Igual que en /api/leads/conversations: la asignación no bloquea el listado.
+    after(async () => {
+      try {
+        await adminLeadsService.ensurePendingAssigned();
+      } catch (err) {
+        console.error("[ensurePendingAssigned]", err);
+      }
+    });
 
     const data = await Promise.race([
       adminLeadsService.listConversations(),

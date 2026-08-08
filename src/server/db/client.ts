@@ -506,11 +506,9 @@ export function ensureSchema(): Promise<void> {
     schemaPromise = withQueryTimeout(
       withDbRetry(async () => {
         if (await isSchemaMarkedComplete(sql)) {
+          // Prod ya migrada: solo reparaciones incrementales (columnas/tablas nuevas).
+          // Evita correr runMigrations completo en cada cold-start — bloqueaba lecturas.
           await ensureIncrementalMigrations(sql);
-          if (!(await schemaIsComplete(sql))) {
-            console.info("[ensureSchema] faltan columnas — ejecutando migración completa");
-            await runMigrations(sql);
-          }
           return;
         }
         if (await schemaIsComplete(sql)) {
