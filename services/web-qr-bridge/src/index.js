@@ -19,6 +19,7 @@ import fs from "node:fs";
 import path from "node:path";
 import QRCode from "qrcode";
 import pino from "pino";
+import NodeCache from "node-cache";
 import {
   makeWASocket,
   useMultiFileAuthState,
@@ -30,6 +31,7 @@ import {
 } from "@whiskeysockets/baileys";
 
 const log = pino({ level: process.env.LOG_LEVEL ?? "info" });
+const msgRetryCounterCache = new NodeCache();
 const PORT = Number(process.env.PORT ?? 8787);
 const BRIDGE_SECRET = process.env.BRIDGE_SECRET ?? "";
 const SESSIONS_DIR = process.env.SESSIONS_DIR ?? "./data/sessions";
@@ -209,6 +211,10 @@ async function forwardInboundToDuMo(session, msg, upsertType) {
     return;
   }
 
+  if (senderJid?.endsWith("@lid") && senderPhone) {
+    rememberLidMapping(session, senderJid, senderPhone);
+  }
+
   const text = extractMessageText(msg);
   const isImage = Boolean(extractMessageContent(msg.message ?? {})?.imageMessage);
   if (!text && !isImage) {
@@ -266,7 +272,59 @@ function createSessionRuntime(channelId, overrides = {}) {
     lastWebhookStatus: null,
     lastWebhookError: null,
     lastWebhookAt: null,
+    lidByPn: new Map(),
   };
+}
+
+function rememberLidMapping(session, lidJid, pnDigits) {
+  if (!session || !lidJid?.endsWith("@lid") || !pnDigits) return;
+  const digits = String(pnDigits).replace(/\D/g, "");
+  if (digits.length < 8 || digits.length > 13) return;
+  const pnJid = `${digits}@s.whatsapp.net`;
+  session.lidByPn.set(pnJid, lidJid);
+  session.lidByPn.set(digits, lidJid);
+  const mapping = session.sock?.signalRepository?.lidMapping;
+  if (mapping?.storeLIDPNMappings) {
+    try {
+      mapping.storeLIDPNMappings([{ lid: lidJid, pn: pnJid }]);
+    } catch (err) {
+      log.warn({ err, lidJid, pnJid }, "storeLIDPNMappings falló");
+    }
+  }
+}
+
+async function resolveLidForPn(session, pnJid) {
+  const normalized = pnJid.toLowerCase();
+  const mapped = session.lidByPn?.get(normalized) ?? session.lidByPn?.get(normalized.split("@")[0]);
+  if (mapped) return mapped;
+
+  const mapping = session.sock?.signalRepository?.lidMapping;
+  if (mapping?.getLIDForPN) {
+    try {
+      const lid = await mapping.getLIDForPN(normalized);
+      if (lid) return lid;
+    } catch (err) {
+      log.warn({ err, pnJid: normalized }, "getLIDForPN falló");
+    }
+  }
+  return null;
+}
+
+async function resolveSendJid(session, { to, jid }) {
+  if (typeof jid === "string" && jid.includes("@")) {
+    const trimmed = jid.trim().toLowerCase();
+    if (trimmed.endsWith("@lid")) return trimmed;
+    const lid = await resolveLidForPn(session, trimmed);
+    return lid ?? trimmed;
+  }
+
+  const digits = String(to ?? "").replace(/\D/g, "");
+  if (!digits) throw new Error("Destino inválido");
+  if (digits.length >= 15) return `${digits}@lid`;
+
+  const pnJid = `${digits}@s.whatsapp.net`;
+  const lid = await resolveLidForPn(session, pnJid);
+  return lid ?? pnJid;
 }
 
 function bootstrapSession(channelId, overrides = {}) {
@@ -350,6 +408,8 @@ async function startBaileys(session) {
     connectTimeoutMs: 60_000,
     markOnlineOnConnect: false,
     syncFullHistory: false,
+    emitOwnEvents: true,
+    msgRetryCounterCache,
     getMessage: async (key) => {
       if (!key?.id) return undefined;
       return messageStore.get(messageStoreKey(key));
@@ -366,6 +426,15 @@ async function startBaileys(session) {
   session.status = "INITIALIZING";
 
   sock.ev.on("creds.update", saveCreds);
+
+  sock.ev.on("lid-mapping.update", (mapping) => {
+    if (!mapping || !session.lidByPn) return;
+    for (const [pn, lid] of Object.entries(mapping)) {
+      if (typeof lid === "string" && lid.endsWith("@lid")) {
+        session.lidByPn.set(String(pn).toLowerCase(), lid);
+      }
+    }
+  });
 
   sock.ev.on("connection.update", async (update) => {
     const { connection, lastDisconnect, qr } = update;
@@ -387,6 +456,13 @@ async function startBaileys(session) {
       session.status = "CONNECTED";
       session.qrDataUrl = null;
       session.phoneNumber = normalizeStoredPhone(phoneFromJid(sock.user?.id ?? ""));
+      if (typeof sock.uploadPreKeysToServerIfRequired === "function") {
+        try {
+          await sock.uploadPreKeysToServerIfRequired();
+        } catch (err) {
+          log.warn({ err, channelId: session.channelId }, "uploadPreKeys al conectar falló");
+        }
+      }
       await notifyDuMo(session, {
         type: "session.connected",
         channelId: session.channelId,
@@ -550,30 +626,6 @@ app.delete("/sessions/:sessionId", auth, async (req, res) => {
   res.json({ ok: true, purged: true, channelId });
 });
 
-function resolveTargetJid({ to, jid }) {
-  if (typeof jid === "string" && jid.includes("@")) return jid.trim();
-  const digits = String(to ?? jid ?? "").replace(/\D/g, "");
-  if (!digits) throw new Error("Destino inválido");
-  if (digits.length >= 15) return `${digits}@lid`;
-  return `${digits}@s.whatsapp.net`;
-}
-
-async function resolveSendJid(session, { to, jid }) {
-  if (typeof jid === "string" && jid.includes("@")) return jid.trim();
-  const digits = String(to ?? "").replace(/\D/g, "");
-  if (!digits) throw new Error("Destino inválido");
-  if (digits.length >= 15) return `${digits}@lid`;
-  if (session.sock && typeof session.sock.onWhatsApp === "function") {
-    try {
-      const [result] = await session.sock.onWhatsApp(`${digits}@s.whatsapp.net`);
-      if (result?.exists && result.jid) return result.jid;
-    } catch (err) {
-      log.warn({ err, digits }, "onWhatsApp falló — usando JID por defecto");
-    }
-  }
-  return `${digits}@s.whatsapp.net`;
-}
-
 app.post("/send", auth, async (req, res) => {
   const { channelId, to, jid, text } = req.body ?? {};
   if (!channelId) return res.status(400).json({ error: "channelId requerido" });
@@ -607,6 +659,7 @@ app.post("/send", auth, async (req, res) => {
 
   try {
     const targetJid = await resolveSendJid(session, { to, jid });
+    log.info({ channelId, targetJid, inputJid: jid, to }, "enviando mensaje QR");
     const sent = await session.sock.sendMessage(targetJid, { text: text ?? "" });
     if (sent?.message) rememberMessage(sent);
     res.json({ id: sent?.key?.id ?? `out-${Date.now()}`, jid: targetJid });
