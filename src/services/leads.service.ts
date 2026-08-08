@@ -96,10 +96,19 @@ export const leadsService = {
 
   /** Persiste un mensaje entrante recibido por el webhook. */
   async receiveMessage(msg: IncomingMessage): Promise<void> {
-    await getConversationRepository().saveMessage(msg);
+    const repo = getConversationRepository();
+    const assignedBefore = await repo.getAssignedAdvisorId(msg.conversationId);
+    await repo.saveMessage(msg);
     if (msg.direction === "in") {
       const { adminLeadsService } = await import("@/services/admin-leads.service");
       await adminLeadsService.autoAssignIfNeeded(msg.conversationId);
+      const assignedAfter = await repo.getAssignedAdvisorId(msg.conversationId);
+      if (assignedAfter && !assignedBefore) {
+        const { emitLeadsMessageNew, messageNewPayloadFromIncoming } = await import(
+          "@/server/realtime/emit"
+        );
+        emitLeadsMessageNew(messageNewPayloadFromIncoming(msg, assignedAfter));
+      }
     }
   },
 

@@ -1,11 +1,34 @@
 import "server-only";
+import { formatChatTime } from "@/lib/format";
+import type { IncomingMessage } from "@/repositories/conversation.repository";
 
 export type LeadsMessageNewPayload = {
   conversationId: string;
   messageId?: string;
   direction?: "in" | "out";
   assignedAdvisorId?: string | null;
+  /** Contenido del mensaje — permite pintar el chat al instante en el cliente. */
+  text?: string;
+  time?: string;
+  createdAt?: string;
+  messageType?: "text" | "image";
 };
+
+export function messageNewPayloadFromIncoming(
+  msg: IncomingMessage,
+  assignedAdvisorId: string | null,
+): LeadsMessageNewPayload {
+  return {
+    conversationId: msg.conversationId,
+    messageId: msg.waMessageId,
+    direction: msg.direction,
+    assignedAdvisorId,
+    text: msg.body,
+    time: formatChatTime(msg.createdAt),
+    createdAt: msg.createdAt,
+    messageType: msg.messageType ?? "text",
+  };
+}
 
 export type LeadsConversationUpdatedPayload = {
   conversationId: string;

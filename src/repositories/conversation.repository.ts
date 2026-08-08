@@ -44,6 +44,7 @@ export interface ConversationRepository {
   saveMessage(msg: IncomingMessage): Promise<void>;
   updateMessageBodyIfPlaceholder(waMessageId: string, body: string): Promise<boolean>;
   markRead(conversationId: string): Promise<void>;
+  getAssignedAdvisorId(conversationId: string): Promise<string | null>;
   /** phone_number_id de DuMo por el que se debe responder esa conversación. */
   getSendFromPhoneId(conversationId: string): Promise<string | null>;
   getWaChatJid(conversationId: string): Promise<string | null>;
@@ -77,6 +78,9 @@ class MockConversationRepository implements ConversationRepository {
   }
   markRead() {
     return Promise.resolve();
+  }
+  getAssignedAdvisorId() {
+    return Promise.resolve(null);
   }
   getSendFromPhoneId() {
     return Promise.resolve(null);
@@ -275,13 +279,21 @@ class PostgresConversationRepository implements ConversationRepository {
     const convRows = (await sql`
       SELECT assigned_advisor_id FROM lead_conversations WHERE id = ${msg.conversationId}
     `) as unknown as { assigned_advisor_id: string | null }[];
-    const { emitLeadsMessageNew } = await import("@/server/realtime/emit");
-    emitLeadsMessageNew({
-      conversationId: msg.conversationId,
-      messageId: msg.waMessageId,
-      direction: msg.direction,
-      assignedAdvisorId: convRows[0]?.assigned_advisor_id ?? null,
-    });
+    const assignedAdvisorId = convRows[0]?.assigned_advisor_id ?? null;
+    const { emitLeadsMessageNew, messageNewPayloadFromIncoming } = await import(
+      "@/server/realtime/emit"
+    );
+    emitLeadsMessageNew(messageNewPayloadFromIncoming(msg, assignedAdvisorId));
+  }
+
+  async getAssignedAdvisorId(conversationId: string): Promise<string | null> {
+    await ensureSchemaForRead();
+    const sql = getSql();
+    if (!sql) return null;
+    const rows = (await sql`
+      SELECT assigned_advisor_id FROM lead_conversations WHERE id = ${conversationId}
+    `) as unknown as { assigned_advisor_id: string | null }[];
+    return rows[0]?.assigned_advisor_id ?? null;
   }
 
   async updateMessageBodyIfPlaceholder(waMessageId: string, body: string): Promise<boolean> {

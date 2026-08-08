@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { io, type Socket } from "socket.io-client";
 import { leadKeys } from "@/hooks/use-leads";
+import type { ChatMessage } from "@/types/conversation";
 
 /** Polling de respaldo cuando WebSocket no está conectado o como red de seguridad. */
 export const REALTIME_FALLBACK_POLL_MS = 45_000;
@@ -13,6 +14,9 @@ type MessageNewEvent = {
   messageId?: string;
   direction?: "in" | "out";
   assignedAdvisorId?: string | null;
+  text?: string;
+  time?: string;
+  messageType?: "text" | "image";
 };
 
 type ConversationUpdatedEvent = {
@@ -22,12 +26,41 @@ type ConversationUpdatedEvent = {
   reason?: string;
 };
 
+function appendMessageToCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  payload: MessageNewEvent,
+) {
+  if (!payload.messageId || !payload.text || !payload.conversationId) return;
+
+  const patch = (prev: ChatMessage[] | undefined) => {
+    if (!prev) return prev;
+    if (prev.some((m) => m.id === payload.messageId)) return prev;
+    const row: ChatMessage = {
+      id: payload.messageId!,
+      conversationId: payload.conversationId,
+      text: payload.text!,
+      time: payload.time ?? "",
+      direction: payload.direction ?? "in",
+      read: false,
+      messageType: payload.messageType ?? "text",
+    };
+    return [...prev, row];
+  };
+
+  queryClient.setQueryData(leadKeys.messages(payload.conversationId), patch);
+  queryClient.setQueryData(["admin", "leads", "messages", payload.conversationId], patch);
+}
+
+function invalidateBandeja(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: leadKeys.conversations });
+  queryClient.invalidateQueries({ queryKey: ["admin", "leads", "conversations"] });
+}
+
 function invalidateForConversation(
   queryClient: ReturnType<typeof useQueryClient>,
   conversationId: string,
 ) {
-  queryClient.invalidateQueries({ queryKey: leadKeys.conversations });
-  queryClient.invalidateQueries({ queryKey: ["admin", "leads", "conversations"] });
+  invalidateBandeja(queryClient);
   queryClient.invalidateQueries({ queryKey: leadKeys.messages(conversationId) });
   queryClient.invalidateQueries({ queryKey: ["admin", "leads", "messages", conversationId] });
   queryClient.invalidateQueries({ queryKey: ["admin", "leads", "detail", conversationId] });
@@ -51,7 +84,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
     socket.on("leads:message:new", (payload: MessageNewEvent) => {
       if (!payload?.conversationId) return;
-      invalidateForConversation(queryClient, payload.conversationId);
+      appendMessageToCache(queryClient, payload);
+      invalidateBandeja(queryClient);
     });
 
     socket.on("leads:conversation:updated", (payload: ConversationUpdatedEvent) => {
@@ -60,8 +94,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     });
 
     socket.on("connect", () => {
-      queryClient.invalidateQueries({ queryKey: leadKeys.conversations });
-      queryClient.invalidateQueries({ queryKey: ["admin", "leads", "conversations"] });
+      invalidateBandeja(queryClient);
     });
 
     return () => {

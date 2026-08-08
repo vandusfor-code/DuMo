@@ -96,7 +96,7 @@ async function postWebhookMessage(fromPhone) {
 
 async function main() {
   const adminUserId = process.env.TEST_ADMIN_USER_ID || "u-admin";
-  const advisorUserId = process.env.TEST_ADVISOR_USER_ID || "u-asesora-1";
+  const advisorUserId = process.env.TEST_ADVISOR_USER_ID || "usr-1786134226280-8zlbo6";
   const fromPhone = process.env.TEST_FROM_PHONE || `57300${String(Date.now()).slice(-7)}`;
 
   console.log("Target:", BASE);
@@ -136,6 +136,21 @@ async function main() {
   const adminReceived = admin1.events.length + admin2.events.length;
   if (adminReceived < 2) {
     console.error("\nFAIL: expected both admin sessions to receive at least 1 event each");
+    process.exit(1);
+  }
+
+  const advisorMessageNew = advisor.events.filter((e) => e.type === "leads:message:new");
+  const advisorUpdated = advisor.events.filter((e) => e.type === "leads:conversation:updated");
+  if (advisorMessageNew.length < 1 || advisorUpdated.length < 1) {
+    console.error(
+      "\nFAIL: advisor should receive both message:new and conversation:updated after auto-assign",
+      { messageNew: advisorMessageNew.length, updated: advisorUpdated.length },
+    );
+    process.exit(1);
+  }
+  const withText = advisorMessageNew.some((e) => e.payload?.text?.length > 0);
+  if (!withText) {
+    console.error("\nFAIL: advisor message:new should include text payload");
     process.exit(1);
   }
 
