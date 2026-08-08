@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ensureSchema, getDatabaseUrl, getSql, hasDatabase, pingDatabase } from "@/server/db/client";
+import { ensureSchema, getDatabaseUrl, getSql, hasDatabase, inspectDatabaseUrlPooler, pingDatabase, runtimeMigrationsEnabled } from "@/server/db/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -182,6 +182,8 @@ export async function GET() {
       connected: true,
       mode: "postgres",
       provider: url?.includes("supabase") ? "supabase" : "postgres",
+      poolerWarnings: inspectDatabaseUrlPooler(url),
+      runtimeMigrationsEnabled: runtimeMigrationsEnabled(),
       tables: tables.map((t) => t.table_name),
       users: users[0]?.n ?? 0,
       conversations: convCount[0]?.n ?? 0,

@@ -69,6 +69,40 @@ export function hasDatabase(): boolean {
   return Boolean(getDatabaseUrl());
 }
 
+/**
+ * Migraciones DDL en el request path están deshabilitadas en producción.
+ * Correr `npm run db:migrate` (o CI) antes/después de cada deploy.
+ * En dev: ALLOW_RUNTIME_MIGRATIONS=1 para el comportamiento anterior.
+ */
+export function runtimeMigrationsEnabled(): boolean {
+  if (process.env.ALLOW_RUNTIME_MIGRATIONS === "1") return true;
+  if (process.env.NODE_ENV === "production") return false;
+  return process.env.SKIP_RUNTIME_MIGRATIONS !== "1";
+}
+
+/** Advierte si la URI apunta al puerto directo de Supabase (5432) en lugar del pooler (6543). */
+export function inspectDatabaseUrlPooler(url: string | null): string[] {
+  if (!url) return [];
+  const problems: string[] = [];
+  try {
+    const u = new URL(url);
+    const port = u.port || "5432";
+    const isSupabasePooler = u.hostname.includes("pooler.supabase.com");
+    const isSupabaseDirect = u.hostname.startsWith("db.") && u.hostname.endsWith(".supabase.co");
+    if (isSupabaseDirect) {
+      problems.push(
+        "URI directa de Supabase (db.*.supabase.co). En serverless usa el Transaction pooler (puerto 6543).",
+      );
+    }
+    if (isSupabasePooler && port === "5432") {
+      problems.push("Pooler Supabase con puerto 5432 — usa 6543 (Transaction mode).");
+    }
+  } catch {
+    /* ignore */
+  }
+  return problems;
+}
+
 /** Reintenta consultas ante timeouts transitorios en serverless. */
 export async function withDbRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
   let lastError: unknown;
@@ -497,28 +531,50 @@ export function ensureAuthSchema(): Promise<void> {
   return Promise.resolve();
 }
 
+/** Ejecuta migraciones DDL completas — solo CI, deploy o `npm run db:migrate`. */
+export async function migrateDatabaseSchema(): Promise<{ ok: boolean; message: string }> {
+  const sql = getSql();
+  if (!sql) {
+    return { ok: false, message: "DATABASE_URL1 no configurada." };
+  }
+
+  schemaPromise = null;
+  schemaReady = false;
+
+  await withDbRetry(async () => {
+    if (await isSchemaMarkedComplete(sql)) {
+      await ensureIncrementalMigrations(sql);
+      return;
+    }
+    if (await schemaIsComplete(sql)) {
+      await markSchemaComplete(sql);
+      return;
+    }
+    await runMigrations(sql);
+    if (await schemaIsComplete(sql)) {
+      await markSchemaComplete(sql);
+    }
+  }, 2);
+
+  schemaReady = true;
+  return { ok: true, message: "Migraciones aplicadas." };
+}
+
 export function ensureSchema(): Promise<void> {
   if (schemaReady) return Promise.resolve();
   const sql = getSql();
   if (!sql) return Promise.resolve();
 
+  if (!runtimeMigrationsEnabled()) {
+    schemaReady = true;
+    return Promise.resolve();
+  }
+
   if (!schemaPromise) {
     schemaPromise = withQueryTimeout(
       withDbRetry(async () => {
-        if (await isSchemaMarkedComplete(sql)) {
-          // Prod ya migrada: solo reparaciones incrementales (columnas/tablas nuevas).
-          // Evita correr runMigrations completo en cada cold-start — bloqueaba lecturas.
-          await ensureIncrementalMigrations(sql);
-          return;
-        }
-        if (await schemaIsComplete(sql)) {
-          await markSchemaComplete(sql);
-          return;
-        }
-        await runMigrations(sql);
-        if (await schemaIsComplete(sql)) {
-          await markSchemaComplete(sql);
-        }
+        const result = await migrateDatabaseSchema();
+        if (!result.ok) throw new Error(result.message);
       }, 1),
       45_000,
     )
@@ -535,34 +591,10 @@ export function ensureSchema(): Promise<void> {
   return schemaPromise;
 }
 
-/**
- * Ruta de lectura (bandeja de chats): no bloquea la UI esperando migraciones pesadas.
- * En prod ya migrada marca el esquema listo en segundos; si la BD está lenta, falla
- * abierto para que los SELECT sigan intentándose.
- */
-export async function ensureSchemaForRead(): Promise<void> {
-  if (schemaReady) return;
-  const sql = getSql();
-  if (!sql) return;
-
-  try {
-    await withQueryTimeout(
-      (async () => {
-        if (await isSchemaMarkedComplete(sql)) {
-          schemaReady = true;
-          void ensureIncrementalMigrations(sql).catch((err) => {
-            console.error("[ensureSchemaForRead] incremental", err);
-          });
-          return;
-        }
-        await ensureSchema();
-      })(),
-      4_000,
-    );
-  } catch (err) {
-    console.warn("[ensureSchemaForRead] allowing reads after slow schema check", err);
-    schemaReady = true;
-  }
+/** Bandeja y lecturas: nunca ejecuta DDL — confía en migraciones de deploy/CI. */
+export function ensureSchemaForRead(): Promise<void> {
+  schemaReady = true;
+  return Promise.resolve();
 }
 
 export async function pingDatabase(): Promise<{ ok: boolean; message: string }> {

@@ -1,0 +1,23 @@
+name: Database migrate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "src/server/db/**"
+      - "src/server/db/migrations/**"
+      - "scripts/migrate-db.mjs"
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run migrations against production
+        env:
+          MIGRATE_URL: ${{ secrets.DUMO_MIGRATE_URL }}
+          MIGRATE_DB_SECRET: ${{ secrets.MIGRATE_DB_SECRET }}
+        run: node scripts/migrate-db.mjs

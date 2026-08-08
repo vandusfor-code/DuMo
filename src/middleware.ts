@@ -11,6 +11,7 @@ const PUBLIC_PREFIXES = [
   "/api/messenger/webhook",
   "/api/web-qr/webhook",
   "/api/system",
+  "/api/system/migrate",
 ];
 
 export async function middleware(request: NextRequest) {

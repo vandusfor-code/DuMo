@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:migrate": "node scripts/migrate-db.mjs",
+    "db:backup": "node scripts/backup-db.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
