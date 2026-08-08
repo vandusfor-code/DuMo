@@ -1,6 +1,6 @@
 import "server-only";
 import { webQrConversationId } from "@/lib/web-qr/conversation-id";
-import { resolveWhatsAppWebSendJid } from "@/lib/whatsapp/phone";
+import { normalizeWhatsAppPhoneDigits, resolveWhatsAppWebSendJid } from "@/lib/whatsapp/phone";
 import { getConversationRepository } from "@/repositories/conversation.repository";
 import { webQrRepository } from "@/repositories/web-qr.repository";
 import { bridgeSendText } from "@/server/web-qr/bridge-client";
@@ -16,8 +16,9 @@ export async function sendWebQrText(input: {
   const repo = getConversationRepository();
   const storedJid = await repo.getWaChatJid(input.conversationId);
   const phone =
-    webQrConversationId(input.to).replace(/^webqr:/, "") ||
-    input.to.replace(/\D/g, "");
+    normalizeWhatsAppPhoneDigits(
+      webQrConversationId(input.to).replace(/^webqr:/, "") || input.to,
+    );
   const jid = resolveWhatsAppWebSendJid(phone, storedJid);
 
   await ensureWebQrBridgeReady(input.channelId);

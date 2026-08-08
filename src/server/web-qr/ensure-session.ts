@@ -1,4 +1,5 @@
 import "server-only";
+import { normalizeWhatsAppPhoneDigits } from "@/lib/whatsapp/phone";
 import { webQrRepository } from "@/repositories/web-qr.repository";
 import { bridgeCreateSession, bridgeGetSessionStatusOrNull } from "@/server/web-qr/bridge-client";
 import { webQrWebhookSecret } from "@/server/web-qr/config";
@@ -40,7 +41,7 @@ export async function ensureWebQrBridgeReady(channelId: string): Promise<void> {
     await new Promise((r) => setTimeout(r, 1000));
     const status = await bridgeGetSessionStatusOrNull(sessionId);
     if (status?.status === "CONNECTED") {
-      await webQrRepository.updateChannelStatus(resolvedId, "CONNECTED", status.phoneNumber);
+      await webQrRepository.updateChannelStatus(resolvedId, "CONNECTED", normalizeWhatsAppPhoneDigits(status.phoneNumber ?? ""));
       await webQrRepository.updateSessionBridge({ channelId: resolvedId, bridgeSessionId: sessionId });
       return;
     }

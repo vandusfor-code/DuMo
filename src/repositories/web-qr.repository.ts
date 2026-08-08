@@ -1,5 +1,6 @@
 import "server-only";
 import type postgres from "postgres";
+import { normalizeWhatsAppPhoneDigits } from "@/lib/whatsapp/phone";
 import { ensureSchema, getSql, withDbRetry, withQueryTimeout } from "@/server/db/client";
 import { DEFAULT_COMPANY_ID } from "@/types/tenant";
 import type { WebQrSession, WhatsAppChannel } from "@/server/web-qr/types";
@@ -108,9 +109,10 @@ export const webQrRepository = {
     await ensureSchema();
     const sql = getSql()!;
     if (phoneNumber) {
+      const phone = normalizeWhatsAppPhoneDigits(phoneNumber);
       await sql`
         UPDATE whatsapp_channels
-        SET status = ${status}, phone_number = ${phoneNumber.replace(/\D/g, "")}, updated_at = now()
+        SET status = ${status}, phone_number = ${phone}, updated_at = now()
         WHERE id = ${id}
       `;
     } else {

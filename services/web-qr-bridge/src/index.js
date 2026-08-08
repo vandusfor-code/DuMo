@@ -65,7 +65,7 @@ function auth(req, res, next) {
 async function notifyDuMo(session, body) {
   if (!session.webhookUrl || !session.webhookSecret) return;
   try {
-    await fetch(session.webhookUrl, {
+    const res = await fetch(session.webhookUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -73,14 +73,38 @@ async function notifyDuMo(session, body) {
       },
       body: JSON.stringify(body),
     });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      log.error(
+        { status: res.status, detail: detail.slice(0, 200), channelId: session.channelId, type: body.type },
+        "webhook DuMo respondió error",
+      );
+    }
   } catch (err) {
     log.error({ err, channelId: session.channelId }, "webhook DuMo falló");
   }
 }
 
+function phoneFromJid(jid) {
+  if (!jid || typeof jid !== "string") return "";
+  const user = jid.split("@")[0] ?? "";
+  const local = user.split(":")[0] ?? user;
+  return local.replace(/\D/g, "");
+}
+
+function normalizeStoredPhone(digits) {
+  let d = String(digits ?? "").replace(/\D/g, "");
+  if (d.length === 14 && d.startsWith("57")) d = d.slice(0, 12);
+  if (d.length === 13 && d.startsWith("56")) d = d.slice(0, 11);
+  return d;
+}
+
 function digitsFromJid(jid) {
   if (!jid || typeof jid !== "string") return "";
-  return (jid.split("@")[0] ?? "").replace(/\D/g, "");
+  if (jid.endsWith("@lid")) {
+    return (jid.split("@")[0] ?? "").replace(/\D/g, "");
+  }
+  return normalizeStoredPhone(phoneFromJid(jid));
 }
 
 /** Teléfono real + JID para responder (Baileys usa @lid cuando oculta el número). */
@@ -230,8 +254,7 @@ async function startBaileys(session) {
     if (connection === "open") {
       session.status = "CONNECTED";
       session.qrDataUrl = null;
-      const jid = sock.user?.id ?? "";
-      session.phoneNumber = jid.split("@")[0]?.replace(/\D/g, "") ?? null;
+      session.phoneNumber = normalizeStoredPhone(phoneFromJid(sock.user?.id ?? ""));
       await notifyDuMo(session, {
         type: "session.connected",
         channelId: session.channelId,

@@ -1,6 +1,6 @@
 import "server-only";
 import { webQrConversationId } from "@/lib/web-qr/conversation-id";
-import { isLikelyWhatsAppLid } from "@/lib/whatsapp/phone";
+import { isLikelyWhatsAppLid, normalizeWhatsAppPhoneDigits } from "@/lib/whatsapp/phone";
 import { getConversationRepository } from "@/repositories/conversation.repository";
 import { webQrRepository } from "@/repositories/web-qr.repository";
 import { leadsService } from "@/services/leads.service";
@@ -11,7 +11,7 @@ async function resolveWebQrConversationId(
   senderJid?: string,
 ): Promise<{ conversationId: string; phone: string }> {
   const repo = getConversationRepository();
-  const digits = phone.replace(/\D/g, "");
+  const digits = normalizeWhatsAppPhoneDigits(phone);
 
   if (senderJid?.trim()) {
     const existing = await repo.findConversationIdByWaChatJid(senderJid.trim());

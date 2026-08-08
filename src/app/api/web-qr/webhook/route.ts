@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import crypto from "node:crypto";
 import { persistWebQrInbound } from "@/server/web-qr/inbound";
+import { normalizeWhatsAppPhoneDigits } from "@/lib/whatsapp/phone";
 import { webQrWebhookSecret } from "@/server/web-qr/config";
 import type { BridgeInboundPayload } from "@/server/web-qr/types";
 import { webQrRepository } from "@/repositories/web-qr.repository";
@@ -37,7 +38,8 @@ export async function POST(request: NextRequest) {
   }
 
   if (body.type === "session.connected" && body.channelId && body.phoneNumber) {
-    await webQrRepository.updateChannelStatus(body.channelId, "CONNECTED", body.phoneNumber);
+    const phone = normalizeWhatsAppPhoneDigits(body.phoneNumber);
+    await webQrRepository.updateChannelStatus(body.channelId, "CONNECTED", phone);
     await webQrRepository.updateSessionBridge({
       channelId: body.channelId,
       bridgeSessionId: `bridge-${body.channelId}`,

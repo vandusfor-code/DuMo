@@ -6,6 +6,7 @@ import {
   bridgeGetSessionStatusOrNull,
   bridgeDisconnectSession,
 } from "@/server/web-qr/bridge-client";
+import { normalizeWhatsAppPhoneDigits } from "@/lib/whatsapp/phone";
 import { webQrBridgeUrl, webQrConfigured, webQrWebhookSecret } from "@/server/web-qr/config";
 
 export const runtime = "nodejs";
@@ -87,7 +88,8 @@ export async function POST(_request: Request, { params }: RouteCtx) {
     });
 
     if (status.status === "CONNECTED" && status.phoneNumber) {
-      await webQrRepository.updateChannelStatus(channelId, "CONNECTED", status.phoneNumber);
+      const phone = normalizeWhatsAppPhoneDigits(status.phoneNumber);
+      await webQrRepository.updateChannelStatus(channelId, "CONNECTED", phone);
     }
 
     return NextResponse.json({
@@ -145,7 +147,8 @@ export async function GET(_request: Request, { params }: RouteCtx) {
     });
   }
   if (status.status === "CONNECTED" && status.phoneNumber) {
-    await webQrRepository.updateChannelStatus(channelId, "CONNECTED", status.phoneNumber);
+    const phone = normalizeWhatsAppPhoneDigits(status.phoneNumber);
+    await webQrRepository.updateChannelStatus(channelId, "CONNECTED", phone);
     await webQrRepository.updateSessionBridge({ channelId, bridgeSessionId });
   } else if (status.status === "DISCONNECTED") {
     await webQrRepository.updateChannelStatus(channelId, "DISCONNECTED");
