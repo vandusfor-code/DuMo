@@ -8,6 +8,10 @@
 
 const BUSINESS_TZ = "America/Santiago";
 
+/** Zona horaria para mostrar horas en chat y UI operativa (DuMo Colombia). */
+export const DISPLAY_TIMEZONE =
+  process.env.NEXT_PUBLIC_APP_TIMEZONE?.trim() || "America/Bogota";
+
 // en-CA formats as yyyy-mm-dd, which is exactly the storage format we use.
 const ISO_DATE_FMT = new Intl.DateTimeFormat("en-CA", {
   timeZone: BUSINESS_TZ,

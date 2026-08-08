@@ -1,7 +1,9 @@
 /**
- * Formatting helpers. The product targets Chilean advisors (RUT, CLP),
- * so dates and currency use es-CL conventions.
+ * Formatting helpers. Dates/currency use es-CL for sales; chat times use
+ * Colombia (America/Bogota) because Vercel runs in UTC and advisors work in CO.
  */
+
+import { DISPLAY_TIMEZONE } from "@/lib/date";
 
 const LONG_DATE = new Intl.DateTimeFormat("es-CL", {
   day: "numeric",
@@ -34,33 +36,44 @@ export function formatDateTime(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
   const datePart = LONG_DATE.format(date);
-  const timePart = new Intl.DateTimeFormat("es-CL", {
+  const timePart = new Intl.DateTimeFormat("es-CO", {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
+    timeZone: DISPLAY_TIMEZONE,
   }).format(date);
   return `${datePart}, ${timePart}`;
 }
 
-/** Chat time: "3:25 p. m." if today, else "dd/mm" — WhatsApp-style. */
+/** yyyy-mm-dd in a given IANA timezone — for same-day checks in chat. */
+function calendarDayKey(date: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+/** Chat time: "8:25 a. m." if today (Colombia), else "dd/mm". */
 export function formatChatTime(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
   const now = new Date();
   const sameDay =
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate();
+    calendarDayKey(date, DISPLAY_TIMEZONE) === calendarDayKey(now, DISPLAY_TIMEZONE);
   if (sameDay) {
-    return new Intl.DateTimeFormat("es-CL", {
+    return new Intl.DateTimeFormat("es-CO", {
       hour: "numeric",
       minute: "2-digit",
       hour12: true,
+      timeZone: DISPLAY_TIMEZONE,
     }).format(date);
   }
-  return new Intl.DateTimeFormat("es-CL", {
+  return new Intl.DateTimeFormat("es-CO", {
     day: "2-digit",
     month: "2-digit",
+    timeZone: DISPLAY_TIMEZONE,
   }).format(date);
 }
 
