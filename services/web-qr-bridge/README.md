@@ -37,6 +37,18 @@ NEXT_PUBLIC_APP_URL=https://du-mo.vercel.app
 4. Mensajes entrantes → bridge → POST `/api/web-qr/webhook` → bandeja Leads (`webqr:{tel}`)
 5. Respuesta asesora → `leads.service` → bridge `/send`
 
+## Migrar un número desde dulabs (WABA) a QR
+
+1. **Railway:** volumen en `/data/sessions`, `SESSIONS_DIR=/data/sessions`, secrets alineados con Vercel.
+2. **DuMo:** `/admin/web-qr` → Agregar línea → Generar QR → escanear → estado **Conectado**.
+3. **Probar** (con dulabs aún activo):
+   - Mensaje de prueba **al** número desde otro celular → debe entrar en Leads como `webqr:573…`
+   - Responder desde DuMo → el cliente lo recibe
+4. **Verificar:** `GET https://du-mo.vercel.app/api/system/web-qr` → `readyForQr: true`
+   - O local: `node scripts/verify-web-qr-cutover.mjs`
+5. **Cortar dulabs:** desactivar reenvío webhook a DuMo (evita el mismo chat en dos hilos).
+6. **Asesoras:** chats nuevos van al hilo `webqr:…`; historial WABA viejo sigue en hilo `573…` (sin migrar).
+
 ## Aislamiento WABA
 
 Este módulo **no modifica** `/api/whatsapp/*` ni `connected_numbers`. Las conversaciones QR usan ID `webqr:573001234567`.

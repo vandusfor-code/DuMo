@@ -17,9 +17,11 @@ export function useAdminConversations() {
   return useQuery({
     queryKey: ["admin", "leads", "conversations"],
     queryFn: () => apiGet<AdminConversation[]>("/api/admin/leads"),
-    refetchInterval: 5000,
-    refetchIntervalInBackground: true,
-    retry: 1,
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: false,
+    staleTime: 5000,
+    retry: 2,
+    placeholderData: (prev) => prev,
   });
 }
 

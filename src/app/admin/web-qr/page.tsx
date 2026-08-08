@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireAdministradorSession } from "@/lib/require-administrador";
 import { WebQrConnectPanel } from "@/components/admin/web-qr/web-qr-connect-panel";
+import { WebQrCutoverChecklist } from "@/components/admin/web-qr/web-qr-cutover-checklist";
 
 export default async function AdminWebQrPage() {
   const session = await requireAdministradorSession();
@@ -16,6 +17,7 @@ export default async function AdminWebQrPage() {
           restricciones de la API comercial.
         </p>
       </header>
+      <WebQrCutoverChecklist />
       <WebQrConnectPanel />
     </div>
   );
