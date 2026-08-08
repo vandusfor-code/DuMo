@@ -116,6 +116,7 @@ function extractInboundSender(msg) {
   return { from: fromDigits, senderJid: senderJid || undefined };
 }
 
+async function startBaileys(session) {
   const dir = path.join(SESSIONS_DIR, session.channelId);
   fs.mkdirSync(dir, { recursive: true });
 
