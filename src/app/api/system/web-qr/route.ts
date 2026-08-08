@@ -60,7 +60,12 @@ export async function GET() {
   }
   if (rawBridgeUrl && !/^https?:\/\//i.test(rawBridgeUrl)) {
     problems.push(
-      `WEB_QR_BRIDGE_URL="${rawBridgeUrl}" no incluye https:// — DuMo ya lo corrige en código; redeploy recomendado, o pon https:// explícito en Vercel.`,
+      `WEB_QR_BRIDGE_URL="${rawBridgeUrl}" no incluye https:// — DuMo lo corrige en código; mejor pon https:// explícito.`,
+    );
+  }
+  if (rawBridgeUrl?.includes("/health")) {
+    problems.push(
+      'WEB_QR_BRIDGE_URL no debe terminar en /health — usa solo la raíz: https://dumo-production.up.railway.app',
     );
   }
   if (host === "railway.app" || host === "www.railway.app") {

@@ -1,11 +1,25 @@
 import "server-only";
 
-/** Acepta host sin protocolo (error común en Vercel): dumo-production.up.railway.app */
+/** Acepta host sin protocolo o con /health pegado por error en Vercel. */
 export function normalizeBridgeUrl(raw: string | null | undefined): string | null {
-  const trimmed = raw?.trim();
+  let trimmed = raw?.trim();
   if (!trimmed) return null;
-  if (/^https?:\/\//i.test(trimmed)) return trimmed.replace(/\/$/, "");
-  return `https://${trimmed.replace(/\/$/, "")}`;
+
+  trimmed = trimmed.replace(/\/+$/, "");
+  if (!/^https?:\/\//i.test(trimmed)) {
+    trimmed = `https://${trimmed}`;
+  }
+
+  try {
+    const u = new URL(trimmed);
+    // El bridge expone /health, /sessions en la raíz — no bajo /health/*
+    if (u.pathname && u.pathname !== "/") {
+      u.pathname = "/";
+    }
+    return u.origin;
+  } catch {
+    return trimmed.replace(/\/health\/?$/i, "").replace(/\/$/, "");
+  }
 }
 
 export function webQrBridgeUrl(): string | null {
