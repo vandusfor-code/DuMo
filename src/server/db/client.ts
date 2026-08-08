@@ -238,6 +238,10 @@ async function ensureIncrementalMigrations(sql: Sql): Promise<void> {
     if (!webQrRows[0]?.exists) {
       await runWebQrMigrations(sql);
     }
+
+    // Columnas añadidas después de marcar schema_complete — reparación idempotente.
+    await sql`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS wa_chat_jid text`;
+    await sql`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS last_message_direction text DEFAULT 'in'`;
   } catch (err) {
     console.error("[ensureIncrementalMigrations]", err);
   }
@@ -503,6 +507,10 @@ export function ensureSchema(): Promise<void> {
       withDbRetry(async () => {
         if (await isSchemaMarkedComplete(sql)) {
           await ensureIncrementalMigrations(sql);
+          if (!(await schemaIsComplete(sql))) {
+            console.info("[ensureSchema] faltan columnas — ejecutando migración completa");
+            await runMigrations(sql);
+          }
           return;
         }
         if (await schemaIsComplete(sql)) {

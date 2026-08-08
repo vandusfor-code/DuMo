@@ -163,6 +163,19 @@ export async function GET() {
     }
   }
 
+  const bridgeLastError =
+    health?.body &&
+    typeof health.body === "object" &&
+    Array.isArray((health.body as { active?: unknown[] }).active)
+      ? ((health.body as { active: { lastWebhookError?: string | null; lastWebhookStatus?: number | null }[] })
+          .active.find((s) => s.lastWebhookStatus && s.lastWebhookStatus >= 400)?.lastWebhookError ?? null)
+      : null;
+  if (bridgeLastError?.includes("wa_chat_jid")) {
+    problems.push(
+      "Mensajes QR fallan al guardar: falta columna wa_chat_jid en la BD. Tras el deploy, abre /api/system/db una vez para aplicar la migración.",
+    );
+  }
+
   return NextResponse.json({
     configured,
     bridgeHost: host,
