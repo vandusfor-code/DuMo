@@ -61,7 +61,13 @@ export async function POST(request: NextRequest) {
   }
 
   if (body.type === "message.inbound" && body.payload) {
-    await persistWebQrInbound(body.payload);
+    try {
+      await persistWebQrInbound(body.payload);
+    } catch (error) {
+      console.error("[POST /api/web-qr/webhook] inbound:", error);
+      const message = error instanceof Error ? error.message : "Error persistiendo mensaje QR";
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
     return NextResponse.json({ ok: true });
   }
 

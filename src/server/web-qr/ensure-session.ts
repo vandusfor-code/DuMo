@@ -8,7 +8,7 @@ function bridgeSessionId(channelId: string): string {
   return `bridge-${channelId}`;
 }
 
-/** Reconecta Baileys tras reinicio del bridge antes de enviar mensajes. */
+/** Reconecta Baileys y sincroniza webhook antes de enviar/recibir. */
 export async function ensureWebQrBridgeReady(channelId: string): Promise<void> {
   const channel = await webQrRepository.findWebQrChannelForRouting(channelId);
   if (!channel) {
@@ -19,8 +19,6 @@ export async function ensureWebQrBridgeReady(channelId: string): Promise<void> {
 
   const resolvedId = channel.id;
   const sessionId = bridgeSessionId(resolvedId);
-  const live = await bridgeGetSessionStatusOrNull(sessionId);
-  if (live?.status === "CONNECTED") return;
 
   const webhookSecret = webQrWebhookSecret();
   if (!webhookSecret) {
@@ -30,6 +28,7 @@ export async function ensureWebQrBridgeReady(channelId: string): Promise<void> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://du-mo.vercel.app";
   const webhookUrl = `${appUrl.replace(/\/$/, "")}/api/web-qr/webhook`;
 
+  // Siempre registrar en bridge (actualiza webhook tras reinicios de Railway).
   await bridgeCreateSession({
     channelId: resolvedId,
     label: channel.label,
@@ -37,15 +36,30 @@ export async function ensureWebQrBridgeReady(channelId: string): Promise<void> {
     webhookSecret,
   });
 
-  for (let i = 0; i < 25; i++) {
+  let live = await bridgeGetSessionStatusOrNull(sessionId);
+  if (live?.status === "CONNECTED") {
+    await webQrRepository.updateChannelStatus(
+      resolvedId,
+      "CONNECTED",
+      normalizeWhatsAppPhoneDigits(live.phoneNumber ?? ""),
+    );
+    await webQrRepository.updateSessionBridge({ channelId: resolvedId, bridgeSessionId: sessionId });
+    return;
+  }
+
+  for (let i = 0; i < 20; i++) {
     await new Promise((r) => setTimeout(r, 1000));
-    const status = await bridgeGetSessionStatusOrNull(sessionId);
-    if (status?.status === "CONNECTED") {
-      await webQrRepository.updateChannelStatus(resolvedId, "CONNECTED", normalizeWhatsAppPhoneDigits(status.phoneNumber ?? ""));
+    live = await bridgeGetSessionStatusOrNull(sessionId);
+    if (live?.status === "CONNECTED") {
+      await webQrRepository.updateChannelStatus(
+        resolvedId,
+        "CONNECTED",
+        normalizeWhatsAppPhoneDigits(live.phoneNumber ?? ""),
+      );
       await webQrRepository.updateSessionBridge({ channelId: resolvedId, bridgeSessionId: sessionId });
       return;
     }
-    if (status?.status === "QR_PENDING") {
+    if (live?.status === "QR_PENDING") {
       throw new Error(
         "WhatsApp Web desconectado. Ve a Admin → WhatsApp Web (QR) y escanea el código de nuevo.",
       );
@@ -55,4 +69,13 @@ export async function ensureWebQrBridgeReady(channelId: string): Promise<void> {
   throw new Error(
     "WhatsApp Web aún reconectando. Espera unos segundos e intenta de nuevo.",
   );
+}
+
+/** Igual que ensureWebQrBridgeReady pero sin lanzar — para precalentar al abrir admin. */
+export async function warmWebQrBridgeSession(channelId: string): Promise<void> {
+  try {
+    await ensureWebQrBridgeReady(channelId);
+  } catch {
+    /* el admin verá el estado real en la UI */
+  }
 }

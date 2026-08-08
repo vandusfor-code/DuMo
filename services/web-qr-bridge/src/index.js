@@ -63,13 +63,18 @@ function auth(req, res, next) {
 }
 
 async function notifyDuMo(session, body) {
-  if (!session.webhookUrl || !session.webhookSecret) return;
+  const webhookUrl = session.webhookUrl || process.env.DUMO_WEBHOOK_URL || "";
+  const webhookSecret = session.webhookSecret || process.env.DUMO_WEBHOOK_SECRET || "";
+  if (!webhookUrl || !webhookSecret) {
+    log.error({ channelId: session.channelId, type: body.type }, "webhook DuMo NO configurado — evento perdido");
+    return;
+  }
   try {
-    const res = await fetch(session.webhookUrl, {
+    const res = await fetch(webhookUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Web-Qr-Webhook-Secret": session.webhookSecret,
+        "X-Web-Qr-Webhook-Secret": webhookSecret,
       },
       body: JSON.stringify(body),
     });
@@ -81,7 +86,7 @@ async function notifyDuMo(session, body) {
       );
     }
   } catch (err) {
-    log.error({ err, channelId: session.channelId }, "webhook DuMo falló");
+    log.error({ err, channelId: session.channelId, type: body.type }, "webhook DuMo falló");
   }
 }
 
@@ -252,6 +257,12 @@ async function startBaileys(session) {
     }
 
     if (connection === "open") {
+      if (!session.webhookUrl && process.env.DUMO_WEBHOOK_URL) {
+        session.webhookUrl = process.env.DUMO_WEBHOOK_URL;
+      }
+      if (!session.webhookSecret && process.env.DUMO_WEBHOOK_SECRET) {
+        session.webhookSecret = process.env.DUMO_WEBHOOK_SECRET;
+      }
       session.status = "CONNECTED";
       session.qrDataUrl = null;
       session.phoneNumber = normalizeStoredPhone(phoneFromJid(sock.user?.id ?? ""));
@@ -316,6 +327,7 @@ async function startBaileys(session) {
           customerName: msg.pushName ?? "",
         },
       });
+      log.info({ channelId: session.channelId, from, messageId: msg.key.id }, "mensaje QR reenviado a DuMo");
     }
   });
   } finally {
@@ -366,9 +378,21 @@ app.post("/sessions", auth, async (req, res) => {
   });
 });
 
-app.get("/sessions/:sessionId", auth, (req, res) => {
-  const session = sessions.get(req.params.sessionId);
-  if (!session) return res.status(404).json({ error: "Sesión no encontrada" });
+app.get("/sessions/:sessionId", auth, async (req, res) => {
+  const sessionId = req.params.sessionId;
+  const channelId = sessionId.replace(/^bridge-/, "");
+  let session = sessions.get(sessionId);
+
+  if (!session && hasPersistedCreds(channelId)) {
+    log.info({ channelId }, "GET /sessions — restaurando sesión desde disco");
+    session = bootstrapSession(channelId);
+    await waitForConnected(session, 10);
+  }
+
+  if (!session) {
+    return res.status(404).json({ error: "Sesión no encontrada" });
+  }
+
   res.json({
     sessionId: session.sessionId,
     status: session.status,

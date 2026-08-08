@@ -21,41 +21,35 @@ async function ensureBridgeSession(input: {
   webhookUrl: string;
   webhookSecret: string;
 }) {
-  const existing = await webQrRepository.getSessionByChannel(input.channelId);
-  let bridgeSessionId = existing?.bridgeSessionId ?? `bridge-${input.channelId}`;
+  const bridgeSessionId = `bridge-${input.channelId}`;
 
-  const live = await bridgeGetSessionStatusOrNull(bridgeSessionId);
-  if (live?.status === "CONNECTED" || live?.status === "QR_PENDING" || live?.status === "INITIALIZING") {
-    if (!existing?.bridgeSessionId) {
-      await webQrRepository.updateSessionBridge({ channelId: input.channelId, bridgeSessionId });
-    }
-    return { bridgeSessionId, status: live };
-  }
-
-  const created = await bridgeCreateSession({
+  await bridgeCreateSession({
     channelId: input.channelId,
     label: input.label,
     webhookUrl: input.webhookUrl,
     webhookSecret: input.webhookSecret,
   });
-  bridgeSessionId = created.sessionId;
-  await webQrRepository.updateSessionBridge({
-    channelId: input.channelId,
-    bridgeSessionId,
-  });
+  await webQrRepository.updateSessionBridge({ channelId: input.channelId, bridgeSessionId });
+
+  let status = await bridgeGetSessionStatusOrNull(bridgeSessionId);
+  if (status?.status === "CONNECTED" || status?.qrDataUrl) {
+    return { bridgeSessionId, status };
+  }
+
   await webQrRepository.updateChannelStatus(input.channelId, "INITIALIZING");
 
-  // Baileys tarda unos segundos en emitir el QR
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 12; i++) {
     await new Promise((r) => setTimeout(r, 1000));
-    const status = await bridgeGetSessionStatusOrNull(bridgeSessionId);
+    status = await bridgeGetSessionStatusOrNull(bridgeSessionId);
     if (status?.qrDataUrl || status?.status === "CONNECTED") {
       return { bridgeSessionId, status };
     }
   }
 
-  const status = await bridgeGetSessionStatusOrNull(bridgeSessionId);
-  return { bridgeSessionId, status: status ?? { sessionId: bridgeSessionId, status: "INITIALIZING" } };
+  return {
+    bridgeSessionId,
+    status: status ?? { sessionId: bridgeSessionId, status: "INITIALIZING" },
+  };
 }
 
 /** Inicia o consulta la sesión QR de un canal WEB_QR. */
