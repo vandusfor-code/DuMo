@@ -25,6 +25,9 @@ COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/server.mjs ./server.mjs
 COPY --from=builder /app/realtime ./realtime
 
+# socket.io vive fuera del trace de Next standalone — necesario para server.mjs
+RUN npm install socket.io@4 --omit=dev --no-audit --no-fund
+
 EXPOSE 8080
 ENV PORT=8080
 
