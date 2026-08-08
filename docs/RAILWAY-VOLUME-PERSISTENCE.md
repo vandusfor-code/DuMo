@@ -20,13 +20,15 @@
 
 | Item | Estado |
 |------|--------|
-| Volumen Railway en `/data/sessions` | ✅ **Agregado** (2026-08-08) |
+| Volumen Railway en `/data/sessions` | ✅ Agregado (2026-08-08) |
 | Env `SESSIONS_DIR=/data/sessions` | ✅ Configurado en bridge |
-| QR escaneado + `persistedSessions ≥ 1` | ⏳ **Pendiente** (operador) |
-| Redeploy de prueba → sesión sobrevive | ⏳ **Pendiente** (operador) |
-| Outbound QR probado end-to-end | ⏳ **Pendiente** (operador) |
+| QR escaneado + `persistedSessions ≥ 1` | ✅ **Verificado** (2026-08-08, channel `webqr-a9cf9c4c-…`) |
+| Redeploy de prueba → sesión sobrevive | ✅ **Verificado** (redeploy vía push `6a9f1b6`; post-redeploy `persistedSessions: 1`, status `CONNECTED`) |
+| Outbound QR probado end-to-end | ✅ Bridge `/send` 200 + tráfico real en Leads (`webqr:573181904896`) |
 
 Hasta completar las filas pendientes, asumir que el volumen está montado pero **no verificado en producción real**.
+
+**Actualización 2026-08-08:** verificación funcional completada — volumen OK, sesión sobrevive redeploy, QR E2E operativo.
 
 ---
 
@@ -90,4 +92,5 @@ Fase 1 cambia migraciones DDL y diagnóstico DB en Vercel. **No toca** el bridge
 |-------|--------|
 | 2026-08-08 | Detectado `persistedSessions: 0` — causa probable: sin volumen |
 | 2026-08-08 | Volumen agregado en Railway (`/data/sessions`) |
-| Pendiente | Verificación funcional QR + redeploy (operador) |
+| 2026-08-08 | Redeploy prueba — `persistedSessions` sigue en 1, sesión CONNECTED |
+| 2026-08-08 | QR E2E: inbound/outbound confirmado en producción |
