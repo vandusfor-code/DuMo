@@ -12,6 +12,15 @@ const handle = app.getRequestHandler();
 
 await app.prepare();
 
+try {
+  const { register } = await import("./.next/server/instrumentation.js");
+  if (typeof register === "function") {
+    await register();
+  }
+} catch (err) {
+  console.warn("[server] instrumentation register skipped:", err?.message ?? err);
+}
+
 const httpServer = createServer(async (req, res) => {
   try {
     const parsedUrl = parse(req.url ?? "", true);
