@@ -197,4 +197,17 @@ export const webQrRepository = {
       WHERE id = ${channelId} AND channel_type = 'WEB_QR'
     `;
   },
+
+  /**
+   * Canal WEB_QR para enrutar mensajes. Prefiere el id guardado en la conversación;
+   * si fue eliminado, usa la línea conectada o la más reciente.
+   */
+  async findWebQrChannelForRouting(preferredId?: string | null): Promise<WhatsAppChannel | null> {
+    if (preferredId) {
+      const preferred = await this.getChannel(preferredId);
+      if (preferred?.channelType === "WEB_QR") return preferred;
+    }
+    const channels = await this.listWebQrChannels();
+    return channels.find((c) => c.status === "CONNECTED") ?? channels[0] ?? null;
+  },
 };

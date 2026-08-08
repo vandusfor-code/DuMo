@@ -321,12 +321,17 @@ app.post("/sessions", auth, async (req, res) => {
       session.lastError = err instanceof Error ? err.message : String(err);
       log.error({ err, channelId }, "startBaileys falló");
     });
-  } else if (!session.sock && session.status !== "QR_PENDING") {
-    log.info({ channelId }, "reiniciando sesión Baileys en memoria");
-    startBaileys(session).catch((err) => {
-      session.lastError = err instanceof Error ? err.message : String(err);
-      log.error({ err, channelId }, "startBaileys falló");
-    });
+  } else {
+    if (label) session.label = label;
+    if (webhookUrl) session.webhookUrl = webhookUrl;
+    if (webhookSecret) session.webhookSecret = webhookSecret;
+    if (!session.sock && session.status !== "QR_PENDING") {
+      log.info({ channelId }, "reiniciando sesión Baileys en memoria");
+      startBaileys(session).catch((err) => {
+        session.lastError = err instanceof Error ? err.message : String(err);
+        log.error({ err, channelId }, "startBaileys falló");
+      });
+    }
   }
 
   res.json({

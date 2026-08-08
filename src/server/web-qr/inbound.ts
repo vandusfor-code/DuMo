@@ -2,6 +2,7 @@ import "server-only";
 import { webQrConversationId } from "@/lib/web-qr/conversation-id";
 import { isLikelyWhatsAppLid } from "@/lib/whatsapp/phone";
 import { getConversationRepository } from "@/repositories/conversation.repository";
+import { webQrRepository } from "@/repositories/web-qr.repository";
 import { leadsService } from "@/services/leads.service";
 import type { BridgeInboundPayload } from "@/server/web-qr/types";
 
@@ -31,6 +32,13 @@ async function resolveWebQrConversationId(
 }
 
 export async function persistWebQrInbound(payload: BridgeInboundPayload): Promise<void> {
+  let channelId = payload.channelId;
+  const known = await webQrRepository.getChannel(channelId);
+  if (!known) {
+    const fallback = await webQrRepository.findWebQrChannelForRouting(null);
+    if (fallback) channelId = fallback.id;
+  }
+
   const { conversationId, phone } = await resolveWebQrConversationId(
     payload.from,
     payload.senderJid,
@@ -49,7 +57,7 @@ export async function persistWebQrInbound(payload: BridgeInboundPayload): Promis
     customerName: payload.customerName ?? "",
     direction: "in" as const,
     createdAt,
-    dumoPhoneId: payload.channelId,
+    dumoPhoneId: channelId,
     waChatJid: payload.senderJid?.trim() || undefined,
   };
 

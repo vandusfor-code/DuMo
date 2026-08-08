@@ -226,9 +226,6 @@ export const leadsService = {
 
     if (isWebQrConversation(input.conversationId)) {
       const channelId = await resolveWebQrChannelId(input.conversationId);
-      if (!channelId) {
-        throw new Error("No se encontró el canal WhatsApp Web de esta conversación.");
-      }
       return sendWebQrText({
         channelId,
         conversationId: input.conversationId,

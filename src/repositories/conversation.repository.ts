@@ -47,6 +47,7 @@ export interface ConversationRepository {
   getSendFromPhoneId(conversationId: string): Promise<string | null>;
   getWaChatJid(conversationId: string): Promise<string | null>;
   findConversationIdByWaChatJid(waChatJid: string): Promise<string | null>;
+  updateDumoPhoneId(conversationId: string, dumoPhoneId: string): Promise<void>;
   /** Token de envío registrado para un phone_number_id conectado. */
   getAccessTokenForPhoneId(phoneNumberId: string): Promise<string | null>;
   /** phone_number_id registrados como conectados a DuMo (números activos). */
@@ -77,6 +78,9 @@ class MockConversationRepository implements ConversationRepository {
   }
   findConversationIdByWaChatJid() {
     return Promise.resolve(null);
+  }
+  updateDumoPhoneId() {
+    return Promise.resolve();
   }
   getAccessTokenForPhoneId() {
     return Promise.resolve(null);
@@ -292,6 +296,14 @@ class PostgresConversationRepository implements ConversationRepository {
     } catch {
       return null;
     }
+  }
+
+  async updateDumoPhoneId(conversationId: string, dumoPhoneId: string): Promise<void> {
+    await ensureSchema();
+    const sql = getSql()!;
+    await sql`
+      UPDATE lead_conversations SET dumo_phone_id = ${dumoPhoneId} WHERE id = ${conversationId}
+    `;
   }
 
   async getAccessTokenForPhoneId(phoneNumberId: string): Promise<string | null> {
