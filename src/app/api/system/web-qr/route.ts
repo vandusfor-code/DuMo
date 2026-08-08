@@ -5,6 +5,8 @@ import {
   webQrConfigured,
   webQrWebhookSecret,
 } from "@/server/web-qr/config";
+import { bridgeTestWebhook } from "@/server/web-qr/bridge-client";
+import { verifyWebQrWebhookReachable } from "@/server/web-qr/verify-webhook";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -77,13 +79,59 @@ export async function GET() {
     problems.push("DuMo no pudo obtener /health del bridge — revisa la URL y que Railway esté desplegado.");
   }
 
+  const webhookReachable = configured ? await verifyWebQrWebhookReachable() : null;
+  if (webhookReachable && !webhookReachable.ok) {
+    problems.push(
+      `Webhook QR no responde OK (${webhookReachable.status ?? "?"}): ${webhookReachable.error ?? "secreto incorrecto"}. WEB_QR_WEBHOOK_SECRET (Vercel) debe ser idéntico a DUMO_WEBHOOK_SECRET (Railway).`,
+    );
+  }
+
+  let bridgeWebhookTest: {
+    ok: boolean;
+    lastWebhookStatus?: number;
+    lastWebhookError?: string | null;
+    webhookConfigured?: boolean;
+  } | null = null;
+
+  const activeChannelId =
+    health?.body &&
+    typeof health.body === "object" &&
+    Array.isArray((health.body as { active?: unknown[] }).active)
+      ? ((health.body as { active: { channelId?: string; status?: string }[] }).active.find(
+          (s) => s.status === "CONNECTED",
+        )?.channelId ?? null)
+      : null;
+
+  if (configured && activeChannelId) {
+    try {
+      bridgeWebhookTest = await bridgeTestWebhook(activeChannelId);
+      if (!bridgeWebhookTest.ok) {
+        problems.push(
+          `Bridge → DuMo webhook falló (HTTP ${bridgeWebhookTest.lastWebhookStatus ?? "?"}): ${bridgeWebhookTest.lastWebhookError ?? "revisa DUMO_WEBHOOK_SECRET en Railway"}.`,
+        );
+      }
+    } catch (err) {
+      bridgeWebhookTest = {
+        ok: false,
+        lastWebhookError: err instanceof Error ? err.message : String(err),
+      };
+      problems.push("No se pudo probar webhook desde el bridge.");
+    }
+  }
+
   return NextResponse.json({
     configured,
     bridgeHost: host,
     webhookSecretSet: Boolean(webQrWebhookSecret()),
     bridgeSecretSet: Boolean(webQrBridgeSecret()),
     health,
-    readyForQr: configured && health?.ok === true,
+    webhookReachable,
+    bridgeWebhookTest,
+    readyForQr:
+      configured &&
+      health?.ok === true &&
+      webhookReachable?.ok === true &&
+      (bridgeWebhookTest?.ok ?? true),
     problems,
     hint: "Admin UI: /admin/web-qr (solo administrador).",
   });

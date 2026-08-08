@@ -63,9 +63,11 @@ function auth(req, res, next) {
 }
 
 async function notifyDuMo(session, body) {
-  const webhookUrl = session.webhookUrl || process.env.DUMO_WEBHOOK_URL || "";
-  const webhookSecret = session.webhookSecret || process.env.DUMO_WEBHOOK_SECRET || "";
+  const webhookUrl = (session.webhookUrl || process.env.DUMO_WEBHOOK_URL || "").trim();
+  const webhookSecret = (session.webhookSecret || process.env.DUMO_WEBHOOK_SECRET || "").trim();
   if (!webhookUrl || !webhookSecret) {
+    session.lastWebhookStatus = 0;
+    session.lastWebhookError = "webhook no configurado";
     log.error({ channelId: session.channelId, type: body.type }, "webhook DuMo NO configurado — evento perdido");
     return;
   }
@@ -78,14 +80,21 @@ async function notifyDuMo(session, body) {
       },
       body: JSON.stringify(body),
     });
+    session.lastWebhookStatus = res.status;
+    session.lastWebhookAt = new Date().toISOString();
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
+      session.lastWebhookError = detail.slice(0, 200) || `HTTP ${res.status}`;
       log.error(
-        { status: res.status, detail: detail.slice(0, 200), channelId: session.channelId, type: body.type },
+        { status: res.status, detail: session.lastWebhookError, channelId: session.channelId, type: body.type },
         "webhook DuMo respondió error",
       );
+    } else {
+      session.lastWebhookError = null;
     }
   } catch (err) {
+    session.lastWebhookStatus = 0;
+    session.lastWebhookError = err instanceof Error ? err.message : String(err);
     log.error({ err, channelId: session.channelId, type: body.type }, "webhook DuMo falló");
   }
 }
@@ -145,6 +154,30 @@ function extractInboundSender(msg) {
   return { from: fromDigits, senderJid: senderJid || undefined };
 }
 
+function extractMessageText(msg) {
+  const m = msg.message;
+  if (!m) return "";
+  return (
+    m.conversation ??
+    m.extendedTextMessage?.text ??
+    m.imageMessage?.caption ??
+    m.videoMessage?.caption ??
+    m.documentMessage?.caption ??
+    m.buttonsResponseMessage?.selectedDisplayText ??
+    m.listResponseMessage?.title ??
+    m.templateButtonReplyMessage?.selectedDisplayText ??
+    ""
+  );
+}
+
+function shouldSkipInboundJid(remoteJid) {
+  if (!remoteJid) return true;
+  if (remoteJid === "status@broadcast") return true;
+  if (remoteJid.endsWith("@broadcast")) return true;
+  if (remoteJid.endsWith("@newsletter")) return true;
+  return false;
+}
+
 function hasPersistedCreds(channelId) {
   return fs.existsSync(path.join(SESSIONS_DIR, channelId, "creds.json"));
 }
@@ -155,13 +188,16 @@ function createSessionRuntime(channelId, overrides = {}) {
     sessionId,
     channelId,
     label: overrides.label ?? channelId,
-    webhookUrl: overrides.webhookUrl ?? process.env.DUMO_WEBHOOK_URL ?? "",
-    webhookSecret: overrides.webhookSecret ?? process.env.DUMO_WEBHOOK_SECRET ?? "",
+    webhookUrl: (overrides.webhookUrl ?? process.env.DUMO_WEBHOOK_URL ?? "").trim(),
+    webhookSecret: (overrides.webhookSecret ?? process.env.DUMO_WEBHOOK_SECRET ?? "").trim(),
     status: "INITIALIZING",
     qrDataUrl: null,
     phoneNumber: null,
     sock: null,
     lastError: null,
+    lastWebhookStatus: null,
+    lastWebhookError: null,
+    lastWebhookAt: null,
   };
 }
 
@@ -258,10 +294,10 @@ async function startBaileys(session) {
 
     if (connection === "open") {
       if (!session.webhookUrl && process.env.DUMO_WEBHOOK_URL) {
-        session.webhookUrl = process.env.DUMO_WEBHOOK_URL;
+        session.webhookUrl = process.env.DUMO_WEBHOOK_URL.trim();
       }
       if (!session.webhookSecret && process.env.DUMO_WEBHOOK_SECRET) {
-        session.webhookSecret = process.env.DUMO_WEBHOOK_SECRET;
+        session.webhookSecret = process.env.DUMO_WEBHOOK_SECRET.trim();
       }
       session.status = "CONNECTED";
       session.qrDataUrl = null;
@@ -272,6 +308,7 @@ async function startBaileys(session) {
         phoneNumber: session.phoneNumber,
         sessionData: { connectedAt: new Date().toISOString() },
       });
+      await notifyDuMo(session, { type: "ping" });
       io.to(session.sessionId).emit("connected", { phoneNumber: session.phoneNumber });
     }
 
@@ -302,17 +339,26 @@ async function startBaileys(session) {
   });
 
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
-    if (type !== "notify") return;
+    if (type !== "notify" && type !== "append") return;
+    const nowSec = Math.floor(Date.now() / 1000);
+
     for (const msg of messages) {
       if (msg.key.fromMe) continue;
-      const { from, senderJid } = extractInboundSender(msg);
-      if (!from && !senderJid) continue;
 
-      const text =
-        msg.message?.conversation ??
-        msg.message?.extendedTextMessage?.text ??
-        msg.message?.imageMessage?.caption ??
-        "";
+      const remoteJid = msg.key.remoteJid ?? "";
+      if (shouldSkipInboundJid(remoteJid)) continue;
+
+      const ts = Number(msg.messageTimestamp ?? 0);
+      if (type === "append" && ts && nowSec - ts > 120) continue;
+
+      const { from, senderJid } = extractInboundSender(msg);
+      if (!from && !senderJid) {
+        log.warn({ channelId: session.channelId, remoteJid, type }, "mensaje QR sin remitente");
+        continue;
+      }
+
+      const text = extractMessageText(msg);
+      const isImage = Boolean(msg.message?.imageMessage);
 
       await notifyDuMo(session, {
         type: "message.inbound",
@@ -321,13 +367,16 @@ async function startBaileys(session) {
           from,
           senderJid,
           messageId: msg.key.id ?? `qr-${Date.now()}`,
-          timestamp: Number(msg.messageTimestamp ?? Math.floor(Date.now() / 1000)),
-          type: msg.message?.imageMessage ? "image" : "text",
+          timestamp: ts || nowSec,
+          type: isImage ? "image" : "text",
           text: text || undefined,
           customerName: msg.pushName ?? "",
         },
       });
-      log.info({ channelId: session.channelId, from, messageId: msg.key.id }, "mensaje QR reenviado a DuMo");
+      log.info(
+        { channelId: session.channelId, from, senderJid, messageId: msg.key.id, upsertType: type },
+        "mensaje QR reenviado a DuMo",
+      );
     }
   });
   } finally {
@@ -343,13 +392,16 @@ app.post("/sessions", auth, async (req, res) => {
   if (!channelId) return res.status(400).json({ error: "channelId requerido" });
 
   const sessionId = `bridge-${channelId}`;
+  const trimmedWebhookUrl = (webhookUrl ?? process.env.DUMO_WEBHOOK_URL ?? "").trim();
+  const trimmedWebhookSecret = (webhookSecret ?? process.env.DUMO_WEBHOOK_SECRET ?? "").trim();
+
   let session = sessions.get(sessionId);
   if (!session) {
     log.info({ channelId }, "nueva sesión Baileys");
     session = createSessionRuntime(channelId, {
       label: label ?? channelId,
-      webhookUrl: webhookUrl ?? process.env.DUMO_WEBHOOK_URL ?? "",
-      webhookSecret: webhookSecret ?? process.env.DUMO_WEBHOOK_SECRET ?? "",
+      webhookUrl: trimmedWebhookUrl,
+      webhookSecret: trimmedWebhookSecret,
     });
     sessions.set(sessionId, session);
     startBaileys(session).catch((err) => {
@@ -358,8 +410,8 @@ app.post("/sessions", auth, async (req, res) => {
     });
   } else {
     if (label) session.label = label;
-    if (webhookUrl) session.webhookUrl = webhookUrl;
-    if (webhookSecret) session.webhookSecret = webhookSecret;
+    if (trimmedWebhookUrl) session.webhookUrl = trimmedWebhookUrl;
+    if (trimmedWebhookSecret) session.webhookSecret = trimmedWebhookSecret;
     if (!session.sock && session.status !== "QR_PENDING") {
       log.info({ channelId }, "reiniciando sesión Baileys en memoria");
       startBaileys(session).catch((err) => {
@@ -375,6 +427,9 @@ app.post("/sessions", auth, async (req, res) => {
     qrDataUrl: session.qrDataUrl ?? undefined,
     phoneNumber: session.phoneNumber ?? undefined,
     lastError: session.lastError ?? undefined,
+    webhookConfigured: Boolean(session.webhookUrl && session.webhookSecret),
+    lastWebhookStatus: session.lastWebhookStatus ?? undefined,
+    lastWebhookError: session.lastWebhookError ?? undefined,
   });
 });
 
@@ -481,15 +536,44 @@ app.post("/send", auth, async (req, res) => {
   }
 });
 
+app.post("/test-webhook", auth, async (req, res) => {
+  const { channelId } = req.body ?? {};
+  if (!channelId) return res.status(400).json({ error: "channelId requerido" });
+
+  const sessionId = `bridge-${channelId}`;
+  let session = sessions.get(sessionId);
+  if (!session && hasPersistedCreds(channelId)) {
+    session = bootstrapSession(channelId);
+  }
+  if (!session) {
+    return res.status(404).json({ error: "Sesión no encontrada" });
+  }
+
+  await notifyDuMo(session, { type: "ping" });
+  res.json({
+    ok: session.lastWebhookStatus >= 200 && session.lastWebhookStatus < 300,
+    lastWebhookStatus: session.lastWebhookStatus,
+    lastWebhookError: session.lastWebhookError,
+    webhookConfigured: Boolean(session.webhookUrl && session.webhookSecret),
+  });
+});
+
 app.get("/health", (_req, res) => {
   res.json({
     ok: true,
     sessions: sessions.size,
+    webhookEnvConfigured: Boolean(
+      (process.env.DUMO_WEBHOOK_URL ?? "").trim() && (process.env.DUMO_WEBHOOK_SECRET ?? "").trim(),
+    ),
     active: [...sessions.values()].map((s) => ({
       channelId: s.channelId,
       status: s.status,
       hasQr: Boolean(s.qrDataUrl),
       lastError: s.lastError ?? null,
+      webhookConfigured: Boolean(s.webhookUrl && s.webhookSecret),
+      lastWebhookStatus: s.lastWebhookStatus ?? null,
+      lastWebhookError: s.lastWebhookError ?? null,
+      lastWebhookAt: s.lastWebhookAt ?? null,
     })),
   });
 });

@@ -10,8 +10,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function authorized(request: NextRequest): boolean {
-  const expected = webQrWebhookSecret();
-  const provided = request.headers.get("x-web-qr-webhook-secret");
+  const expected = webQrWebhookSecret()?.trim();
+  const provided = request.headers.get("x-web-qr-webhook-secret")?.trim();
   if (!expected || !provided) return false;
   const a = Buffer.from(provided);
   const b = Buffer.from(expected);
@@ -58,6 +58,10 @@ export async function POST(request: NextRequest) {
   if (body.type === "session.disconnected" && body.channelId) {
     await webQrRepository.updateChannelStatus(body.channelId, "DISCONNECTED");
     return NextResponse.json({ ok: true });
+  }
+
+  if (body.type === "ping") {
+    return NextResponse.json({ ok: true, pong: true });
   }
 
   if (body.type === "message.inbound" && body.payload) {

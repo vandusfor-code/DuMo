@@ -3,6 +3,7 @@ import { normalizeWhatsAppPhoneDigits } from "@/lib/whatsapp/phone";
 import { webQrRepository } from "@/repositories/web-qr.repository";
 import { bridgeCreateSession, bridgeGetSessionStatusOrNull } from "@/server/web-qr/bridge-client";
 import { webQrWebhookSecret } from "@/server/web-qr/config";
+import { verifyWebQrWebhookReachable } from "@/server/web-qr/verify-webhook";
 
 function bridgeSessionId(channelId: string): string {
   return `bridge-${channelId}`;
@@ -33,8 +34,15 @@ export async function ensureWebQrBridgeReady(channelId: string): Promise<void> {
     channelId: resolvedId,
     label: channel.label,
     webhookUrl,
-    webhookSecret,
+    webhookSecret: webhookSecret.trim(),
   });
+
+  const webhookCheck = await verifyWebQrWebhookReachable();
+  if (!webhookCheck.ok) {
+    throw new Error(
+      `Webhook QR rechazado (${webhookCheck.status ?? "?"}): ${webhookCheck.error ?? "revisa WEB_QR_WEBHOOK_SECRET en Vercel y DUMO_WEBHOOK_SECRET en Railway"}`,
+    );
+  }
 
   let live = await bridgeGetSessionStatusOrNull(sessionId);
   if (live?.status === "CONNECTED") {

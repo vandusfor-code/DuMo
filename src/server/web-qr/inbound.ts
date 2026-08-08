@@ -75,7 +75,9 @@ export async function persistWebQrInbound(payload: BridgeInboundPayload): Promis
   if (!body && payload.type !== "text") {
     body = `⚠️ DuMo recibió ${payload.type} por WhatsApp Web. Pide al cliente que envíe texto o imagen.`;
   }
-  if (!body) return;
+  if (!body) {
+    body = "📩 Mensaje recibido por WhatsApp Web";
+  }
 
   await leadsService.receiveMessage({
     ...baseMessage,

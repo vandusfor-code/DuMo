@@ -88,4 +88,17 @@ export async function bridgeSendText(input: {
   });
 }
 
+/** Prueba el webhook Railway → Vercel con el secreto de la sesión activa. */
+export async function bridgeTestWebhook(channelId: string): Promise<{
+  ok: boolean;
+  lastWebhookStatus?: number;
+  lastWebhookError?: string | null;
+  webhookConfigured?: boolean;
+}> {
+  return bridgeFetch("/test-webhook", {
+    method: "POST",
+    body: JSON.stringify({ channelId }),
+  });
+}
+
 export type { BridgeInboundPayload };
