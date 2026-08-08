@@ -61,7 +61,7 @@ export async function GET() {
     pageIdConfigured: configuredPageIds.length > 0,
     configuredPageIds: configuredPageIds.map(mask),
     pageName: integration?.pageName ?? null,
-    webhookPath: "/api/whatsapp/webhook",
+    webhookPath: "/api/messenger/webhook",
     requiredMetaSubscription: "messages (objeto Page)",
     messengerConversations,
     lastMessengerInboundAt: lastInboundAt,

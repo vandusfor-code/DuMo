@@ -1,12 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import crypto from "node:crypto";
 import { leadsService } from "@/services/leads.service";
-import { persistMessengerInbound } from "@/server/messenger/inbound";
-import {
-  allowedMessengerPageIds,
-  getMessengerIntegrationConfig,
-  matchesWebhookVerifyToken,
-} from "@/server/messenger/config";
 import { resolveAllowedPhoneIds } from "@/server/whatsapp/webhook-allowlist";
 
 export const runtime = "nodejs";
@@ -41,7 +35,9 @@ export async function GET(request: NextRequest) {
   const mode = params.get("hub.mode");
   const token = params.get("hub.verify_token");
   const challenge = params.get("hub.challenge");
-  if (mode === "subscribe" && matchesWebhookVerifyToken(token)) {
+  const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN?.trim();
+
+  if (mode === "subscribe" && verifyToken && token === verifyToken) {
     return new NextResponse(challenge ?? "", { status: 200 });
   }
   return new NextResponse("Forbidden", { status: 403 });
@@ -160,7 +156,7 @@ export async function POST(request: NextRequest) {
   const authorized =
     hasValidMetaSignature(rawBody, signature) || forwardedFromDulabs;
   if (!authorized) {
-    console.warn("[webhook] unauthorized POST", {
+    console.warn("[webhook/whatsapp] unauthorized POST", {
       hasSignature: Boolean(signature),
       forwardedFromDulabs,
     });
@@ -171,13 +167,6 @@ export async function POST(request: NextRequest) {
     const payload = JSON.parse(rawBody) as {
       object?: string;
       entry?: Array<{
-        id?: string;
-        messaging?: Array<{
-          sender?: { id?: string };
-          recipient?: { id?: string };
-          timestamp?: number;
-          message?: { mid?: string; text?: string; is_echo?: boolean };
-        }>;
         changes?: {
           field?: string;
           value?: {
@@ -189,36 +178,6 @@ export async function POST(request: NextRequest) {
       }>;
     };
 
-    if (payload.object === "page") {
-      const messengerConfig = await getMessengerIntegrationConfig();
-      const allowedPages = new Set(
-        [...allowedMessengerPageIds(), messengerConfig?.pageId].filter(Boolean) as string[],
-      );
-
-      if (allowedPages.size === 0) {
-        console.warn(
-          "[webhook] MESSENGER_PAGE_ID no configurado; se aceptan eventos de todas las páginas",
-        );
-      }
-
-      for (const entry of payload.entry ?? []) {
-        const pageId = entry.id ?? "";
-        if (allowedPages.size > 0 && pageId && !allowedPages.has(pageId)) {
-          console.warn("[webhook] ignored messenger page_id", {
-            received: pageId,
-            allowed: [...allowedPages],
-          });
-          continue;
-        }
-
-        for (const event of entry.messaging ?? []) {
-          await persistMessengerInbound(event, pageId);
-        }
-      }
-
-      return new NextResponse("EVENT_RECEIVED", { status: 200 });
-    }
-
     const allow = await resolveAllowedPhoneIds(forwardedFromDulabs);
     let inboundCount = 0;
     let ignoredPhoneIds = 0;
@@ -228,7 +187,7 @@ export async function POST(request: NextRequest) {
         const phoneId = change.value?.metadata?.phone_number_id;
         if (allow.length > 0 && phoneId && !allow.includes(phoneId)) {
           ignoredPhoneIds += 1;
-          console.warn("[webhook] ignored phone_number_id", {
+          console.warn("[webhook/whatsapp] ignored phone_number_id", {
             phoneId,
             allow,
             source: forwardedFromDulabs ? "dulabs" : "meta",
@@ -251,7 +210,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (inboundCount > 0 || ignoredPhoneIds > 0) {
-      console.info("[webhook] whatsapp", {
+      console.info("[webhook/whatsapp]", {
         source: forwardedFromDulabs ? "dulabs" : "meta",
         object: payload.object ?? null,
         inboundCount,

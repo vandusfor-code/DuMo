@@ -8,6 +8,7 @@ const PUBLIC_PREFIXES = [
   "/api/auth/login",
   "/api/auth/logout",
   "/api/whatsapp/webhook",
+  "/api/messenger/webhook",
   "/api/system",
 ];
 

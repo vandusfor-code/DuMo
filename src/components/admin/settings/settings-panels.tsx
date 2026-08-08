@@ -113,7 +113,7 @@ export function SettingsSections({
             </div>
           </div>
           <p className="max-w-xs text-right text-[12px] text-muted">
-            Webhook: <code className="text-[11px]">/api/whatsapp/webhook</code> · Suscripción:{" "}
+            Webhook: <code className="text-[11px]">/api/messenger/webhook</code> · Suscripción:{" "}
             <strong>messages</strong>
           </p>
         </div>
