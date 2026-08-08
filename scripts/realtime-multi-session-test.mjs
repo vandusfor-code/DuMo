@@ -75,7 +75,7 @@ async function postWebhookMessage(fromPhone) {
       from: fromPhone,
       senderJid: `${fromPhone}@s.whatsapp.net`,
       messageId: msgId,
-      timestamp: Date.now(),
+      timestamp: Math.floor(Date.now() / 1000),
       type: "text",
       text: `WebSocket multi-session test ${new Date().toISOString()}`,
       customerName: "WS Test",
