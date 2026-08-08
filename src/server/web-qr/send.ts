@@ -40,7 +40,7 @@ export async function sendWebQrText(input: {
     dumoPhoneId: input.channelId,
     messageType: "text",
     companyId: input.companyId,
-    waChatJid: jid,
+    waChatJid: sent.jid ?? jid,
   });
 
   return sent;

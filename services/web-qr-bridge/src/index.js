@@ -201,15 +201,46 @@ function extractMessageText(msg) {
   return "";
 }
 
+async function resolveInboundPhone(session, { from, senderJid, senderPhone }) {
+  if (senderPhone) return senderPhone;
+  if (from && !isLikelyLidDigits(from)) return from;
+
+  if (senderJid?.endsWith("@lid") && session.lidByPn) {
+    for (const [pn, lid] of session.lidByPn.entries()) {
+      if (lid === senderJid) {
+        const d = String(pn).replace(/@s\.whatsapp\.net$/i, "").replace(/\D/g, "");
+        if (d.length >= 8 && d.length <= 13) return d;
+      }
+    }
+  }
+
+  const mapping = session.sock?.signalRepository?.lidMapping;
+  if (senderJid?.endsWith("@lid") && mapping?.getPNForLID) {
+    try {
+      const pn = await mapping.getPNForLID(senderJid);
+      if (pn) {
+        const d = digitsFromJid(pn);
+        if (d.length >= 8 && d.length <= 13) return d;
+      }
+    } catch (err) {
+      log.warn({ err, senderJid }, "getPNForLID falló");
+    }
+  }
+
+  return from;
+}
+
 async function forwardInboundToDuMo(session, msg, upsertType) {
   const remoteJid = msg.key?.remoteJid ?? "";
   if (shouldSkipInboundJid(remoteJid)) return;
 
-  const { from, senderJid, senderPhone } = extractInboundSender(msg);
+  let { from, senderJid, senderPhone } = extractInboundSender(msg);
   if (!from && !senderJid) {
     log.warn({ channelId: session.channelId, remoteJid, upsertType }, "mensaje QR sin remitente");
     return;
   }
+
+  senderPhone = await resolveInboundPhone(session, { from, senderJid, senderPhone });
 
   if (senderJid?.endsWith("@lid") && senderPhone) {
     rememberLidMapping(session, senderJid, senderPhone);

@@ -5,8 +5,8 @@ import { withLatency } from "@/lib/mock";
 import { formatChatTime } from "@/lib/format";
 import { resolveConversationChannel } from "@/lib/conversation-channel";
 import { isMessengerConversation } from "@/lib/messenger/conversation-id";
-import { isWebQrConversation } from "@/lib/web-qr/conversation-id";
-import { formatWhatsAppDisplayPhone, isLikelyWhatsAppLid } from "@/lib/whatsapp/phone";
+import { isWebQrConversation, webQrConversationId } from "@/lib/web-qr/conversation-id";
+import { formatWhatsAppDisplayPhone, isLikelyWhatsAppLid, normalizeWhatsAppPhoneDigits } from "@/lib/whatsapp/phone";
 import { ensureSchema, getSql, hasDatabase, withDbRetry, withQueryTimeout } from "@/server/db/client";
 
 /** Un mensaje entrante/saliente a persistir. */
@@ -48,6 +48,10 @@ export interface ConversationRepository {
   getSendFromPhoneId(conversationId: string): Promise<string | null>;
   getWaChatJid(conversationId: string): Promise<string | null>;
   findConversationIdByWaChatJid(waChatJid: string): Promise<string | null>;
+  /** Busca conversación webqr existente por teléfono o JID (evita duplicar LID vs PN). */
+  findWebQrConversationId(phoneDigits: string, waChatJid?: string): Promise<string | null>;
+  /** Mueve mensajes de un hilo duplicado al canónico. */
+  mergeWebQrConversations(targetId: string, duplicateId: string): Promise<void>;
   updateDumoPhoneId(conversationId: string, dumoPhoneId: string): Promise<void>;
   /** Token de envío registrado para un phone_number_id conectado. */
   getAccessTokenForPhoneId(phoneNumberId: string): Promise<string | null>;
@@ -82,6 +86,12 @@ class MockConversationRepository implements ConversationRepository {
   }
   findConversationIdByWaChatJid() {
     return Promise.resolve(null);
+  }
+  findWebQrConversationId() {
+    return Promise.resolve(null);
+  }
+  mergeWebQrConversations() {
+    return Promise.resolve();
   }
   updateDumoPhoneId() {
     return Promise.resolve();
@@ -240,7 +250,11 @@ class PostgresConversationRepository implements ConversationRepository {
           WHEN lead_conversations.phone = '' OR lead_conversations.phone IS NULL
             THEN EXCLUDED.phone
           ELSE lead_conversations.phone END,
-        wa_chat_jid = COALESCE(EXCLUDED.wa_chat_jid, lead_conversations.wa_chat_jid),
+        wa_chat_jid = CASE
+          WHEN EXCLUDED.wa_chat_jid IS NOT NULL AND EXCLUDED.wa_chat_jid LIKE '%@lid'
+            THEN EXCLUDED.wa_chat_jid
+          ELSE COALESCE(EXCLUDED.wa_chat_jid, lead_conversations.wa_chat_jid)
+        END,
         dumo_phone_id = COALESCE(lead_conversations.dumo_phone_id, EXCLUDED.dumo_phone_id)
     `;
 
@@ -321,6 +335,82 @@ class PostgresConversationRepository implements ConversationRepository {
     } catch {
       return null;
     }
+  }
+
+  async findWebQrConversationId(phoneDigits: string, waChatJid?: string): Promise<string | null> {
+    await ensureSchema();
+    const sql = getSql()!;
+    const jid = waChatJid?.trim();
+    const digits = normalizeWhatsAppPhoneDigits(phoneDigits);
+
+    if (jid) {
+      const byJid = await this.findConversationIdByWaChatJid(jid);
+      if (byJid) return byJid;
+
+      const lidUser = jid.split("@")[0]?.replace(/\D/g, "") ?? "";
+      if (lidUser && jid.endsWith("@lid")) {
+        const byLidId = webQrConversationId(lidUser);
+        const rows = (await sql`
+          SELECT id FROM lead_conversations WHERE id = ${byLidId} LIMIT 1
+        `) as unknown as { id: string }[];
+        if (rows[0]?.id) return rows[0].id;
+      }
+    }
+
+    if (digits && !isLikelyWhatsAppLid(digits)) {
+      const canonical = webQrConversationId(digits);
+      const rows = (await sql`
+        SELECT id FROM lead_conversations WHERE id = ${canonical} LIMIT 1
+      `) as unknown as { id: string }[];
+      if (rows[0]?.id) return rows[0].id;
+
+      const byPhone = (await sql`
+        SELECT id FROM lead_conversations
+        WHERE id LIKE 'webqr:%'
+          AND regexp_replace(phone, '\\D', '', 'g') = ${digits}
+        ORDER BY last_message_at DESC
+        LIMIT 1
+      `) as unknown as { id: string }[];
+      if (byPhone[0]?.id) return byPhone[0].id;
+    }
+
+    if (digits && isLikelyWhatsAppLid(digits)) {
+      const lidConv = webQrConversationId(digits);
+      const rows = (await sql`
+        SELECT id FROM lead_conversations WHERE id = ${lidConv} LIMIT 1
+      `) as unknown as { id: string }[];
+      if (rows[0]?.id) return rows[0].id;
+    }
+
+    return null;
+  }
+
+  async mergeWebQrConversations(targetId: string, duplicateId: string): Promise<void> {
+    if (!targetId || !duplicateId || targetId === duplicateId) return;
+    if (!isWebQrConversation(targetId) || !isWebQrConversation(duplicateId)) return;
+
+    await ensureSchema();
+    const sql = getSql()!;
+
+    await sql`
+      UPDATE lead_messages
+      SET conversation_id = ${targetId}
+      WHERE conversation_id = ${duplicateId}
+    `;
+
+    await sql`
+      UPDATE lead_conversations AS target
+      SET
+        unread = target.unread + COALESCE((
+          SELECT unread FROM lead_conversations WHERE id = ${duplicateId}
+        ), 0),
+        wa_chat_jid = COALESCE(target.wa_chat_jid, (
+          SELECT wa_chat_jid FROM lead_conversations WHERE id = ${duplicateId}
+        ))
+      WHERE target.id = ${targetId}
+    `;
+
+    await sql`DELETE FROM lead_conversations WHERE id = ${duplicateId}`;
   }
 
   async updateDumoPhoneId(conversationId: string, dumoPhoneId: string): Promise<void> {

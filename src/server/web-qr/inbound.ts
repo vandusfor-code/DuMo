@@ -12,19 +12,28 @@ async function resolveWebQrConversationId(
 ): Promise<{ conversationId: string; phone: string }> {
   const repo = getConversationRepository();
   const digits = normalizeWhatsAppPhoneDigits(phone);
+  const realPhone = digits && !isLikelyWhatsAppLid(digits) ? digits : null;
+  const canonicalId = realPhone ? webQrConversationId(realPhone) : null;
 
-  if (senderJid?.trim()) {
-    const existing = await repo.findConversationIdByWaChatJid(senderJid.trim());
-    if (existing) {
-      return {
-        conversationId: existing,
-        phone: digits && !isLikelyWhatsAppLid(digits) ? digits : phone,
-      };
+  const existing = await repo.findWebQrConversationId(digits, senderJid);
+
+  if (existing && canonicalId && existing !== canonicalId) {
+    const existingSuffix = existing.replace(/^webqr:/, "");
+    if (isLikelyWhatsAppLid(existingSuffix)) {
+      await repo.mergeWebQrConversations(canonicalId, existing);
+      return { conversationId: canonicalId, phone: realPhone! };
     }
   }
 
-  if (digits && !isLikelyWhatsAppLid(digits)) {
-    return { conversationId: webQrConversationId(digits), phone: digits };
+  if (existing) {
+    return {
+      conversationId: existing,
+      phone: realPhone ?? digits,
+    };
+  }
+
+  if (canonicalId) {
+    return { conversationId: canonicalId, phone: realPhone };
   }
 
   const fallback = digits || senderJid?.split("@")[0]?.replace(/\D/g, "") || "";

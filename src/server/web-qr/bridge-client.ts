@@ -81,7 +81,7 @@ export async function bridgeSendText(input: {
   to?: string;
   jid?: string;
   text: string;
-}): Promise<{ id: string }> {
+}): Promise<{ id: string; jid?: string }> {
   return bridgeFetch("/send", {
     method: "POST",
     body: JSON.stringify(input),
