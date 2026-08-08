@@ -51,11 +51,17 @@ export async function GET() {
     }
   }
 
+  const rawBridgeUrl = process.env.WEB_QR_BRIDGE_URL?.trim() ?? null;
   const host = maskHost(bridgeUrl);
   const problems: string[] = [];
 
   if (!configured) {
     problems.push("Faltan WEB_QR_BRIDGE_URL, WEB_QR_BRIDGE_SECRET o WEB_QR_WEBHOOK_SECRET en Vercel.");
+  }
+  if (rawBridgeUrl && !/^https?:\/\//i.test(rawBridgeUrl)) {
+    problems.push(
+      `WEB_QR_BRIDGE_URL="${rawBridgeUrl}" no incluye https:// — DuMo ya lo corrige en código; redeploy recomendado, o pon https:// explícito en Vercel.`,
+    );
   }
   if (host === "railway.app" || host === "www.railway.app") {
     problems.push(
