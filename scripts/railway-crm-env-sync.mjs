@@ -20,7 +20,7 @@ const dryRun = process.argv.includes("--dry-run");
 const service = process.env.RAILWAY_CRM_SERVICE ?? "dumo-crm";
 
 const SKIP_PREFIXES = ["VERCEL_", "TURBO_", "NX_"];
-const SKIP_KEYS = new Set(["DATABASE_URL1", "DATABASE_URL", "NEXT_PUBLIC_APP_URL"]);
+const SKIP_KEYS = new Set(["DATABASE_URL1", "DATABASE_URL", "NEXT_PUBLIC_APP_URL", "VERCEL"]);
 
 const OVERRIDES = {
   DATABASE_URL1: "${{Postgres.DATABASE_URL}}",
@@ -57,6 +57,13 @@ for (const [key, val] of Object.entries(parsed)) {
   if (SKIP_PREFIXES.some((p) => key.startsWith(p))) continue;
   if (!val?.trim()) continue;
   toSet[key] = val;
+}
+
+if (parsed.NEXT_PUBLIC_SUPABASE_URL?.trim()) {
+  toSet.SUPABASE_URL = parsed.NEXT_PUBLIC_SUPABASE_URL.trim();
+}
+if (!toSet.SUPABASE_STORAGE_BUCKET) {
+  toSet.SUPABASE_STORAGE_BUCKET = "dumo-media";
 }
 
 console.log(`Variables (${service}):`, Object.keys(toSet).sort().join(", "));
