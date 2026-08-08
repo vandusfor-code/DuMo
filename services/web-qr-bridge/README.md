@@ -4,6 +4,13 @@ Proceso **persistente** con Baileys. DuMo (Vercel) no puede mantener sockets Wha
 
 ## Despliegue (Railway / Fly / VPS)
 
+**Node.js 20+** obligatorio (`@whiskeysockets/baileys` 7.x).
+
+En Railway:
+- **Root Directory:** `services/web-qr-bridge` (no el repo raíz — si apuntas a la raíz, el build fallará o desplegará Next.js por error)
+- **Node:** 20+ vía `.nvmrc` / `engines` / `nixpacks.toml` (o variable `NIXPACKS_NODE_VERSION=20`)
+- **Volumen:** montar en `/data/sessions`, env `SESSIONS_DIR=/data/sessions`
+
 ```bash
 cd services/web-qr-bridge
 npm install
