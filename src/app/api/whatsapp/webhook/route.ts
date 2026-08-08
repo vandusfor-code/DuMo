@@ -7,6 +7,7 @@ import {
   getMessengerIntegrationConfig,
   matchesWebhookVerifyToken,
 } from "@/server/messenger/config";
+import { resolveAllowedPhoneIds } from "@/server/whatsapp/webhook-allowlist";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -65,13 +66,6 @@ function hasValidForwardSecret(request: NextRequest): boolean {
   const provided = request.headers.get("x-dumo-forward-secret");
   if (!expected || !provided) return false;
   return safeEqual(provided, expected);
-}
-
-function allowedPhoneIds(): string[] {
-  return (process.env.WHATSAPP_PHONE_NUMBER_IDS ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
 }
 
 type WaImagePayload = {
@@ -161,10 +155,15 @@ async function persistInboundMessage(input: {
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
   const signature = request.headers.get("x-hub-signature-256");
+  const forwardedFromDulabs = hasValidForwardSecret(request);
 
   const authorized =
-    hasValidMetaSignature(rawBody, signature) || hasValidForwardSecret(request);
+    hasValidMetaSignature(rawBody, signature) || forwardedFromDulabs;
   if (!authorized) {
+    console.warn("[webhook] unauthorized POST", {
+      hasSignature: Boolean(signature),
+      forwardedFromDulabs,
+    });
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
@@ -180,6 +179,7 @@ export async function POST(request: NextRequest) {
           message?: { mid?: string; text?: string; is_echo?: boolean };
         }>;
         changes?: {
+          field?: string;
           value?: {
             metadata?: { phone_number_id?: string };
             contacts?: { profile?: { name?: string }; wa_id?: string }[];
@@ -219,25 +219,45 @@ export async function POST(request: NextRequest) {
       return new NextResponse("EVENT_RECEIVED", { status: 200 });
     }
 
-    const allow = allowedPhoneIds();
+    const allow = await resolveAllowedPhoneIds(forwardedFromDulabs);
+    let inboundCount = 0;
+    let ignoredPhoneIds = 0;
 
     for (const entry of payload.entry ?? []) {
       for (const change of entry.changes ?? []) {
         const phoneId = change.value?.metadata?.phone_number_id;
         if (allow.length > 0 && phoneId && !allow.includes(phoneId)) {
-          console.warn("[webhook] ignored phone_number_id", phoneId);
+          ignoredPhoneIds += 1;
+          console.warn("[webhook] ignored phone_number_id", {
+            phoneId,
+            allow,
+            source: forwardedFromDulabs ? "dulabs" : "meta",
+            object: payload.object ?? null,
+          });
           continue;
         }
 
         const contact = change.value?.contacts?.[0];
-        for (const msg of change.value?.messages ?? []) {
+        const messages = change.value?.messages ?? [];
+        for (const msg of messages) {
           await persistInboundMessage({
             msg,
             phoneId,
             customerName: contact?.profile?.name ?? "",
           });
+          inboundCount += 1;
         }
       }
+    }
+
+    if (inboundCount > 0 || ignoredPhoneIds > 0) {
+      console.info("[webhook] whatsapp", {
+        source: forwardedFromDulabs ? "dulabs" : "meta",
+        object: payload.object ?? null,
+        inboundCount,
+        ignoredPhoneIds,
+        filterActive: allow.length > 0,
+      });
     }
   } catch (error) {
     console.error("[POST /api/whatsapp/webhook] parse", error);
