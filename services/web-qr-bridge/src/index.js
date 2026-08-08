@@ -232,7 +232,20 @@ async function startBaileys(session) {
       const code = lastDisconnect?.error?.output?.statusCode;
       session.status = "DISCONNECTED";
       session.sock = null;
+      session.qrDataUrl = null;
+      session.phoneNumber = null;
       await notifyDuMo(session, { type: "session.disconnected", channelId: session.channelId });
+
+      if (code === DisconnectReason.loggedOut) {
+        log.info({ channelId: session.channelId }, "sesión cerrada desde el teléfono — borrando credenciales");
+        sessions.delete(session.sessionId);
+        try {
+          fs.rmSync(path.join(SESSIONS_DIR, session.channelId), { recursive: true, force: true });
+        } catch (err) {
+          log.warn({ err, channelId: session.channelId }, "no se pudieron borrar credenciales tras logout");
+        }
+        return;
+      }
 
       if (code !== DisconnectReason.loggedOut) {
         log.info({ channelId: session.channelId, code }, "reconectando Baileys…");
@@ -321,16 +334,32 @@ app.get("/sessions/:sessionId", auth, (req, res) => {
 });
 
 app.delete("/sessions/:sessionId", auth, async (req, res) => {
-  const session = sessions.get(req.params.sessionId);
-  if (!session) return res.status(404).json({ error: "Sesión no encontrada" });
-  try {
-    await session.sock?.logout();
-  } catch {
-    /* ya desconectado */
+  const sessionId = req.params.sessionId;
+  const channelId = sessionId.replace(/^bridge-/, "");
+  const session = sessions.get(sessionId);
+
+  if (session) {
+    try {
+      await session.sock?.logout();
+    } catch {
+      /* ya desconectado */
+    }
+    try {
+      session.sock?.end(undefined);
+    } catch {
+      /* socket ya cerrado */
+    }
+    sessions.delete(sessionId);
   }
-  session.status = "DISCONNECTED";
-  session.sock = null;
-  res.json({ ok: true });
+
+  try {
+    fs.rmSync(path.join(SESSIONS_DIR, channelId), { recursive: true, force: true });
+    log.info({ channelId }, "credenciales QR eliminadas del disco");
+  } catch (err) {
+    log.warn({ err, channelId }, "no se pudieron borrar credenciales en disco");
+  }
+
+  res.json({ ok: true, purged: true, channelId });
 });
 
 function resolveTargetJid({ to, jid }) {

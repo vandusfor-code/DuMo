@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiPost } from "@/lib/api-client";
+import { apiGet, apiPost, apiDelete } from "@/lib/api-client";
 import type { WhatsAppChannel } from "@/types/web-qr";
 
 export const webQrKeys = {
@@ -30,12 +30,12 @@ export function useWebQrChannels() {
   });
 }
 
-export function useWebQrSession(channelId: string | null, pollQr = false) {
+export function useWebQrSession(channelId: string | null, poll = false) {
   return useQuery({
     queryKey: webQrKeys.session(channelId ?? ""),
     queryFn: () => apiGet<SessionResponse>(`/api/web-qr/channels/${channelId}/session`),
     enabled: Boolean(channelId),
-    refetchInterval: pollQr ? 2500 : false,
+    refetchInterval: poll ? 5000 : false,
   });
 }
 
@@ -53,6 +53,20 @@ export function useStartWebQrSession() {
   return useMutation({
     mutationFn: (channelId: string) =>
       apiPost<SessionResponse>(`/api/web-qr/channels/${channelId}/session`, {}),
+    onSuccess: (_data, channelId) => {
+      qc.invalidateQueries({ queryKey: webQrKeys.channels });
+      qc.invalidateQueries({ queryKey: webQrKeys.session(channelId) });
+    },
+  });
+}
+
+export function useDisconnectWebQrSession() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (channelId: string) =>
+      apiDelete<{ ok: boolean; channelId: string }>(
+        `/api/web-qr/channels/${channelId}/session`,
+      ),
     onSuccess: (_data, channelId) => {
       qc.invalidateQueries({ queryKey: webQrKeys.channels });
       qc.invalidateQueries({ queryKey: webQrKeys.session(channelId) });

@@ -168,4 +168,23 @@ export const webQrRepository = {
       WHERE channel_id = ${channelId}
     `;
   },
+
+  /** Desvincula por completo: borra bridge id, credenciales locales y resetea teléfono. */
+  async clearWebQrSession(channelId: string): Promise<void> {
+    await ensureSchema();
+    const sql = getSql()!;
+    await sql`
+      UPDATE whatsapp_channels
+      SET status = 'DISCONNECTED', phone_number = 'pending', updated_at = now()
+      WHERE id = ${channelId}
+    `;
+    await sql`
+      UPDATE web_qr_sessions
+      SET bridge_session_id = NULL,
+          session_data = '{}'::jsonb,
+          last_reconnect_at = now(),
+          updated_at = now()
+      WHERE channel_id = ${channelId}
+    `;
+  },
 };

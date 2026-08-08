@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (body.type === "session.disconnected" && body.channelId) {
-    await webQrRepository.updateChannelStatus(body.channelId, "DISCONNECTED");
+    await webQrRepository.clearWebQrSession(body.channelId);
     return NextResponse.json({ ok: true });
   }
 

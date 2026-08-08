@@ -138,6 +138,7 @@ export async function GET(_request: Request, { params }: RouteCtx) {
 
   const status = await bridgeGetSessionStatusOrNull(dbSession.bridgeSessionId);
   if (!status) {
+    await webQrRepository.updateChannelStatus(channelId, "DISCONNECTED");
     return NextResponse.json({
       channelId,
       status: "DISCONNECTED",
@@ -147,6 +148,10 @@ export async function GET(_request: Request, { params }: RouteCtx) {
   }
   if (status.status === "CONNECTED" && status.phoneNumber) {
     await webQrRepository.updateChannelStatus(channelId, "CONNECTED", status.phoneNumber);
+  } else if (status.status === "DISCONNECTED") {
+    await webQrRepository.updateChannelStatus(channelId, "DISCONNECTED");
+  } else if (status.status === "QR_PENDING" || status.status === "INITIALIZING") {
+    await webQrRepository.updateChannelStatus(channelId, "INITIALIZING");
   }
 
   return NextResponse.json({
@@ -164,17 +169,23 @@ export async function DELETE(_request: Request, { params }: RouteCtx) {
   }
 
   const { channelId } = await params;
+  const channel = await webQrRepository.getChannel(channelId);
+  if (!channel || channel.channelType !== "WEB_QR") {
+    return NextResponse.json({ error: "Canal no encontrado." }, { status: 404 });
+  }
+
   const dbSession = await webQrRepository.getSessionByChannel(channelId);
-  if (dbSession?.bridgeSessionId) {
+  const bridgeSessionId = dbSession?.bridgeSessionId ?? `bridge-${channelId}`;
+
+  if (webQrConfigured()) {
     try {
-      await bridgeDisconnectSession(dbSession.bridgeSessionId);
-    } catch {
-      /* bridge caído — igual marcamos desconectado localmente */
+      await bridgeDisconnectSession(bridgeSessionId);
+    } catch (error) {
+      console.warn("[DELETE /api/web-qr/.../session] bridge:", error);
     }
   }
 
-  await webQrRepository.updateChannelStatus(channelId, "DISCONNECTED");
-  await webQrRepository.saveSessionData(channelId, {});
+  await webQrRepository.clearWebQrSession(channelId);
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, channelId });
 }

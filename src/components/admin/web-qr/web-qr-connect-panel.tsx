@@ -1,46 +1,75 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, QrCode, Smartphone, Wifi, WifiOff } from "lucide-react";
+import { Loader2, LogOut, QrCode, Smartphone, Wifi, WifiOff } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import {
   useCreateWebQrChannel,
+  useDisconnectWebQrSession,
   useStartWebQrSession,
   useWebQrChannels,
   useWebQrSession,
+  webQrKeys,
 } from "@/hooks/use-web-qr";
 import type { WhatsAppChannel } from "@/types/web-qr";
 
-function StatusBadge({ status }: { status: WhatsAppChannel["status"] }) {
+function StatusBadge({ status }: { status: WhatsAppChannel["status"] | string }) {
+  const normalized =
+    status === "QR_PENDING" || status === "INITIALIZING"
+      ? "INITIALIZING"
+      : status === "CONNECTED"
+        ? "CONNECTED"
+        : "DISCONNECTED";
+
   const map = {
     CONNECTED: { label: "Conectado", className: "bg-success-soft text-success-ink", icon: Wifi },
     DISCONNECTED: { label: "Desconectado", className: "bg-muted/20 text-muted", icon: WifiOff },
     INITIALIZING: { label: "Inicializando", className: "bg-warning-soft text-warning-ink", icon: Loader2 },
   } as const;
-  const cfg = map[status] ?? map.DISCONNECTED;
+  const cfg = map[normalized];
   const Icon = cfg.icon;
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${cfg.className}`}>
-      <Icon className={`size-3.5 ${status === "INITIALIZING" ? "animate-spin" : ""}`} />
+      <Icon className={`size-3.5 ${normalized === "INITIALIZING" ? "animate-spin" : ""}`} />
       {cfg.label}
     </span>
   );
 }
 
+function resolveLiveStatus(
+  channel: WhatsAppChannel,
+  sessionStatus?: string,
+): WhatsAppChannel["status"] | string {
+  if (sessionStatus === "CONNECTED") return "CONNECTED";
+  if (sessionStatus === "QR_PENDING" || sessionStatus === "INITIALIZING") return "INITIALIZING";
+  if (sessionStatus === "DISCONNECTED") return "DISCONNECTED";
+  return channel.status;
+}
+
 function ChannelCard({ channel }: { channel: WhatsAppChannel }) {
+  const qc = useQueryClient();
   const start = useStartWebQrSession();
-  const [polling, setPolling] = useState(channel.status !== "CONNECTED");
+  const disconnect = useDisconnectWebQrSession();
+  const [confirmLogout, setConfirmLogout] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
-  const session = useWebQrSession(channel.id, polling);
+
+  const hasSession = channel.status === "CONNECTED" || channel.phoneNumber !== "pending";
+  const session = useWebQrSession(channel.id, hasSession || channel.status !== "DISCONNECTED");
+
+  const liveStatus = resolveLiveStatus(channel, session.data?.status);
+  const isConnected = liveStatus === "CONNECTED";
+  const isInitializing = liveStatus === "INITIALIZING" || session.data?.status === "QR_PENDING";
 
   useEffect(() => {
-    if (session.data?.status === "CONNECTED") setPolling(false);
-    if (session.data?.status === "QR_PENDING") setPolling(true);
-  }, [session.data?.status]);
+    if (session.data?.status === "DISCONNECTED" && channel.status !== "DISCONNECTED") {
+      void qc.invalidateQueries({ queryKey: webQrKeys.channels });
+    }
+  }, [session.data?.status, channel.status, qc]);
 
   const handleConnect = async () => {
-    setPolling(true);
     setLocalError(null);
     try {
       await start.mutateAsync(channel.id);
@@ -49,64 +78,124 @@ function ChannelCard({ channel }: { channel: WhatsAppChannel }) {
     }
   };
 
+  const handleDisconnect = async () => {
+    setLocalError(null);
+    try {
+      await disconnect.mutateAsync(channel.id);
+      setConfirmLogout(false);
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : "No se pudo cerrar la sesión.");
+    }
+  };
+
   const qr = session.data?.qrDataUrl ?? start.data?.qrDataUrl;
-  const connectedPhone = session.data?.phoneNumber ?? channel.phoneNumber;
+  const connectedPhone =
+    session.data?.phoneNumber ??
+    (channel.phoneNumber !== "pending" ? channel.phoneNumber : null);
 
   return (
-    <div className="rounded-card border border-line bg-card p-5 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-fg">{channel.label}</p>
-          <p className="mt-0.5 font-mono text-[11px] text-muted">{channel.id}</p>
-          {connectedPhone && connectedPhone !== "pending" ? (
-            <p className="mt-1 text-xs text-muted">+{connectedPhone}</p>
-          ) : null}
+    <>
+      <div className="rounded-card border border-line bg-card p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-fg">{channel.label}</p>
+            <p className="mt-0.5 font-mono text-[11px] text-muted">{channel.id}</p>
+            {connectedPhone ? (
+              <p className="mt-1 text-xs text-muted">+{connectedPhone}</p>
+            ) : null}
+          </div>
+          <StatusBadge status={liveStatus} />
         </div>
-        <StatusBadge status={channel.status} />
+
+        {isConnected ? (
+          <div className="mt-4 space-y-3">
+            <p className="text-xs text-success-ink">
+              Sesión activa. Los mensajes entrantes aparecerán en Leads con prefijo webqr.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2 text-danger-ink hover:bg-danger-soft hover:text-danger-ink"
+              onClick={() => setConfirmLogout(true)}
+              disabled={disconnect.isPending}
+            >
+              {disconnect.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <LogOut className="size-4" />
+              )}
+              Cerrar sesión
+            </Button>
+          </div>
+        ) : (
+          <div className="mt-4 flex flex-col items-center gap-3 rounded-xl border border-dashed border-line bg-canvas/60 p-4">
+            {qr ? (
+              <>
+                <p className="text-center text-xs text-muted">
+                  Escanea con WhatsApp → Dispositivos vinculados → Vincular dispositivo
+                </p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={qr} alt="Código QR WhatsApp Web" className="size-52 rounded-lg bg-white p-2" />
+              </>
+            ) : (
+              <div className="flex flex-col items-center gap-2 py-6 text-muted">
+                <QrCode className="size-10 opacity-40" />
+                <p className="text-center text-xs">
+                  {start.isPending || session.isFetching || isInitializing
+                    ? "Conectando con el bridge… el QR aparecerá en unos segundos."
+                    : "Pulsa el botón para generar el código QR."}
+                </p>
+              </div>
+            )}
+            {localError || start.error ? (
+              <p className="text-center text-xs text-danger-ink">
+                {localError ?? (start.error instanceof Error ? start.error.message : "Error al generar QR")}
+              </p>
+            ) : null}
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleConnect}
+                disabled={start.isPending}
+                className="gap-2"
+              >
+                {start.isPending ? <Loader2 className="size-4 animate-spin" /> : <Smartphone className="size-4" />}
+                {qr ? "Actualizar QR" : "Generar código QR"}
+              </Button>
+              {(hasSession || qr) && !isInitializing ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="gap-2 text-danger-ink"
+                  onClick={() => setConfirmLogout(true)}
+                  disabled={disconnect.isPending}
+                >
+                  <LogOut className="size-4" />
+                  Cerrar sesión
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        )}
+
+        {localError && isConnected ? (
+          <p className="mt-2 text-xs text-danger-ink">{localError}</p>
+        ) : null}
       </div>
 
-      {channel.status !== "CONNECTED" ? (
-        <div className="mt-4 flex flex-col items-center gap-3 rounded-xl border border-dashed border-line bg-canvas/60 p-4">
-          {qr ? (
-            <>
-              <p className="text-center text-xs text-muted">
-                Escanea con WhatsApp → Dispositivos vinculados → Vincular dispositivo
-              </p>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={qr} alt="Código QR WhatsApp Web" className="size-52 rounded-lg bg-white p-2" />
-            </>
-          ) : (
-            <div className="flex flex-col items-center gap-2 py-6 text-muted">
-              <QrCode className="size-10 opacity-40" />
-              <p className="text-xs">
-                {start.isPending || session.isFetching
-                  ? "Conectando con el bridge… el QR aparecerá en unos segundos."
-                  : "Pulsa el botón para generar el código QR."}
-              </p>
-            </div>
-          )}
-          {localError || start.error ? (
-            <p className="text-center text-xs text-danger-ink">
-              {localError ?? (start.error instanceof Error ? start.error.message : "Error al generar QR")}
-            </p>
-          ) : null}
-          <Button
-            type="button"
-            size="sm"
-            onClick={handleConnect}
-            disabled={start.isPending}
-            className="gap-2"
-          >
-            {start.isPending ? <Loader2 className="size-4 animate-spin" /> : <Smartphone className="size-4" />}
-            {qr ? "Actualizar QR" : "Generar código QR"}
-          </Button>
-        </div>
-      ) : (
-        <p className="mt-3 text-xs text-success-ink">
-          Sesión activa. Los mensajes entrantes aparecerán en Leads con prefijo webqr.
-        </p>
-      )}
-    </div>
+      <ConfirmDialog
+        open={confirmLogout}
+        title="Cerrar sesión de WhatsApp Web"
+        description="Se cerrará la sesión en DuMo y en el bridge, y se borrarán las credenciales guardadas. Tendrás que escanear un QR nuevo para volver a conectar esta línea."
+        confirmLabel="Cerrar sesión"
+        isLoading={disconnect.isPending}
+        onConfirm={() => void handleDisconnect()}
+        onCancel={() => setConfirmLogout(false)}
+      />
+    </>
   );
 }
 
