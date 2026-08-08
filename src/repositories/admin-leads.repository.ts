@@ -179,6 +179,12 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
     const rows = await this.fetchRows();
     const conv = rows.find((r) => r.id === input.conversationId);
     if (!conv) throw new Error("Conversación no encontrada");
+    const { emitLeadsConversationUpdated } = await import("@/server/realtime/emit");
+    emitLeadsConversationUpdated({
+      conversationId: input.conversationId,
+      assignedAdvisorId: advisor.id,
+      reason: "assign",
+    });
     return mapConversation(conv);
   }
 
@@ -367,10 +373,21 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
         WHERE c.id = p.id
           AND c.assigned_advisor_id IS NULL
           AND a.rn = (p.rn % a.total)
-        RETURNING c.id
+        RETURNING c.id, c.assigned_advisor_id
       `,
       6000,
     );
+    if (rows.length > 0) {
+      const { emitLeadsConversationUpdated } = await import("@/server/realtime/emit");
+      for (const row of rows) {
+        const r = row as { id: string; assigned_advisor_id: string | null };
+        emitLeadsConversationUpdated({
+          conversationId: r.id,
+          assignedAdvisorId: r.assigned_advisor_id,
+          reason: "auto-assign",
+        });
+      }
+    }
     return rows.length;
   }
 

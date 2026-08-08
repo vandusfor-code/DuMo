@@ -4,9 +4,10 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "@/lib/api-client";
 import { fetchAdvisorConversations, leadKeys } from "@/hooks/use-leads";
+import { REALTIME_FALLBACK_POLL_MS } from "@/providers/realtime-provider";
 import type { AdminConversation } from "@/types/admin-lead";
 
-export const MESSAGE_POLL_MS = 6000;
+export const MESSAGE_POLL_MS = REALTIME_FALLBACK_POLL_MS;
 
 export function useAdvisorConversationsPoll(enabled = true) {
   return useQuery({

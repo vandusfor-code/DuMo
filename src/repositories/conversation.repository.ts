@@ -271,6 +271,17 @@ class PostgresConversationRepository implements ConversationRepository {
       )
       ON CONFLICT (id) DO NOTHING
     `;
+
+    const convRows = (await sql`
+      SELECT assigned_advisor_id FROM lead_conversations WHERE id = ${msg.conversationId}
+    `) as unknown as { assigned_advisor_id: string | null }[];
+    const { emitLeadsMessageNew } = await import("@/server/realtime/emit");
+    emitLeadsMessageNew({
+      conversationId: msg.conversationId,
+      messageId: msg.waMessageId,
+      direction: msg.direction,
+      assignedAdvisorId: convRows[0]?.assigned_advisor_id ?? null,
+    });
   }
 
   async updateMessageBodyIfPlaceholder(waMessageId: string, body: string): Promise<boolean> {
@@ -291,6 +302,16 @@ class PostgresConversationRepository implements ConversationRepository {
       WHERE id = ${rows[0].conversation_id}
         AND last_message = ${placeholder}
     `;
+    const convId = rows[0].conversation_id;
+    const convRows = (await sql`
+      SELECT assigned_advisor_id FROM lead_conversations WHERE id = ${convId}
+    `) as unknown as { assigned_advisor_id: string | null }[];
+    const { emitLeadsConversationUpdated } = await import("@/server/realtime/emit");
+    emitLeadsConversationUpdated({
+      conversationId: convId,
+      assignedAdvisorId: convRows[0]?.assigned_advisor_id ?? null,
+      reason: "message",
+    });
     return true;
   }
 
@@ -298,6 +319,16 @@ class PostgresConversationRepository implements ConversationRepository {
     await ensureSchema();
     const sql = getSql()!;
     await sql`UPDATE lead_conversations SET unread = 0 WHERE id = ${conversationId}`;
+    const convRows = (await sql`
+      SELECT assigned_advisor_id FROM lead_conversations WHERE id = ${conversationId}
+    `) as unknown as { assigned_advisor_id: string | null }[];
+    const { emitLeadsConversationUpdated } = await import("@/server/realtime/emit");
+    emitLeadsConversationUpdated({
+      conversationId,
+      unread: 0,
+      assignedAdvisorId: convRows[0]?.assigned_advisor_id ?? null,
+      reason: "read",
+    });
   }
 
   async getSendFromPhoneId(conversationId: string): Promise<string | null> {

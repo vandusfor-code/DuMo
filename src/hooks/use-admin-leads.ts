@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiDelete, apiGet, apiPost, apiPostForm, apiPut } from "@/lib/api-client";
+import { REALTIME_FALLBACK_POLL_MS } from "@/providers/realtime-provider";
 import type {
   AdminAdvisor,
   AdminConversation,
@@ -17,7 +18,7 @@ export function useAdminConversations() {
   return useQuery({
     queryKey: ["admin", "leads", "conversations"],
     queryFn: () => apiGet<AdminConversation[]>("/api/admin/leads"),
-    refetchInterval: 10_000,
+    refetchInterval: REALTIME_FALLBACK_POLL_MS,
     refetchIntervalInBackground: false,
     staleTime: 5000,
     retry: 2,
@@ -45,7 +46,7 @@ export function useAdminMessages(conversationId: string | null) {
     queryKey: ["admin", "leads", "messages", conversationId],
     queryFn: () => apiGet<ChatMessage[]>(`/api/admin/leads?conversationId=${conversationId}&messages=1`),
     enabled: !!conversationId,
-    refetchInterval: 3000,
+    refetchInterval: REALTIME_FALLBACK_POLL_MS,
     // Sin reintentos infinitos: si falla, se muestra el error de inmediato en
     // vez de quedarse cargando (el polling vuelve a intentarlo igual).
     retry: 1,

@@ -7,6 +7,7 @@ import { salesScriptKeys } from "@/hooks/use-sales-script";
 import { latestGestionKeys } from "@/hooks/use-latest-gestion";
 import { crmClientKeys } from "@/hooks/use-crm-clients";
 import { salesKeys } from "@/hooks/use-sales";
+import { REALTIME_FALLBACK_POLL_MS } from "@/providers/realtime-provider";
 import type { ChatMessage, Conversation } from "@/types/conversation";
 import type { Plan, SaveLeadInput } from "@/types/lead";
 import type { SaveLeadResult } from "@/types/sales-script";
@@ -33,7 +34,7 @@ export function useConversations() {
   return useQuery({
     queryKey: leadKeys.conversations,
     queryFn: fetchAdvisorConversations,
-    refetchInterval: 6000,
+    refetchInterval: REALTIME_FALLBACK_POLL_MS,
     refetchIntervalInBackground: true,
     staleTime: 3000,
     retry: 2,
@@ -46,7 +47,7 @@ export function useConversationMessages(conversationId: string | null) {
     queryKey: leadKeys.messages(conversationId ?? ""),
     queryFn: () => fetchConversationMessages(conversationId!),
     enabled: Boolean(conversationId),
-    refetchInterval: 5000,
+    refetchInterval: REALTIME_FALLBACK_POLL_MS,
     refetchIntervalInBackground: true,
     staleTime: 2000,
     retry: 2,

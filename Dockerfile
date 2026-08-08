@@ -22,8 +22,10 @@ ENV HOSTNAME=0.0.0.0
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/server.mjs ./server.mjs
+COPY --from=builder /app/realtime ./realtime
 
 EXPOSE 8080
 ENV PORT=8080
 
-CMD ["node", "server.js"]
+CMD ["node", "server.mjs"]
