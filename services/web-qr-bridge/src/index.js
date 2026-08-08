@@ -559,9 +559,13 @@ app.post("/test-webhook", auth, async (req, res) => {
 });
 
 app.get("/health", (_req, res) => {
+  const persistedChannelIds = listPersistedChannelIds();
   res.json({
     ok: true,
     sessions: sessions.size,
+    persistedSessions: persistedChannelIds.length,
+    persistedChannelIds,
+    sessionsDir: SESSIONS_DIR,
     webhookEnvConfigured: Boolean(
       (process.env.DUMO_WEBHOOK_URL ?? "").trim() && (process.env.DUMO_WEBHOOK_SECRET ?? "").trim(),
     ),

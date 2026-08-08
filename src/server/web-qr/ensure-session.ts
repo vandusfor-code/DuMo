@@ -9,6 +9,46 @@ function bridgeSessionId(channelId: string): string {
   return `bridge-${channelId}`;
 }
 
+function webQrWebhookUrl(): string {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://du-mo.vercel.app";
+  return `${appUrl.replace(/\/$/, "")}/api/web-qr/webhook`;
+}
+
+/** Registra la sesión en el bridge (sin esperar CONNECTED). Tras reinicios de Railway. */
+export async function registerWebQrBridgeSession(channelId: string): Promise<void> {
+  const channel = await webQrRepository.getChannel(channelId);
+  if (!channel || channel.channelType !== "WEB_QR") return;
+
+  const webhookSecret = webQrWebhookSecret();
+  if (!webhookSecret) return;
+
+  await bridgeCreateSession({
+    channelId,
+    label: channel.label,
+    webhookUrl: webQrWebhookUrl(),
+    webhookSecret: webhookSecret.trim(),
+  });
+  await webQrRepository.updateSessionBridge({
+    channelId,
+    bridgeSessionId: bridgeSessionId(channelId),
+  });
+}
+
+/** Re-registra todas las líneas QR de la BD en el bridge. */
+export async function reconcileWebQrBridgeSessions(): Promise<number> {
+  const channels = await webQrRepository.listWebQrChannels();
+  let registered = 0;
+  for (const ch of channels) {
+    try {
+      await registerWebQrBridgeSession(ch.id);
+      registered++;
+    } catch (error) {
+      console.warn("[reconcileWebQrBridgeSessions]", ch.id, error);
+    }
+  }
+  return registered;
+}
+
 /** Reconecta Baileys y sincroniza webhook antes de enviar/recibir. */
 export async function ensureWebQrBridgeReady(channelId: string): Promise<void> {
   const channel = await webQrRepository.findWebQrChannelForRouting(channelId);
@@ -26,16 +66,8 @@ export async function ensureWebQrBridgeReady(channelId: string): Promise<void> {
     throw new Error("WEB_QR_WEBHOOK_SECRET no configurado en Vercel.");
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://du-mo.vercel.app";
-  const webhookUrl = `${appUrl.replace(/\/$/, "")}/api/web-qr/webhook`;
-
   // Siempre registrar en bridge (actualiza webhook tras reinicios de Railway).
-  await bridgeCreateSession({
-    channelId: resolvedId,
-    label: channel.label,
-    webhookUrl,
-    webhookSecret: webhookSecret.trim(),
-  });
+  await registerWebQrBridgeSession(resolvedId);
 
   const webhookCheck = await verifyWebQrWebhookReachable();
   if (!webhookCheck.ok) {

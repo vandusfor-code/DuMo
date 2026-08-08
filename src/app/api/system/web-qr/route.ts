@@ -6,6 +6,7 @@ import {
   webQrWebhookSecret,
 } from "@/server/web-qr/config";
 import { bridgeTestWebhook } from "@/server/web-qr/bridge-client";
+import { reconcileWebQrBridgeSessions } from "@/server/web-qr/ensure-session";
 import { verifyWebQrWebhookReachable } from "@/server/web-qr/verify-webhook";
 
 export const runtime = "nodejs";
@@ -26,9 +27,8 @@ export async function GET() {
   const bridgeUrl = webQrBridgeUrl();
   const configured = webQrConfigured();
 
-  let health: { ok: boolean; status?: number; body?: unknown; error?: string } | null = null;
-
-  if (bridgeUrl && webQrBridgeSecret()) {
+  async function fetchBridgeHealth() {
+    if (!bridgeUrl || !webQrBridgeSecret()) return null;
     try {
       const res = await fetch(`${bridgeUrl.replace(/\/$/, "")}/health`, {
         cache: "no-store",
@@ -40,16 +40,37 @@ export async function GET() {
       } catch {
         body = await res.text().catch(() => null);
       }
-      health = {
+      return {
         ok: res.ok && typeof body === "object" && body !== null && (body as { ok?: boolean }).ok === true,
         status: res.status,
         body,
       };
     } catch (err) {
-      health = {
+      return {
         ok: false,
         error: err instanceof Error ? err.message : String(err),
       };
+    }
+  }
+
+  let health = await fetchBridgeHealth();
+  let reconcileAttempted = false;
+
+  const sessionCount =
+    health?.body && typeof health.body === "object"
+      ? Number((health.body as { sessions?: number }).sessions ?? 0)
+      : 0;
+  const persistedSessions =
+    health?.body && typeof health.body === "object"
+      ? Number((health.body as { persistedSessions?: number }).persistedSessions ?? 0)
+      : 0;
+
+  if (configured && health?.ok && sessionCount === 0) {
+    reconcileAttempted = true;
+    const registered = await reconcileWebQrBridgeSessions();
+    if (registered > 0) {
+      await new Promise((r) => setTimeout(r, 4000));
+      health = await fetchBridgeHealth();
     }
   }
 
@@ -102,6 +123,29 @@ export async function GET() {
         )?.channelId ?? null)
       : null;
 
+  const hasConnectedSession = Boolean(activeChannelId);
+
+  const latestPersistedSessions =
+    health?.body && typeof health.body === "object"
+      ? Number((health.body as { persistedSessions?: number }).persistedSessions ?? 0)
+      : persistedSessions;
+
+  if (configured && health?.ok && !hasConnectedSession) {
+    if (latestPersistedSessions === 0) {
+      problems.push(
+        "Bridge sin credenciales en disco — Railway perdió la sesión. Ve a /admin/web-qr y escanea el QR de nuevo.",
+      );
+    } else if (reconcileAttempted) {
+      problems.push(
+        "Bridge reconectando sesión desde disco — espera 10–20 s y recarga. Si pide QR, escanéalo en /admin/web-qr.",
+      );
+    } else {
+      problems.push(
+        "Bridge sin sesión activa (reinicio reciente). Abre /admin/web-qr o recarga este diagnóstico.",
+      );
+    }
+  }
+
   if (configured && activeChannelId) {
     try {
       bridgeWebhookTest = await bridgeTestWebhook(activeChannelId);
@@ -127,11 +171,13 @@ export async function GET() {
     health,
     webhookReachable,
     bridgeWebhookTest,
+    reconcileAttempted,
     readyForQr:
       configured &&
       health?.ok === true &&
       webhookReachable?.ok === true &&
-      (bridgeWebhookTest?.ok ?? true),
+      hasConnectedSession &&
+      (bridgeWebhookTest?.ok ?? false),
     problems,
     hint: "Admin UI: /admin/web-qr (solo administrador).",
   });

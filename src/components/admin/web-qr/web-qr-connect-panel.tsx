@@ -58,18 +58,13 @@ function ChannelCard({ channel }: { channel: WhatsAppChannel }) {
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [autoRestoreAttempted, setAutoRestoreAttempted] = useState(false);
 
   const session = useWebQrSession(channel.id, true);
 
   const liveStatus = resolveLiveStatus(channel, session.data?.status);
   const isConnected = liveStatus === "CONNECTED";
   const isInitializing = liveStatus === "INITIALIZING" || session.data?.status === "QR_PENDING";
-
-  useEffect(() => {
-    if (session.data?.status === "DISCONNECTED" && channel.status !== "DISCONNECTED") {
-      void qc.invalidateQueries({ queryKey: webQrKeys.channels });
-    }
-  }, [session.data?.status, channel.status, qc]);
 
   const handleConnect = async () => {
     setLocalError(null);
@@ -79,6 +74,35 @@ function ChannelCard({ channel }: { channel: WhatsAppChannel }) {
       setLocalError(err instanceof Error ? err.message : "No se pudo conectar con el bridge.");
     }
   };
+
+  useEffect(() => {
+    if (session.data?.status === "DISCONNECTED" && channel.status !== "DISCONNECTED") {
+      void qc.invalidateQueries({ queryKey: webQrKeys.channels });
+    }
+  }, [session.data?.status, channel.status, qc]);
+
+  useEffect(() => {
+    if (autoRestoreAttempted || start.isPending || session.isFetching) return;
+    const bridgeStatus = session.data?.status;
+    const staleDbSession =
+      channel.status === "CONNECTED" || channel.status === "INITIALIZING";
+    const needsRestore =
+      staleDbSession &&
+      (bridgeStatus === "DISCONNECTED" ||
+        bridgeStatus === "INITIALIZING" ||
+        bridgeStatus === "QR_PENDING" ||
+        !bridgeStatus);
+    if (needsRestore) {
+      setAutoRestoreAttempted(true);
+      void handleConnect();
+    }
+  }, [
+    autoRestoreAttempted,
+    channel.status,
+    session.data?.status,
+    session.isFetching,
+    start.isPending,
+  ]);
 
   const handleDisconnect = async () => {
     setLocalError(null);

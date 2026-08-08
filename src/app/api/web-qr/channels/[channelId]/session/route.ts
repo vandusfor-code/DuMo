@@ -130,14 +130,37 @@ export async function GET(_request: Request, { params }: RouteCtx) {
     });
   }
 
-  const status = await bridgeGetSessionStatusOrNull(bridgeSessionId);
+  let status = await bridgeGetSessionStatusOrNull(bridgeSessionId);
+  if (!status) {
+    const webhookSecret = webQrWebhookSecret()!;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://du-mo.vercel.app";
+    const webhookUrl = `${appUrl.replace(/\/$/, "")}/api/web-qr/webhook`;
+    try {
+      const restored = await ensureBridgeSession({
+        channelId,
+        label: channel.label,
+        webhookUrl,
+        webhookSecret,
+      });
+      status = restored.status;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await webQrRepository.updateChannelStatus(channelId, "DISCONNECTED");
+      return NextResponse.json({
+        channelId,
+        status: "DISCONNECTED",
+        qrDataUrl: null,
+        error: message,
+      });
+    }
+  }
   if (!status) {
     await webQrRepository.updateChannelStatus(channelId, "DISCONNECTED");
     return NextResponse.json({
       channelId,
       status: "DISCONNECTED",
       qrDataUrl: null,
-      error: "Sesión perdida en el bridge (reinicio). Pulsa Generar código QR de nuevo.",
+      error: "Sesión perdida en el bridge. Pulsa Generar código QR de nuevo.",
     });
   }
   if (status.status === "CONNECTED" && status.phoneNumber) {
