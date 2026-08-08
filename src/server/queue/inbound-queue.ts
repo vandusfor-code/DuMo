@@ -3,10 +3,10 @@ import { Queue } from "bullmq";
 import { getRedisConnection, isQueueEnabled } from "@/server/queue/redis";
 import {
   INBOUND_QUEUE_NAME,
-  type InboundJobData,
   type WebQrInboundJob,
   type WhatsAppInboundJob,
 } from "@/server/queue/inbound-jobs";
+import type { BridgeInboundPayload } from "@/server/web-qr/types";
 
 let queue: Queue | null = null;
 
