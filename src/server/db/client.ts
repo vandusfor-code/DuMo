@@ -4,6 +4,10 @@ import { SEED_ADMIN, seedAdminPasswordHash } from "@/lib/auth/seed-admin";
 import { DEFAULT_COMPANY_ID } from "@/types/tenant";
 import { QUICK_REPLY_REQUIRED_COLUMNS, runQuickReplyAndTenantMigrations } from "@/server/db/migrations/quick-reply-schema";
 import { runTeleprompterScriptMigrations } from "@/server/db/migrations/teleprompter-scripts-schema";
+import {
+  ADVISOR_PRESENCE_REQUIRED_COLUMNS,
+  runAdvisorPresenceMigrations,
+} from "@/server/db/migrations/advisor-presence-schema";
 import { runTipificationMigrations, TIPIFICATION_REQUIRED_COLUMNS } from "@/server/db/migrations/tipifications-schema";
 import { runWebQrMigrations } from "@/server/db/migrations/web-qr-schema";
 
@@ -174,6 +178,7 @@ const REQUIRED_COLUMNS = [
   "app_config.key",
   "users.last_seen_at",
   "users.monthly_sales_goal",
+  ...ADVISOR_PRESENCE_REQUIRED_COLUMNS,
   "lead_conversations.dumo_phone_id",
   "lead_conversations.assigned_advisor_id",
   "lead_conversations.assigned_advisor_name",
@@ -288,6 +293,7 @@ async function ensureIncrementalMigrations(sql: Sql): Promise<void> {
     // Columnas añadidas después de marcar schema_complete — reparación idempotente.
     await sql`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS wa_chat_jid text`;
     await sql`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS last_message_direction text DEFAULT 'in'`;
+    await runAdvisorPresenceMigrations(sql);
   } catch (err) {
     console.error("[ensureIncrementalMigrations]", err);
   }
@@ -495,6 +501,7 @@ async function runMigrations(sql: Sql) {
 
     await runQuickReplyAndTenantMigrations(tx);
     await runTipificationMigrations(tx);
+    await runAdvisorPresenceMigrations(tx);
     await runTeleprompterScriptMigrations(tx);
     await runWebQrMigrations(tx);
 
