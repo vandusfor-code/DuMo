@@ -6,6 +6,7 @@ import {
   EquipmentCatalogTable,
   EquipmentDialog,
 } from "@/components/admin/equipment/equipment-panels";
+import { EquipmentImportDialog } from "@/components/admin/equipment/equipment-import-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/shared/error-state";
 import {
@@ -25,6 +26,7 @@ export default function AdminEquiposPage() {
   const remove = useDeleteEquipment();
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<EquipmentCatalogItem | null>(null);
 
   return (
@@ -45,6 +47,7 @@ export default function AdminEquiposPage() {
             setEditing(null);
             setDialogOpen(true);
           }}
+          onImport={() => setImportOpen(true)}
           onEdit={(item) => {
             setEditing(item);
             setDialogOpen(true);
@@ -53,6 +56,8 @@ export default function AdminEquiposPage() {
           onDelete={(id) => remove.mutate(id)}
         />
       )}
+
+      <EquipmentImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
 
       <EquipmentDialog
         open={dialogOpen}

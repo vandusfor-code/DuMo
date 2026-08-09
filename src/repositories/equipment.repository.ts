@@ -33,6 +33,10 @@ function normalizeItem(raw: EquipmentCatalogItem): EquipmentCatalogItem {
   };
 }
 
+function newEquipmentId() {
+  return `eq-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 class MockEquipmentRepository implements EquipmentRepository {
   private items: EquipmentCatalogItem[] = [...EQUIPMENT_CATALOG_MOCK];
 
@@ -61,7 +65,7 @@ class MockEquipmentRepository implements EquipmentRepository {
   async create(input: UpsertEquipmentInput) {
     const item: EquipmentCatalogItem = normalizeItem({
       ...input,
-      id: `eq-${Date.now()}`,
+      id: newEquipmentId(),
     });
     this.items.push(item);
     return item;
@@ -133,7 +137,7 @@ class PostgresEquipmentRepository implements EquipmentRepository {
 
   async create(input: UpsertEquipmentInput) {
     const items = await this.load();
-    const item = normalizeItem({ ...input, id: `eq-${Date.now()}` });
+    const item = normalizeItem({ ...input, id: newEquipmentId() });
     await this.save([...items, item]);
     return item;
   }

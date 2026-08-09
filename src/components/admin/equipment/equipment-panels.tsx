@@ -1,7 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  MoreVertical,
+  Pencil,
+  Plus,
+  Trash2,
+  Download,
+  Upload,
+  AlertCircle,
+  Copy,
+  Check,
+} from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +29,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { EquipmentCatalogItem, EquipmentStatus, UpsertEquipmentInput } from "@/types/equipment";
+import { validateEquipmentCatalogInput } from "@/lib/equipment-catalog";
+import { EQUIPMENT_AI_IMPORT_PROMPT } from "@/lib/equipment-ai-prompt";
+import { EQUIPMENT_TEMPLATE_PATH } from "@/lib/equipment-import";
 import { cn } from "@/lib/utils";
 
 const money = new Intl.NumberFormat("es-CL", {
@@ -47,24 +60,54 @@ const EMPTY: UpsertEquipmentInput = {
 export function EquipmentCatalogTable({
   items,
   onCreate,
+  onImport,
   onEdit,
   onToggleStatus,
   onDelete,
 }: {
   items: EquipmentCatalogItem[];
   onCreate: () => void;
+  onImport: () => void;
   onEdit: (item: EquipmentCatalogItem) => void;
   onToggleStatus: (id: string, status: EquipmentStatus) => void;
   onDelete: (id: string) => void;
 }) {
+  const [promptCopied, setPromptCopied] = useState(false);
+
+  const handleCopyAiPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(EQUIPMENT_AI_IMPORT_PROMPT);
+      setPromptCopied(true);
+      window.setTimeout(() => setPromptCopied(false), 2000);
+    } catch {
+      setPromptCopied(false);
+    }
+  };
+
   return (
     <Card className="overflow-hidden">
-      <div className="flex items-center justify-between border-b border-line px-5 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
         <h3 className="text-[15px] font-semibold text-ink">Catálogo de equipos</h3>
-        <Button size="sm" onClick={onCreate}>
-          <Plus className="size-4" />
-          Crear equipo
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="outline" asChild>
+            <a href={EQUIPMENT_TEMPLATE_PATH} download>
+              <Download className="size-4" />
+              Descargar plantilla
+            </a>
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => void handleCopyAiPrompt()}>
+            {promptCopied ? <Check className="size-4" /> : <Copy className="size-4" />}
+            {promptCopied ? "Prompt copiado" : "Copiar prompt IA"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={onImport}>
+            <Upload className="size-4" />
+            Cargar equipos
+          </Button>
+          <Button size="sm" onClick={onCreate}>
+            <Plus className="size-4" />
+            Crear equipo
+          </Button>
+        </div>
       </div>
       <Table>
         <TableHeader>
@@ -167,9 +210,11 @@ export function EquipmentDialog({
   onSave: (values: UpsertEquipmentInput) => void;
 }) {
   const [values, setValues] = useState<UpsertEquipmentInput>(EMPTY);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
+      setValidationError(null);
       setValues(
         initial
           ? {
@@ -313,11 +358,28 @@ export function EquipmentDialog({
             </select>
           </label>
         </div>
+        {validationError ? (
+          <p className="mt-4 flex items-start gap-2 rounded-xl border border-danger/20 bg-danger-soft px-4 py-3 text-[13px] text-danger-ink">
+            <AlertCircle className="mt-0.5 size-4 shrink-0" />
+            {validationError}
+          </p>
+        ) : null}
         <div className="mt-6 flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="button" onClick={() => onSave(values)}>
+          <Button
+            type="button"
+            onClick={() => {
+              const error = validateEquipmentCatalogInput(values);
+              if (error) {
+                setValidationError(error);
+                return;
+              }
+              setValidationError(null);
+              onSave(values);
+            }}
+          >
             Guardar
           </Button>
         </div>

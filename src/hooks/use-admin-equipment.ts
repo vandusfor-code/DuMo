@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "@/lib/api-client";
-import type { EquipmentCatalogItem, EquipmentStatus, UpsertEquipmentInput } from "@/types/equipment";
+import type { EquipmentCatalogItem, EquipmentStatus, UpsertEquipmentInput, EquipmentBulkImportResult } from "@/types/equipment";
 
 export function useEquipmentCatalog() {
   return useQuery({
@@ -41,6 +41,15 @@ export function useDeleteEquipment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => apiDelete<{ ok: boolean }>(`/api/admin/equipment?id=${encodeURIComponent(id)}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "equipment"] }),
+  });
+}
+
+export function useBulkImportEquipment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (items: Array<{ rowNumber: number; equipment: UpsertEquipmentInput }>) =>
+      apiPost<EquipmentBulkImportResult>("/api/admin/equipment/bulk", { items }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "equipment"] }),
   });
 }

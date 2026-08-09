@@ -145,9 +145,44 @@ export function validateLineEquipmentForTeleprompter(
 export function validateEquipmentCatalogInput(
   input: UpsertEquipmentInput & { isPieCero?: boolean },
 ): string | null {
+  if (!input.commercialName?.trim()) {
+    return "El nombre comercial es obligatorio.";
+  }
+  if (!input.brand?.trim()) {
+    return "La marca es obligatoria.";
+  }
+  if (!input.model?.trim()) {
+    return "El modelo es obligatorio.";
+  }
+
+  const totalValue = Number(input.totalValue);
+  if (!Number.isFinite(totalValue) || totalValue <= 0) {
+    return "El valor total debe ser un número mayor a 0.";
+  }
+
+  const downPayment = Number(input.downPayment);
+  if (!Number.isFinite(downPayment) || downPayment < 0) {
+    return "El valor del pie debe ser un número igual o mayor a 0.";
+  }
+
+  const installmentsCount = Number(input.installmentsCount);
+  if (!Number.isInteger(installmentsCount) || installmentsCount <= 0) {
+    return "La cantidad de cuotas debe ser un número entero mayor a 0.";
+  }
+
+  const installmentValue = Number(input.installmentValue);
+  if (!Number.isFinite(installmentValue) || installmentValue <= 0) {
+    return "El valor de cada cuota debe ser un número mayor a 0.";
+  }
+
+  if (input.status !== "active" && input.status !== "inactive") {
+    return 'El estado debe ser "Activo" o "Inactivo".';
+  }
+
   if (input.isPieCero !== undefined && typeof input.isPieCero !== "boolean") {
     return "Indica si el equipo tiene beneficio Pie Cero (Sí o No).";
   }
+
   return null;
 }
 

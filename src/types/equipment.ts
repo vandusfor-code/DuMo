@@ -22,6 +22,11 @@ export interface EquipmentCatalogItem {
 
 export type UpsertEquipmentInput = Omit<EquipmentCatalogItem, "id">;
 
+export type EquipmentBulkImportResult = {
+  created: { rowNumber: number; id: string; commercialName: string }[];
+  failed: { rowNumber: number; error: string }[];
+};
+
 /** Vista reducida para el selector en Gestión (solo activos). */
 export interface AdvisorEquipmentOption {
   id: string;
