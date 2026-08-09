@@ -17,6 +17,8 @@ import { commercialPlansService } from "@/services/commercial-plans.service";
 import { businessDateISO } from "@/lib/date";
 import { getDefaultClientProfile } from "@/data/mock/admin-leads.mock";
 import { ensureSchema, getSql, withDbRetry } from "@/server/db/client";
+import { tipificationService } from "@/services/tipification.service";
+import { DEFAULT_COMPANY_ID } from "@/types/tenant";
 import type postgres from "postgres";
 
 function buildLead(id: string, input: SaveLeadInput, advisorId: string): Lead {
@@ -66,7 +68,11 @@ export class PostgresLeadRepository {
       `,
     );
 
-    if (input.type === "venta") {
+    const isSaleFlow = await tipificationService.triggersSaleFlowForSlug(
+      DEFAULT_COMPANY_ID,
+      input.type,
+    );
+    if (isSaleFlow) {
       await withDbRetry(() =>
         sql`
           UPDATE lead_conversations

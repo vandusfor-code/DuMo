@@ -1,4 +1,4 @@
-/** Tipificación de la gestión (Tipo de gestión). */
+/** Tipificación de la gestión. */
 export type LeadType =
   | "venta"
   | "consulta"
@@ -113,9 +113,9 @@ export interface Lead {
   phone: string;
   customerName: string;
   rut: string;
-  status: LeadType;
+  status: string;
   advisorId: string;
-  type: LeadType;
+  type: string;
   notes: string;
   createdAt: string;
 }
@@ -125,7 +125,7 @@ export type LatestGestionDraft = {
   gestionId: string;
   customerName: string;
   rut: string;
-  type: LeadType;
+  type: string;
   notes: string;
   lines: SaveLeadInput["lines"];
   hasScript: boolean;
@@ -137,7 +137,8 @@ export interface SaveLeadInput {
   phone: string;
   customerName: string;
   rut: string;
-  type: LeadType;
+  /** Slug de tipificación (ej. "venta", "seguimiento"). */
+  type: string;
   notes: string;
   lines: {
     phone: string;

@@ -10,6 +10,7 @@
     "lint": "eslint",
     "db:migrate": "node scripts/migrate-db.mjs",
     "db:backup": "node scripts/backup-db.mjs",
+    "dev:db-env": "node scripts/sync-local-postgres-env.mjs",
     "railway:postgres:migrate": "node scripts/railway-postgres-migrate.mjs",
     "railway:postgres:import": "node scripts/railway-postgres-import.mjs",
     "railway:postgres:verify": "node scripts/railway-postgres-verify.mjs",

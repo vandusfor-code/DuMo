@@ -41,6 +41,7 @@ import {
   isCompleteSaleLine,
   mapSaleLineForSave,
 } from "@/lib/lead-save";
+import { useSaleFlowType, useTipificationCatalog } from "@/hooks/use-tipification-catalog";
 import { useWatch } from "react-hook-form";
 
 function defaultsFor(c: AdminConversation): LeadFormValues {
@@ -75,8 +76,9 @@ export function AdminLeadFormPanel({
   const script = saveLead.data?.script ?? fetchedScript ?? null;
   const methods = useForm<LeadFormValues>({ defaultValues: defaultsFor(conversation) });
   const type = useWatch({ control: methods.control, name: "type" });
-  const isVenta = type === "venta";
-  const showScriptTab = isVenta && (scriptTabUnlocked || Boolean(script));
+  const isSaleFlow = useSaleFlowType(type);
+  const { triggersSaleFlow } = useTipificationCatalog();
+  const showScriptTab = isSaleFlow && (scriptTabUnlocked || Boolean(script));
 
   useEffect(() => {
     setScriptTabUnlocked(false);
@@ -90,13 +92,13 @@ export function AdminLeadFormPanel({
   }, [showScriptTab, activeTab]);
 
   useEffect(() => {
-    if (!isVenta && activeTab === "script") {
+    if (!isSaleFlow && activeTab === "script") {
       setActiveTab("gestion");
     }
-  }, [isVenta, activeTab]);
+  }, [isSaleFlow, activeTab]);
 
   const onSubmit = methods.handleSubmit(async (values) => {
-    if (values.type === "venta") {
+    if (triggersSaleFlow(values.type)) {
       const completeLines = values.lines.filter(isCompleteSaleLine);
       if (completeLines.length === 0) {
         methods.setError("root", {
@@ -120,7 +122,7 @@ export function AdminLeadFormPanel({
       type: values.type,
       notes: notesParts.join("\n\n"),
       lines:
-        values.type === "venta"
+        triggersSaleFlow(values.type)
           ? values.lines.filter(isCompleteSaleLine).map(mapSaleLineForSave)
           : [],
       registerSale: saveModeRef.current === "sale",
@@ -145,7 +147,7 @@ export function AdminLeadFormPanel({
         <div className="flex h-full flex-col">
           <div className="flex items-center justify-between border-b border-line px-4 py-3">
             <p className="text-[14px] font-semibold text-ink">Gestión del cliente</p>
-            {type === "venta" ? (
+            {isSaleFlow ? (
               <Button
                 type="submit"
                 disabled={saveLead.isPending}
@@ -180,7 +182,7 @@ export function AdminLeadFormPanel({
               <TabsContent value="gestion" className="space-y-4 outline-none">
                 <ClientCard />
                 <LeadTypeSelect />
-                {type === "venta" && <SaleDetails />}
+                {isSaleFlow && <SaleDetails />}
                 <ObservationField
                   name="observations"
                   label="Observaciones"
@@ -217,9 +219,9 @@ export function AdminLeadFormPanel({
                 <ActionButtons
                   isSaving={saveLead.isPending}
                   onCancel={() => methods.reset(defaultsFor(conversation))}
-                  mode={type === "venta" ? "script" : "tipify"}
+                  mode={isSaleFlow ? "script" : "tipify"}
                   onPrimaryAction={() => {
-                    saveModeRef.current = type === "venta" ? "script" : "tipify";
+                    saveModeRef.current = isSaleFlow ? "script" : "tipify";
                   }}
                 />
               </TabsContent>

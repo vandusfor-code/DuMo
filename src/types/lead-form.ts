@@ -39,7 +39,7 @@ export interface LeadFormValues {
   customerName: string;
   rut: string;
   phone: string;
-  type: LeadType;
+  type: string;
   observations: string;
   internalNotes: string;
   lines: LeadLineValues[];

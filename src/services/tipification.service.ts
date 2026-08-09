@@ -7,6 +7,12 @@ import type {
   TipificationWithUsage,
   UpdateTipificationInput,
 } from "@/types/tipification";
+import {
+  assertTipificationEditable,
+  isProtectedTipificationSlug,
+  protectedTipificationError,
+} from "@/lib/tipification-system";
+import { slugifyTipificationName } from "@/lib/tipification-colors";
 
 async function listAllWithUsage(companyId: string): Promise<TipificationWithUsage[]> {
   const repo = getTipificationRepository();
@@ -33,23 +39,40 @@ export const tipificationService = {
     return getTipificationRepository().getBySlug(scope.companyId, slug);
   },
 
+  async triggersSaleFlowForSlug(companyId: string, slug: string): Promise<boolean> {
+    const item = await getTipificationRepository().getBySlug(companyId, slug);
+    if (item) return item.triggersSaleFlow;
+    return slug === "venta";
+  },
+
   create(scope: TenantScope, input: CreateTipificationInput) {
     if (!input.name?.trim()) throw new Error("El nombre es obligatorio.");
     if (!input.badgeBg || !input.badgeText) throw new Error("Selecciona un color.");
+    const slug = input.slug?.trim() || slugifyTipificationName(input.name);
+    if (isProtectedTipificationSlug(slug)) {
+      throw new Error(protectedTipificationError(slug));
+    }
     return getTipificationRepository().create(scope.companyId, input, scope.userId);
   },
 
-  update(scope: TenantScope, id: string, input: UpdateTipificationInput) {
+  async update(scope: TenantScope, id: string, input: UpdateTipificationInput) {
     if (input.name !== undefined && !input.name.trim()) {
       throw new Error("El nombre es obligatorio.");
     }
-    return getTipificationRepository().update(scope.companyId, id, input);
+    const repo = getTipificationRepository();
+    const current = await repo.getById(scope.companyId, id);
+    if (!current) throw new Error("Tipificación no encontrada.");
+    assertTipificationEditable(current.slug);
+    return repo.update(scope.companyId, id, input);
   },
 
   async checkDelete(scope: TenantScope, id: string): Promise<TipificationDeleteCheck> {
     const repo = getTipificationRepository();
     const item = await repo.getById(scope.companyId, id);
     if (!item) throw new Error("Tipificación no encontrada.");
+    if (isProtectedTipificationSlug(item.slug)) {
+      return { usageCount: await repo.countUsageBySlug(scope.companyId, item.slug), canDelete: false };
+    }
     const usageCount = await repo.countUsageBySlug(scope.companyId, item.slug);
     return { usageCount, canDelete: usageCount === 0 };
   },
@@ -58,6 +81,7 @@ export const tipificationService = {
     const repo = getTipificationRepository();
     const item = await repo.getById(scope.companyId, id);
     if (!item) throw new Error("Tipificación no encontrada.");
+    assertTipificationEditable(item.slug);
 
     const usageCount = await repo.countUsageBySlug(scope.companyId, item.slug);
     if (usageCount > 0) {

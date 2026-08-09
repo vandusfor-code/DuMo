@@ -46,6 +46,20 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error) {
     console.error("[POST /api/auth/login]", error);
+    const message =
+      error instanceof Error ? error.message : "No se pudo iniciar sesión.";
+    const isDev = process.env.NODE_ENV === "development";
+    const isDbConfig =
+      message.includes("DATABASE_URL") || message.includes("Base de datos no configurada");
+    if (isDev && isDbConfig) {
+      return NextResponse.json(
+        {
+          error:
+            "Base de datos no configurada en local. Agrega DATABASE_URL1 a .env.local (ejecuta: node scripts/sync-local-postgres-env.mjs) y reinicia npm run dev.",
+        },
+        { status: 503 },
+      );
+    }
     return NextResponse.json({ error: "No se pudo iniciar sesión." }, { status: 500 });
   }
 }

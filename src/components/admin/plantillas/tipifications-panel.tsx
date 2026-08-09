@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Loader2, Lock, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -16,6 +16,7 @@ import {
   findTipificationColorPreset,
 } from "@/lib/tipification-colors";
 import { cn } from "@/lib/utils";
+import { isProtectedTipificationSlug } from "@/lib/tipification-system";
 import type { TipificationWithUsage } from "@/types/tipification";
 
 function TipificationBadge({
@@ -95,9 +96,21 @@ export function TipificationsPanel() {
               </tr>
             </thead>
             <tbody>
-              {data.map((item) => (
+              {data.map((item) => {
+                const isProtected = isProtectedTipificationSlug(item.slug);
+                return (
                 <tr key={item.id} className="border-b border-line last:border-0">
-                  <td className="px-5 py-4 font-medium text-ink">{item.name}</td>
+                  <td className="px-5 py-4 font-medium text-ink">
+                    <span className="inline-flex items-center gap-2">
+                      {item.name}
+                      {isProtected ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-canvas px-2 py-0.5 text-[11px] font-medium text-muted">
+                          <Lock className="size-3" />
+                          Sistema
+                        </span>
+                      ) : null}
+                    </span>
+                  </td>
                   <td className="px-5 py-4">
                     <TipificationBadge
                       name={item.name}
@@ -112,6 +125,9 @@ export function TipificationsPanel() {
                     {item.usageCount} registro{item.usageCount === 1 ? "" : "s"}
                   </td>
                   <td className="px-5 py-4">
+                    {isProtected ? (
+                      <span className="text-[12px] text-muted">Protegida</span>
+                    ) : (
                     <div className="flex justify-end gap-1">
                       <button
                         type="button"
@@ -133,9 +149,11 @@ export function TipificationsPanel() {
                         <Trash2 className="size-4" />
                       </button>
                     </div>
+                    )}
                   </td>
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
         </div>

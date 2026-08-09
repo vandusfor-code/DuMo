@@ -10,7 +10,7 @@ import { EMPTY_LEAD_LINE, type LeadFormValues } from "@/types/lead-form";
 import { SectionCard, SectionCardBody, SectionCardHeader } from "@/components/leads/premium/section-card";
 import { QueryFatalError } from "@/components/shared/query-state";
 
-/** Detalles de la venta — solo visible cuando Tipo de gestión = Venta. */
+/** Detalles de la venta — solo visible cuando la tipificación activa el flujo de venta. */
 export function SaleDetails() {
   const { control } = useFormContext<LeadFormValues>();
   const { fields, append, remove } = useFieldArray({ control, name: "lines" });

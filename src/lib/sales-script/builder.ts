@@ -20,8 +20,11 @@ export function getScriptBuildError(input: {
   commercialPlans: CommercialPlan[];
   equipmentCatalog?: EquipmentCatalogItem[];
   deliveryConfig: DeliveryTeleprompterConfig;
+  isSaleFlowType?: boolean;
 }): string | null {
-  const eligibilityReason = getScriptUnavailableReason(input.gestion);
+  const eligibilityReason = getScriptUnavailableReason(input.gestion, {
+    isSaleFlowType: input.isSaleFlowType,
+  });
   if (eligibilityReason) return eligibilityReason;
 
   return getTeleprompterContextError({
@@ -40,9 +43,11 @@ export function buildSalesScript(input: {
   advisor?: { name: string; email: string };
   deliveryConfig: DeliveryTeleprompterConfig;
   overrides?: ScriptOverrideMap;
+  isSaleFlowType?: boolean;
 }): GeneratedSalesScript | null {
   const main = input.gestion.lines[0];
-  const eligible = isScriptEligible(input.gestion);
+  const saleFlowOptions = { isSaleFlowType: input.isSaleFlowType };
+  const eligible = isScriptEligible(input.gestion, saleFlowOptions);
 
   logScriptBuildCheckpoint("buildSalesScript · entrada", {
     gestionId: input.gestionId,
@@ -56,7 +61,7 @@ export function buildSalesScript(input: {
   if (!eligible) {
     logScriptBuildCheckpoint("buildSalesScript · detenido", {
       reason: "isScriptEligible === false",
-      getScriptUnavailableReason: getScriptUnavailableReason(input.gestion),
+      getScriptUnavailableReason: getScriptUnavailableReason(input.gestion, saleFlowOptions),
     });
     return null;
   }

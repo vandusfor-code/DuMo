@@ -11,6 +11,8 @@ import { equipmentService } from "@/services/equipment.service";
 import { getScriptUnavailableReason, isScriptEligible } from "@/lib/sales-script/eligibility";
 import { getScriptBuildError } from "@/lib/sales-script/builder";
 import { getDeliveryConfigurationRepository } from "@/repositories/delivery-configuration.repository";
+import { tipificationService } from "@/services/tipification.service";
+import { DEFAULT_COMPANY_ID } from "@/types/tenant";
 import type { SaveLeadInput } from "@/types/lead";
 import type { SaveLeadResult } from "@/types/sales-script";
 
@@ -33,16 +35,20 @@ export async function saveLeadWithScript(
   let clientSaved = false;
   let clientError: string | null = null;
 
+  const companyId = DEFAULT_COMPANY_ID;
+  const isSaleFlow = await tipificationService.triggersSaleFlowForSlug(companyId, input.type);
+  const saleFlowOptions = { isSaleFlowType: isSaleFlow };
+
   const saveAction: SaveLeadAction =
     input.saveAction ?? (input.registerSale ? "sale" : "script");
   const shouldGenerateScript =
-    saveAction !== "tipify" && input.type === "venta" && input.lines.length > 0;
-  const shouldRegisterSale = saveAction === "sale" && input.type === "venta" && input.lines.length > 0;
+    saveAction !== "tipify" && isSaleFlow && input.lines.length > 0;
+  const shouldRegisterSale = saveAction === "sale" && isSaleFlow && input.lines.length > 0;
 
   if (shouldGenerateScript) {
     const main = input.lines[0];
-    const unavailableReason = getScriptUnavailableReason(input);
-    const eligible = isScriptEligible(input);
+    const unavailableReason = getScriptUnavailableReason(input, saleFlowOptions);
+    const eligible = isScriptEligible(input, saleFlowOptions);
 
     logScriptSaveCheckpoint("saveLeadWithScript · entrada", {
       conversationId: input.conversationId,
@@ -65,6 +71,7 @@ export async function saveLeadWithScript(
           gestionId: lead.id,
           gestion: input,
           advisor,
+          isSaleFlowType: isSaleFlow,
         });
         if (!script) {
           const [commercialConfig, deliveryConfig, equipmentCatalog] = await Promise.all([
@@ -77,6 +84,7 @@ export async function saveLeadWithScript(
             commercialPlans: commercialConfig.plans,
             equipmentCatalog,
             deliveryConfig,
+            isSaleFlowType: isSaleFlow,
           });
           logScriptSaveCheckpoint("saveLeadWithScript · buildSalesScript devolvió null", {
             getScriptBuildError: scriptUnavailableReason,
@@ -105,7 +113,7 @@ export async function saveLeadWithScript(
   }
 
   if (shouldRegisterSale && scope) {
-    const saleInput = leadGestionToNewSaleInput(input);
+    const saleInput = leadGestionToNewSaleInput(input, saleFlowOptions);
     if (saleInput) {
       try {
         sale = await salesService.create(saleInput, scope);
@@ -157,7 +165,7 @@ export async function saveLeadWithScript(
     "steps.length": result.script?.steps.length ?? null,
   });
 
-  if (input.type === "venta" && input.lines.length > 0) {
+  if (isSaleFlow && input.lines.length > 0) {
     try {
       const persistedScript = await getLeadRepository().getSalesScriptByGestionId(lead.id);
       logScriptSaveCheckpoint("saveLeadWithScript · relectura BD inmediata", {

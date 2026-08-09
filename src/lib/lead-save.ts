@@ -57,7 +57,7 @@ export function draftToFormValues(input: {
     gestionId: string;
     customerName: string;
     rut: string;
-    type: LeadType;
+    type: string;
     notes: string;
     lines: SaveLeadInput["lines"];
   } | null;
@@ -150,8 +150,12 @@ export function mapLeadLineToSaleType(
 }
 
 /** Convierte una gestión de venta guardada en Leads al payload de Mis Ventas. */
-export function leadGestionToNewSaleInput(input: SaveLeadInput): NewSaleInput | null {
-  if (input.type !== "venta" || input.lines.length === 0) return null;
+export function leadGestionToNewSaleInput(
+  input: SaveLeadInput,
+  options?: { isSaleFlowType?: boolean },
+): NewSaleInput | null {
+  const isSaleFlow = options?.isSaleFlowType ?? input.type === "venta";
+  if (!isSaleFlow || input.lines.length === 0) return null;
   return {
     customerName: input.customerName,
     rut: input.rut,

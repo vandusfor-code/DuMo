@@ -25,8 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { SegmentedControl } from "@/components/ui/segmented-control";
-import { StatusBadge } from "@/components/leads/premium/status-badge";
-import { LEAD_TYPE_LABELS } from "@/types/lead";
+import { DynamicTipificationBadge } from "@/components/shared/dynamic-tipification-badge";
 import { formatLongDate, getInitials } from "@/lib/format";
 import type { CrmClient } from "@/types/crm-client";
 
@@ -73,12 +72,8 @@ function buildColumns(showAdvisor: boolean, leadsHref: string) {
       },
     }),
     columnHelper.accessor("gestionType", {
-      header: "Tipo",
-      cell: (info) => (
-        <StatusBadge variant={info.getValue() === "venta" ? "active" : "in_progress"}>
-          {LEAD_TYPE_LABELS[info.getValue()]}
-        </StatusBadge>
-      ),
+      header: "Tipificación",
+      cell: (info) => <DynamicTipificationBadge slug={info.getValue()} />,
     }),
     columnHelper.accessor("updatedDate", {
       header: "Última gestión",

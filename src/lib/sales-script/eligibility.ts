@@ -7,8 +7,12 @@ function lineEquipmentLabel(index: number): string {
 }
 
 /** Motivo legible cuando no aplica generar script automático. Null = elegible. */
-export function getScriptUnavailableReason(gestion: SaveLeadInput): string | null {
-  if (gestion.type !== "venta" || gestion.lines.length === 0) {
+export function getScriptUnavailableReason(
+  gestion: SaveLeadInput,
+  options?: { isSaleFlowType?: boolean },
+): string | null {
+  const isSaleFlow = options?.isSaleFlowType ?? gestion.type === "venta";
+  if (!isSaleFlow || gestion.lines.length === 0) {
     return "El script solo se genera al guardar una gestión de venta con al menos una línea completa.";
   }
 
@@ -30,6 +34,9 @@ export function getScriptUnavailableReason(gestion: SaveLeadInput): string | nul
   return null;
 }
 
-export function isScriptEligible(gestion: SaveLeadInput): boolean {
-  return getScriptUnavailableReason(gestion) === null;
+export function isScriptEligible(
+  gestion: SaveLeadInput,
+  options?: { isSaleFlowType?: boolean },
+): boolean {
+  return getScriptUnavailableReason(gestion, options) === null;
 }

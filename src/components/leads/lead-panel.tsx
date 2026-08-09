@@ -29,11 +29,13 @@ import {
   SectionCardHeader,
 } from "@/components/leads/premium/section-card";
 import { StatusBadge } from "@/components/leads/premium/status-badge";
+import { DynamicTipificationBadge } from "@/components/shared/dynamic-tipification-badge";
 import type { Conversation } from "@/types/conversation";
 import type { LeadFormValues } from "@/types/lead-form";
 import type { GeneratedSalesScript } from "@/types/sales-script";
 import type { SaveLeadAction } from "@/types/crm-client";
 import { cn } from "@/lib/utils";
+import { useSaleFlowType } from "@/hooks/use-tipification-catalog";
 
 export function LeadPanel({
   conversation,
@@ -74,7 +76,7 @@ export function LeadPanel({
 }) {
   const { control } = useFormContext<LeadFormValues>();
   const type = useWatch({ control, name: "type" });
-  const isVenta = type === "venta";
+  const isSaleFlow = useSaleFlowType(type);
   const [activeTab, setActiveTab] = useState("gestion");
   const [scriptTabUnlocked, setScriptTabUnlocked] = useState(false);
   const {
@@ -85,7 +87,7 @@ export function LeadPanel({
   } = useSalesScript(conversation.id);
   const script = savedScript ?? fetchedScript ?? null;
   const gestionSaved = hasSavedGestion || isSuccess;
-  const showScriptTab = isVenta && (scriptTabUnlocked || Boolean(script));
+  const showScriptTab = isSaleFlow && (scriptTabUnlocked || Boolean(script));
 
   useEffect(() => {
     setScriptTabUnlocked(false);
@@ -106,16 +108,16 @@ export function LeadPanel({
   }, [showScriptTab, activeTab]);
 
   useEffect(() => {
-    if (!isVenta && activeTab === "script") {
+    if (!isSaleFlow && activeTab === "script") {
       setActiveTab("gestion");
     }
-  }, [isVenta, activeTab]);
+  }, [isSaleFlow, activeTab]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center justify-between border-b border-line px-4 py-3">
         <h2 className="text-[16px] font-semibold leading-[1.45] text-ink">Gestión del cliente</h2>
-        {isVenta ? (
+        {isSaleFlow ? (
           <Button type="submit" disabled={isSaving} onClick={onSaveSale}>
             {isSaving ? (
               <Loader2 className="size-[18px] animate-spin" />
@@ -149,13 +151,13 @@ export function LeadPanel({
                 <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
                   <span className="text-[13px] font-medium text-muted">Estado</span>
                   <StatusBadge variant="in_progress">En gestión</StatusBadge>
-                  {type === "venta" ? <StatusBadge variant="active">Venta</StatusBadge> : null}
+                  {type ? <DynamicTipificationBadge slug={type} /> : null}
                 </div>
                 <LeadTypeSelect />
               </SectionCardBody>
             </SectionCard>
 
-            {type === "venta" && <SaleDetails />}
+            {isSaleFlow && <SaleDetails />}
 
             <SectionCard>
               <SectionCardHeader title="Notas de gestión" />
@@ -200,7 +202,7 @@ export function LeadPanel({
                       : "Venta guardada correctamente. Ya aparece en Mis Ventas."
                     : script
                       ? "Gestión guardada. El script de la llamada ya está disponible."
-                      : isVenta
+                      : isSaleFlow
                         ? "Gestión guardada correctamente."
                         : clientSaved
                           ? "Cliente tipificado correctamente. Ya aparece en Clientes."
@@ -210,8 +212,8 @@ export function LeadPanel({
             <ActionButtons
               isSaving={isSaving}
               onCancel={onCancel}
-              mode={isVenta ? "script" : "tipify"}
-              onPrimaryAction={isVenta ? onGenerateScript : onTipify}
+              mode={isSaleFlow ? "script" : "tipify"}
+              onPrimaryAction={isSaleFlow ? onGenerateScript : onTipify}
             />
           </TabsContent>
 

@@ -9,6 +9,7 @@ import { getDeliveryConfigurationRepository } from "@/repositories/delivery-conf
 import { getLeadRepository } from "@/repositories/leads.repository";
 import { equipmentService } from "@/services/equipment.service";
 import { teleprompterScriptService } from "@/services/teleprompter-script.service";
+import { tipificationService } from "@/services/tipification.service";
 import { DEFAULT_COMPANY_ID } from "@/types/tenant";
 import { isScriptFlowKey } from "@/lib/sales-script/cms/flow-registry";
 
@@ -17,8 +18,14 @@ export const salesScriptService = {
     gestionId: string;
     gestion: SaveLeadInput;
     advisor?: { name: string; email: string };
+    companyId?: string;
+    isSaleFlowType?: boolean;
   }): Promise<GeneratedSalesScript | null> {
-    if (input.gestion.type !== "venta" || input.gestion.lines.length === 0) {
+    const companyId = input.companyId ?? DEFAULT_COMPANY_ID;
+    const isSaleFlow =
+      input.isSaleFlowType ??
+      (await tipificationService.triggersSaleFlowForSlug(companyId, input.gestion.type));
+    if (!isSaleFlow || input.gestion.lines.length === 0) {
       return null;
     }
 
@@ -55,6 +62,7 @@ export const salesScriptService = {
       advisor: input.advisor,
       deliveryConfig,
       overrides,
+      isSaleFlowType: isSaleFlow,
     });
 
     if (!script) return null;

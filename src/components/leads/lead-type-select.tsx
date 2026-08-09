@@ -1,7 +1,7 @@
 "use client";
 
 import { Controller, useFormContext } from "react-hook-form";
-import { Tag } from "lucide-react";
+import { Loader2, Tag } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -10,16 +10,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FormField } from "@/components/forms/form-field";
-import { LEAD_TYPE_LABELS, type LeadType } from "@/types/lead";
+import { useTipificationCatalog } from "@/hooks/use-tipification-catalog";
 import type { LeadFormValues } from "@/types/lead-form";
-
-const OPTIONS = Object.entries(LEAD_TYPE_LABELS) as [LeadType, string][];
 
 export function LeadTypeSelect() {
   const { control } = useFormContext<LeadFormValues>();
+  const { options, isLoading, usingFallback } = useTipificationCatalog();
 
   return (
-    <FormField label="Tipo de gestión">
+    <FormField label="Tipificación">
       <Controller
         control={control}
         name="type"
@@ -27,20 +26,30 @@ export function LeadTypeSelect() {
           <Select value={field.value} onValueChange={field.onChange}>
             <SelectTrigger inputSize>
               <span className="flex items-center gap-2">
-                <Tag className="size-[18px] text-brand" />
-                <SelectValue placeholder="Selecciona una opción" />
+                {isLoading ? (
+                  <Loader2 className="size-[18px] animate-spin text-muted" />
+                ) : (
+                  <Tag className="size-[18px] text-brand" />
+                )}
+                <SelectValue placeholder="Selecciona una tipificación" />
               </span>
             </SelectTrigger>
             <SelectContent>
-              {OPTIONS.map(([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
+              {options.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         )}
       />
+      {usingFallback ? (
+        <p className="mt-1.5 text-[12px] text-muted">
+          Mostrando tipificaciones de respaldo. La lista se actualizará cuando la conexión se
+          restablezca.
+        </p>
+      ) : null}
     </FormField>
   );
 }

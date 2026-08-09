@@ -7,7 +7,7 @@ export interface CrmClient {
   customerName: string;
   rut: string;
   phone: string;
-  gestionType: LeadType;
+  gestionType: string;
   advisorId: string;
   advisorName: string;
   hasSale: boolean;

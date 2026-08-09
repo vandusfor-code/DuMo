@@ -1,7 +1,7 @@
 import "server-only";
 import { DEFAULT_TIPIFICATION_SEEDS } from "@/lib/tipification-seeds";
 import { slugifyTipificationName } from "@/lib/tipification-colors";
-import { sql, hasDatabase } from "@/server/db/client";
+import { getSql, hasDatabase } from "@/server/db/client";
 import { DEFAULT_COMPANY_ID } from "@/types/tenant";
 import type {
   CreateTipificationInput,
@@ -132,8 +132,14 @@ class MockTipificationRepository implements TipificationRepository {
 }
 
 class PostgresTipificationRepository implements TipificationRepository {
+  private get sql() {
+    const client = getSql();
+    if (!client) throw new Error("Base de datos no configurada");
+    return client;
+  }
+
   async listActive(companyId: string) {
-    const rows = await sql<Record<string, unknown>[]>`
+    const rows = await this.sql<Record<string, unknown>[]>`
       SELECT * FROM tipifications
       WHERE company_id = ${companyId} AND status = 'active'
       ORDER BY sort_order ASC, name ASC
@@ -142,7 +148,7 @@ class PostgresTipificationRepository implements TipificationRepository {
   }
 
   async listAll(companyId: string) {
-    const rows = await sql<Record<string, unknown>[]>`
+    const rows = await this.sql<Record<string, unknown>[]>`
       SELECT * FROM tipifications
       WHERE company_id = ${companyId}
       ORDER BY sort_order ASC, name ASC
@@ -151,7 +157,7 @@ class PostgresTipificationRepository implements TipificationRepository {
   }
 
   async getById(companyId: string, id: string) {
-    const rows = await sql<Record<string, unknown>[]>`
+    const rows = await this.sql<Record<string, unknown>[]>`
       SELECT * FROM tipifications
       WHERE company_id = ${companyId} AND id = ${id}
       LIMIT 1
@@ -160,7 +166,7 @@ class PostgresTipificationRepository implements TipificationRepository {
   }
 
   async getBySlug(companyId: string, slug: string) {
-    const rows = await sql<Record<string, unknown>[]>`
+    const rows = await this.sql<Record<string, unknown>[]>`
       SELECT * FROM tipifications
       WHERE company_id = ${companyId} AND slug = ${slug}
       LIMIT 1
@@ -169,7 +175,7 @@ class PostgresTipificationRepository implements TipificationRepository {
   }
 
   async countUsageBySlug(_companyId: string, slug: string) {
-    const rows = await sql<{ total: number }[]>`
+    const rows = await this.sql<{ total: number }[]>`
       SELECT (
         (SELECT count(*)::int FROM lead_gestiones WHERE gestion_type = ${slug}) +
         (SELECT count(*)::int FROM crm_clients WHERE gestion_type = ${slug})
@@ -188,13 +194,13 @@ class PostgresTipificationRepository implements TipificationRepository {
       input.sortOrder ??
       Number(
         (
-          await sql<{ max: number | null }[]>`
+          await this.sql<{ max: number | null }[]>`
             SELECT max(sort_order)::int AS max FROM tipifications WHERE company_id = ${companyId}
           `
         )[0]?.max ?? 0,
       ) + 1;
 
-    const rows = await sql<Record<string, unknown>[]>`
+    const rows = await this.sql<Record<string, unknown>[]>`
       INSERT INTO tipifications (
         id, company_id, slug, name, badge_bg, badge_text,
         sort_order, triggers_sale_flow, status, created_by
@@ -212,7 +218,7 @@ class PostgresTipificationRepository implements TipificationRepository {
     const current = await this.getById(companyId, id);
     if (!current) throw new Error("Tipificación no encontrada.");
 
-    const rows = await sql<Record<string, unknown>[]>`
+    const rows = await this.sql<Record<string, unknown>[]>`
       UPDATE tipifications
       SET
         name = ${input.name?.trim() ?? current.name},
@@ -229,7 +235,7 @@ class PostgresTipificationRepository implements TipificationRepository {
   }
 
   async reassignSlug(_companyId: string, fromSlug: string, toSlug: string) {
-    const gestiones = await sql<{ count: number }[]>`
+    const gestiones = await this.sql<{ count: number }[]>`
       WITH updated AS (
         UPDATE lead_gestiones SET gestion_type = ${toSlug}
         WHERE gestion_type = ${fromSlug}
@@ -237,7 +243,7 @@ class PostgresTipificationRepository implements TipificationRepository {
       )
       SELECT count(*)::int AS count FROM updated
     `;
-    const clients = await sql<{ count: number }[]>`
+    const clients = await this.sql<{ count: number }[]>`
       WITH updated AS (
         UPDATE crm_clients SET gestion_type = ${toSlug}
         WHERE gestion_type = ${fromSlug}
@@ -251,7 +257,7 @@ class PostgresTipificationRepository implements TipificationRepository {
   async delete(companyId: string, id: string) {
     const current = await this.getById(companyId, id);
     if (!current) throw new Error("Tipificación no encontrada.");
-    await sql`
+    await this.sql`
       DELETE FROM tipifications
       WHERE company_id = ${companyId} AND id = ${id}
     `;

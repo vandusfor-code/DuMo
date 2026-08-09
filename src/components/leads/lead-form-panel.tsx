@@ -14,6 +14,7 @@ import {
   isCompleteSaleLine,
   mapSaleLineForSave,
 } from "@/lib/lead-save";
+import { useTipificationCatalog } from "@/hooks/use-tipification-catalog";
 import { useForm, FormProvider } from "react-hook-form";
 
 /**
@@ -25,6 +26,7 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
   const saveLead = useSaveLead(conversation.id);
   const gestionDraft = useLatestGestionDraft(conversation.id);
   const saveModeRef = useRef<SaveLeadAction>("script");
+  const { triggersSaleFlow } = useTipificationCatalog();
   const methods = useForm<LeadFormValues>({
     defaultValues: draftToFormValues({ conversation }),
   });
@@ -36,7 +38,7 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
   }, [conversation.id, gestionDraft.data?.gestionId, gestionDraft.isLoading]);
 
   const onSubmit = methods.handleSubmit(async (values) => {
-    if (values.type === "venta") {
+    if (triggersSaleFlow(values.type)) {
       const completeLines = values.lines.filter(isCompleteSaleLine);
       if (completeLines.length === 0) {
         methods.setError("root", {
@@ -60,7 +62,7 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
       type: values.type,
       notes: notesParts.join("\n\n"),
       lines:
-        values.type === "venta"
+        triggersSaleFlow(values.type)
           ? values.lines.filter(isCompleteSaleLine).map(mapSaleLineForSave)
           : [],
       registerSale: saveModeRef.current === "sale",
