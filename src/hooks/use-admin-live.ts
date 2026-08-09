@@ -7,10 +7,11 @@ import type { AdvisorPresenceUpdateResult, LiveSnapshot } from "@/types/admin-li
 
 const LIVE_POLL_MS = 30_000;
 
-export function useLiveSnapshot() {
+export function useLiveSnapshot(selectedDate: string) {
   return useQuery({
-    queryKey: ["admin", "live", "snapshot"],
-    queryFn: () => apiGet<LiveSnapshot>("/api/admin/live/snapshot"),
+    queryKey: ["admin", "live", "snapshot", selectedDate],
+    queryFn: () =>
+      apiGet<LiveSnapshot>(`/api/admin/live/snapshot?date=${encodeURIComponent(selectedDate)}`),
     refetchInterval: LIVE_POLL_MS,
     refetchIntervalInBackground: true,
   });

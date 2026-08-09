@@ -29,3 +29,18 @@ export function businessDateISO(date: Date = new Date()): string {
 export function businessMonth(date: Date = new Date()): string {
   return businessDateISO(date).slice(0, 7);
 }
+
+/** Previous calendar day in Chile business time (yyyy-mm-dd). */
+export function previousBusinessDateISO(dateIso: string): string {
+  const [y, m, d] = dateIso.split("-").map(Number);
+  const utc = Date.UTC(y, m - 1, d, 12, 0, 0);
+  return businessDateISO(new Date(utc - 86_400_000));
+}
+
+/** Etiqueta legible para UI admin (es-CL). */
+export function formatBusinessDateLabel(dateIso: string): string {
+  const [y, m, d] = dateIso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  const month = new Intl.DateTimeFormat("es-CL", { month: "long", timeZone: BUSINESS_TZ }).format(dt);
+  return `${String(d).padStart(2, "0")} de ${month}, ${y}`;
+}

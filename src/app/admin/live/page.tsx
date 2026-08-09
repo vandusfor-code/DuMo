@@ -1,14 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { LiveAdvisorsTable, LiveMetrics } from "@/components/admin/live/live-panels";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/shared/error-state";
 import { QueryStaleBanner, shouldShowFatalQueryError } from "@/components/shared/query-state";
+import { businessDateISO } from "@/lib/date";
 import { useLiveSnapshot } from "@/hooks/use-admin-live";
 
 export default function AdminLivePage() {
-  const query = useLiveSnapshot();
+  const [selectedDate, setSelectedDate] = useState(() => businessDateISO());
+  const query = useLiveSnapshot(selectedDate);
   const { data, isLoading, refetch } = query;
   const fatal = shouldShowFatalQueryError(query);
 
@@ -17,6 +20,8 @@ export default function AdminLivePage() {
       <AdminPageHeader
         title="Live."
         subtitle="Monitorea en tiempo real la actividad de tu equipo comercial."
+        selectedDate={selectedDate}
+        onDateChange={setSelectedDate}
       />
 
       {fatal ? (

@@ -3,12 +3,12 @@ import {
   ADVISOR_ONLINE_WINDOW_MINUTES,
   type AdvisorPresenceStatus,
 } from "@/lib/advisor-presence";
-import { businessDateISO } from "@/lib/date";
+import { businessDateISO, previousBusinessDateISO } from "@/lib/date";
 import type { LiveSnapshot } from "@/types/admin-live";
 import { ensureSchema, getSql, withDbRetry, withQueryTimeout } from "@/server/db/client";
 
 export interface AdvisorPresenceRepository {
-  getLiveSnapshot(): Promise<LiveSnapshot>;
+  getLiveSnapshot(selectedDate?: string): Promise<LiveSnapshot>;
   setPresence(
     advisorId: string,
     status: AdvisorPresenceStatus,
@@ -33,11 +33,13 @@ function productivityPct(sales: number, gestiones: number): number {
 }
 
 class PostgresAdvisorPresenceRepository implements AdvisorPresenceRepository {
-  async getLiveSnapshot(): Promise<LiveSnapshot> {
+  async getLiveSnapshot(selectedDate?: string): Promise<LiveSnapshot> {
     await ensureSchema();
     const sql = requireSql();
+    const dayIso = selectedDate?.trim() || businessDateISO();
     const todayIso = businessDateISO();
-    const yesterdayIso = businessDateISO(new Date(Date.now() - 86_400_000));
+    const isToday = dayIso === todayIso;
+    const previousIso = previousBusinessDateISO(dayIso);
 
     const rows = await withQueryTimeout(
       sql<
@@ -52,26 +54,35 @@ class PostgresAdvisorPresenceRepository implements AdvisorPresenceRepository {
           sales_today: number;
         }[]
       >`
-        WITH gestiones_today AS (
+        WITH gestiones_day AS (
           SELECT advisor_id, count(*)::int AS n
           FROM lead_gestiones
           WHERE advisor_id IS NOT NULL
-            AND to_char(created_at AT TIME ZONE 'America/Santiago', 'YYYY-MM-DD') = ${todayIso}
+            AND to_char(created_at AT TIME ZONE 'America/Santiago', 'YYYY-MM-DD') = ${dayIso}
           GROUP BY advisor_id
         ),
-        assigned_today AS (
-          SELECT assigned_advisor_id AS advisor_id, count(*)::int AS n
-          FROM lead_conversations
-          WHERE assigned_advisor_id IS NOT NULL
-            AND assigned_advisor_at IS NOT NULL
-            AND to_char(assigned_advisor_at AT TIME ZONE 'America/Santiago', 'YYYY-MM-DD') = ${todayIso}
-          GROUP BY assigned_advisor_id
+        assigned_day AS (
+          SELECT c.assigned_advisor_id AS advisor_id, count(*)::int AS n
+          FROM lead_conversations c
+          WHERE c.assigned_advisor_id IS NOT NULL
+            AND to_char(
+              coalesce(
+                c.assigned_advisor_at,
+                (
+                  SELECT min(m.created_at)
+                  FROM lead_messages m
+                  WHERE m.conversation_id = c.id AND m.direction = 'in'
+                )
+              ) AT TIME ZONE 'America/Santiago',
+              'YYYY-MM-DD'
+            ) = ${dayIso}
+          GROUP BY c.assigned_advisor_id
         ),
-        sales_today AS (
+        sales_day AS (
           SELECT advisor_id, count(*)::int AS n
           FROM sales
           WHERE advisor_id IS NOT NULL
-            AND sale_date = ${todayIso}::date
+            AND sale_date = ${dayIso}::date
           GROUP BY advisor_id
         )
         SELECT
@@ -80,7 +91,8 @@ class PostgresAdvisorPresenceRepository implements AdvisorPresenceRepository {
           u.avatar_url,
           u.presence_status,
           (
-            u.last_seen_at IS NOT NULL
+            ${isToday}
+            AND u.last_seen_at IS NOT NULL
             AND u.last_seen_at > now() - make_interval(mins => ${ADVISOR_ONLINE_WINDOW_MINUTES})
             AND u.presence_status <> 'desconectado'
           ) AS is_online,
@@ -88,9 +100,9 @@ class PostgresAdvisorPresenceRepository implements AdvisorPresenceRepository {
           coalesce(at.n, 0)::int AS assigned_today,
           coalesce(s.n, 0)::int AS sales_today
         FROM users u
-        LEFT JOIN gestiones_today g ON g.advisor_id = u.id
-        LEFT JOIN assigned_today at ON at.advisor_id = u.id
-        LEFT JOIN sales_today s ON s.advisor_id = u.id
+        LEFT JOIN gestiones_day g ON g.advisor_id = u.id
+        LEFT JOIN assigned_day at ON at.advisor_id = u.id
+        LEFT JOIN sales_day s ON s.advisor_id = u.id
         WHERE u.role = 'asesora' AND u.active = true
         ORDER BY is_online DESC, u.name ASC
       `,
@@ -100,61 +112,91 @@ class PostgresAdvisorPresenceRepository implements AdvisorPresenceRepository {
     const totals = await withQueryTimeout(
       sql<
         {
-          gestiones_yesterday: number;
-          sales_yesterday: number;
-          team_gestiones_today: number;
-          team_sales_today: number;
+          gestiones_previous: number;
+          sales_previous: number;
+          team_gestiones_day: number;
+          team_sales_day: number;
           leads_assigned_now: number;
+          active_advisors_day: number;
         }[]
       >`
-        WITH gestiones_today AS (
+        WITH gestiones_day AS (
           SELECT count(*)::int AS n
           FROM lead_gestiones g
           JOIN users u ON u.id = g.advisor_id
           WHERE u.role = 'asesora' AND u.active = true
-            AND to_char(g.created_at AT TIME ZONE 'America/Santiago', 'YYYY-MM-DD') = ${todayIso}
+            AND to_char(g.created_at AT TIME ZONE 'America/Santiago', 'YYYY-MM-DD') = ${dayIso}
         ),
-        gestiones_yesterday AS (
+        gestiones_previous AS (
           SELECT count(*)::int AS n
           FROM lead_gestiones g
           JOIN users u ON u.id = g.advisor_id
           WHERE u.role = 'asesora' AND u.active = true
-            AND to_char(g.created_at AT TIME ZONE 'America/Santiago', 'YYYY-MM-DD') = ${yesterdayIso}
+            AND to_char(g.created_at AT TIME ZONE 'America/Santiago', 'YYYY-MM-DD') = ${previousIso}
         ),
-        sales_today AS (
+        sales_day AS (
           SELECT count(*)::int AS n
           FROM sales s
           JOIN users u ON u.id = s.advisor_id
           WHERE u.role = 'asesora' AND u.active = true
-            AND s.sale_date = ${todayIso}::date
+            AND s.sale_date = ${dayIso}::date
         ),
-        sales_yesterday AS (
+        sales_previous AS (
           SELECT count(*)::int AS n
           FROM sales s
           JOIN users u ON u.id = s.advisor_id
           WHERE u.role = 'asesora' AND u.active = true
-            AND s.sale_date = ${yesterdayIso}::date
+            AND s.sale_date = ${previousIso}::date
+        ),
+        active_advisors_day AS (
+          SELECT count(DISTINCT u.id)::int AS n
+          FROM users u
+          WHERE u.role = 'asesora' AND u.active = true
+            AND (
+              EXISTS (
+                SELECT 1 FROM lead_gestiones g
+                WHERE g.advisor_id = u.id
+                  AND to_char(g.created_at AT TIME ZONE 'America/Santiago', 'YYYY-MM-DD') = ${dayIso}
+              )
+              OR EXISTS (
+                SELECT 1 FROM lead_conversations c
+                WHERE c.assigned_advisor_id = u.id
+                  AND to_char(
+                    coalesce(
+                      c.assigned_advisor_at,
+                      (
+                        SELECT min(m.created_at)
+                        FROM lead_messages m
+                        WHERE m.conversation_id = c.id AND m.direction = 'in'
+                      )
+                    ) AT TIME ZONE 'America/Santiago',
+                    'YYYY-MM-DD'
+                  ) = ${dayIso}
+              )
+            )
         )
         SELECT
-          (SELECT n FROM gestiones_yesterday) AS gestiones_yesterday,
-          (SELECT n FROM sales_yesterday) AS sales_yesterday,
-          (SELECT n FROM gestiones_today) AS team_gestiones_today,
-          (SELECT n FROM sales_today) AS team_sales_today,
+          (SELECT n FROM gestiones_previous) AS gestiones_previous,
+          (SELECT n FROM sales_previous) AS sales_previous,
+          (SELECT n FROM gestiones_day) AS team_gestiones_day,
+          (SELECT n FROM sales_day) AS team_sales_day,
           (
             SELECT count(*)::int
             FROM lead_conversations
             WHERE assigned_advisor_id IS NOT NULL
-          ) AS leads_assigned_now
+          ) AS leads_assigned_now,
+          (SELECT n FROM active_advisors_day) AS active_advisors_day
       `,
       8_000,
     );
 
     const team = totals[0] ?? {
-      gestiones_yesterday: 0,
-      sales_yesterday: 0,
-      team_gestiones_today: 0,
-      team_sales_today: 0,
+      gestiones_previous: 0,
+      sales_previous: 0,
+      team_gestiones_day: 0,
+      team_sales_day: 0,
       leads_assigned_now: 0,
+      active_advisors_day: 0,
     };
 
     const advisors = rows.map((row) => ({
@@ -169,27 +211,31 @@ class PostgresAdvisorPresenceRepository implements AdvisorPresenceRepository {
       connectionProgressPct: null,
     }));
 
-    const connectedAdvisors = advisors.filter((a) => a.isOnline).length;
+    const connectedAdvisors = isToday
+      ? advisors.filter((a) => a.isOnline).length
+      : team.active_advisors_day;
+
     const teamProductivityPct = productivityPct(
-      team.team_sales_today,
-      team.team_gestiones_today,
+      team.team_sales_day,
+      team.team_gestiones_day,
     );
-    const teamProductivityYesterday = productivityPct(
-      team.sales_yesterday,
-      team.gestiones_yesterday,
+    const teamProductivityPrevious = productivityPct(
+      team.sales_previous,
+      team.gestiones_previous,
     );
 
     return {
       summary: {
         connectedAdvisors,
-        leadsManagedToday: team.team_gestiones_today,
+        leadsManagedToday: team.team_gestiones_day,
         leadsAssignedNow: team.leads_assigned_now,
         avgConnectionTimeLabel: null,
         teamProductivityPct,
-        teamProductivityDeltaPct: teamProductivityPct - teamProductivityYesterday,
+        teamProductivityDeltaPct: teamProductivityPct - teamProductivityPrevious,
       },
       advisors,
       updatedAt: new Date().toISOString(),
+      selectedDate: dayIso,
     };
   }
 

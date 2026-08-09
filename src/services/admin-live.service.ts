@@ -5,8 +5,8 @@ import { getAdvisorPresenceRepository } from "@/repositories/advisor-presence.re
 import type { AdvisorPresenceUpdateResult, LiveSnapshot } from "@/types/admin-live";
 
 export const adminLiveService = {
-  getSnapshot(): Promise<LiveSnapshot> {
-    return getAdvisorPresenceRepository().getLiveSnapshot();
+  getSnapshot(selectedDate?: string): Promise<LiveSnapshot> {
+    return getAdvisorPresenceRepository().getLiveSnapshot(selectedDate);
   },
 
   async setAdvisorPresence(

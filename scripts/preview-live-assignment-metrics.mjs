@@ -27,9 +27,19 @@ try {
       u.name,
       count(c.id) FILTER (WHERE c.assigned_advisor_id IS NOT NULL)::int AS assigned_now,
       count(c.id) FILTER (
-        WHERE c.assigned_advisor_at IS NOT NULL
-          AND to_char(c.assigned_advisor_at AT TIME ZONE 'America/Santiago', 'YYYY-MM-DD') = ${today}
-      )::int AS assigned_today,
+        WHERE c.assigned_advisor_id IS NOT NULL
+          AND to_char(
+            coalesce(
+              c.assigned_advisor_at,
+              (
+                SELECT min(m.created_at)
+                FROM lead_messages m
+                WHERE m.conversation_id = c.id AND m.direction = 'in'
+              )
+            ) AT TIME ZONE 'America/Santiago',
+            'YYYY-MM-DD'
+          ) = ${today}
+      )::int AS assigned_on_day,
       (
         SELECT count(*)::int FROM lead_gestiones g
         WHERE g.advisor_id = u.id
@@ -49,7 +59,7 @@ try {
         today,
         leadsAssignedNow: assignedNow[0]?.n ?? 0,
         advisors: byAdvisor,
-        note: "assigned_today será 0 en filas previas al deploy hasta nuevas asignaciones",
+        note: "assigned_on_day usa coalesce(assigned_advisor_at, primer inbound)",
       },
       null,
       2,

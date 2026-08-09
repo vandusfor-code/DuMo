@@ -26,6 +26,8 @@ export interface LiveSnapshot {
   summary: LiveSummary;
   advisors: LiveAdvisorRow[];
   updatedAt: string;
+  /** Día de negocio consultado (yyyy-mm-dd, America/Santiago). */
+  selectedDate: string;
 }
 
 export interface AdvisorPresenceUpdateResult {
