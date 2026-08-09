@@ -29,6 +29,15 @@ import {
   getContentType,
   makeCacheableSignalKeyStore,
 } from "@whiskeysockets/baileys";
+import { processInboundAudioMessage } from "./inbound-audio.js";
+import {
+  assertAllowedInboundAudioMime,
+  extensionFromAudioMime,
+  isSupabaseStorageConfigured,
+  MAX_INBOUND_AUDIO_BYTES,
+  newMediaAssetId,
+} from "./media-config.js";
+import { getSupabaseStorageStatus, uploadInboundAudioToSupabase } from "./supabase-upload.js";
 
 const log = pino({ level: process.env.LOG_LEVEL ?? "info" });
 const msgRetryCounterCache = new NodeCache();
@@ -247,30 +256,83 @@ async function forwardInboundToDuMo(session, msg, upsertType) {
   }
 
   const text = extractMessageText(msg);
-  const isImage = Boolean(extractMessageContent(msg.message ?? {})?.imageMessage);
-  if (!text && !isImage) {
+  const content = extractMessageContent(msg.message ?? {});
+  const isImage = Boolean(content?.imageMessage);
+  const isAudio = Boolean(content?.audioMessage);
+  if (!text && !isImage && !isAudio) {
     rememberMessage(msg);
     return;
   }
 
   rememberMessage(msg);
   const ts = Number(msg.messageTimestamp ?? Math.floor(Date.now() / 1000));
+  const resolvedPhone = senderPhone ?? from;
+
+  /** @type {Record<string, unknown>} */
+  const payload = {
+    channelId: session.channelId,
+    from: resolvedPhone,
+    senderJid,
+    messageId: msg.key.id ?? `qr-${Date.now()}`,
+    timestamp: ts,
+    type: isImage ? "image" : isAudio ? "audio" : "text",
+    text: text || undefined,
+    customerName: msg.pushName ?? "",
+  };
+
+  if (isAudio) {
+    if (!isSupabaseStorageConfigured()) {
+      log.error({ channelId: session.channelId, messageId: msg.key.id }, "audio QR: Supabase no configurado");
+      payload.type = "text";
+      payload.text =
+        "⚠️ No se pudo recibir el audio (almacenamiento no configurado). Pide al cliente que lo reenvíe.";
+    } else if (!session.sock) {
+      log.error({ channelId: session.channelId, messageId: msg.key.id }, "audio QR: socket no conectado");
+      payload.type = "text";
+      payload.text = "⚠️ No se pudo recibir el audio. Pide al cliente que lo reenvíe.";
+    } else {
+      try {
+        const audio = await processInboundAudioMessage({
+          sock: session.sock,
+          msg,
+          audioMessage: content.audioMessage,
+          phone: resolvedPhone,
+        });
+        payload.mediaUrl = audio.publicUrl;
+        payload.mimeType = audio.mimeType;
+        payload.audioPtt = audio.ptt;
+        if (!payload.text) {
+          payload.text = audio.ptt ? "🎤 Nota de voz" : "🔊 Audio";
+        }
+      } catch (err) {
+        log.error(
+          { err, channelId: session.channelId, messageId: msg.key.id },
+          "audio QR: descarga o upload falló",
+        );
+        payload.type = "text";
+        payload.text =
+          err instanceof Error && err.message.includes("no compatible")
+            ? `⚠️ ${err.message}`
+            : "⚠️ No se pudo recibir el audio. Pide al cliente que lo reenvíe.";
+      }
+    }
+  }
 
   await notifyDuMo(session, {
     type: "message.inbound",
-    payload: {
-      channelId: session.channelId,
-      from: senderPhone ?? from,
-      senderJid,
-      messageId: msg.key.id ?? `qr-${Date.now()}`,
-      timestamp: ts,
-      type: isImage ? "image" : "text",
-      text: text || undefined,
-      customerName: msg.pushName ?? "",
-    },
+    payload,
   });
   log.info(
-    { channelId: session.channelId, from, senderJid, messageId: msg.key.id, upsertType, text: text?.slice(0, 40) },
+    {
+      channelId: session.channelId,
+      from,
+      senderJid,
+      messageId: msg.key.id,
+      upsertType,
+      inboundType: payload.type,
+      hasMediaUrl: Boolean(payload.mediaUrl),
+      text: typeof payload.text === "string" ? payload.text.slice(0, 40) : undefined,
+    },
     "mensaje QR reenviado a DuMo",
   );
 }
@@ -468,6 +530,51 @@ async function fetchImageFromUrl(mediaUrl) {
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
       throw new Error("Timeout descargando imagen");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchAudioFromUrl(audioUrl) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), MEDIA_FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(audioUrl, { signal: controller.signal, redirect: "follow" });
+    if (!res.ok) {
+      throw new Error(`No se pudo descargar audio (HTTP ${res.status})`);
+    }
+
+    const contentLength = Number(res.headers.get("content-length") ?? 0);
+    if (contentLength > MAX_INBOUND_AUDIO_BYTES) {
+      throw new Error(`Audio demasiado grande (máx ${MAX_INBOUND_AUDIO_BYTES} bytes)`);
+    }
+
+    const buffer = Buffer.from(await res.arrayBuffer());
+    if (buffer.length > MAX_INBOUND_AUDIO_BYTES) {
+      throw new Error(`Audio demasiado grande (máx ${MAX_INBOUND_AUDIO_BYTES} bytes)`);
+    }
+
+    const headerMime = res.headers.get("content-type") ?? undefined;
+    let mimeType;
+    try {
+      mimeType = assertAllowedInboundAudioMime(headerMime, false);
+    } catch {
+      const ext = path.extname(new URL(audioUrl).pathname).toLowerCase();
+      if (ext === ".mp3") mimeType = assertAllowedInboundAudioMime("audio/mpeg", false);
+      else if (ext === ".ogg" || ext === ".opus") {
+        mimeType = assertAllowedInboundAudioMime("audio/ogg", true);
+      } else {
+        throw new Error(
+          `Formato de audio no compatible (${headerMime || ext || "desconocido"}). Usa OGG/Opus o MP3.`,
+        );
+      }
+    }
+    return { buffer, mimeType };
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error("Timeout descargando audio");
     }
     throw err;
   } finally {
@@ -882,6 +989,56 @@ app.post("/test-webhook", auth, async (req, res) => {
   });
 });
 
+app.post("/debug/supabase-audio-upload", auth, async (req, res) => {
+  const { audioUrl, phone = "57000000000", ptt = false } = req.body ?? {};
+
+  if (!isSupabaseStorageConfigured()) {
+    return res.status(503).json({
+      error: "Supabase Storage no configurado en el bridge.",
+      storage: getSupabaseStorageStatus(),
+    });
+  }
+
+  try {
+    let buffer;
+    let mimeType;
+    if (audioUrl) {
+      const validatedUrl = validateMediaUrl(audioUrl);
+      ({ buffer, mimeType } = await fetchAudioFromUrl(validatedUrl));
+    } else {
+      buffer = Buffer.from(
+        "OggS\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+        "binary",
+      );
+      mimeType = assertAllowedInboundAudioMime("audio/ogg; codecs=opus", Boolean(ptt));
+    }
+
+    const assetId = newMediaAssetId();
+    const extension = extensionFromAudioMime(mimeType);
+    const uploaded = await uploadInboundAudioToSupabase({
+      phone: String(phone).replace(/\D/g, "") || "57000000000",
+      assetId,
+      extension,
+      data: buffer,
+      contentType: mimeType,
+    });
+
+    res.json({
+      ok: true,
+      publicUrl: uploaded.publicUrl,
+      storagePath: uploaded.storagePath,
+      mimeType,
+      bytes: buffer.length,
+      phone: String(phone).replace(/\D/g, "") || "57000000000",
+    });
+  } catch (err) {
+    log.error({ err, audioUrl }, "debug supabase-audio-upload falló");
+    res.status(502).json({
+      error: err instanceof Error ? err.message : "No se pudo subir audio de prueba",
+    });
+  }
+});
+
 app.get("/health", (_req, res) => {
   const persistedChannelIds = listPersistedChannelIds();
   res.json({
@@ -893,6 +1050,8 @@ app.get("/health", (_req, res) => {
     webhookEnvConfigured: Boolean(
       (process.env.DUMO_WEBHOOK_URL ?? "").trim() && (process.env.DUMO_WEBHOOK_SECRET ?? "").trim(),
     ),
+    supabaseStorage: getSupabaseStorageStatus(),
+    inboundAudioEnabled: isSupabaseStorageConfigured(),
     active: [...sessions.values()].map((s) => ({
       channelId: s.channelId,
       status: s.status,

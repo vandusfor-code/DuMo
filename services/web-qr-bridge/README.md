@@ -26,6 +26,29 @@ npm start
 | `DUMO_WEBHOOK_URL` | `https://du-mo.vercel.app/api/web-qr/webhook` |
 | `DUMO_WEBHOOK_SECRET` | Mismo valor que `WEB_QR_WEBHOOK_SECRET` en Vercel |
 | `SESSIONS_DIR` | Carpeta para credenciales Baileys (volumen persistente) |
+| `SUPABASE_URL` | URL del proyecto Supabase (o `NEXT_PUBLIC_SUPABASE_URL`) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key — **requerido para audio entrante QR** |
+| `SUPABASE_STORAGE_BUCKET` | Bucket de media (default `dumo-media`) |
+| `DUMO_COMPANY_ID` | ID tenant para rutas storage (default `company-default`) |
+
+### Audio entrante (Fase A)
+
+Cuando llega una nota de voz o archivo de audio por QR, el bridge:
+
+1. Descarga el binario con Baileys (`downloadMediaMessage`)
+2. Lo sube a Supabase Storage (`companies/{companyId}/chat/inbound/webqr:{tel}/…`)
+3. Reenvía el webhook a DuMo con `type: "audio"` y `mediaUrl` público
+
+**Prueba curl (sin celular):** `POST /debug/supabase-audio-upload` con header `x-web-qr-bridge-secret`.
+
+```bash
+curl -sS -X POST "$BRIDGE_URL/debug/supabase-audio-upload" \
+  -H "Content-Type: application/json" \
+  -H "x-web-qr-bridge-secret: $BRIDGE_SECRET" \
+  -d '{"phone":"573001234567"}'
+```
+
+**Prueba real:** envía un audio al número QR conectado; verifica en logs `audio QR subido a Supabase` y que el webhook incluye `mediaUrl`.
 
 ## DuMo (Vercel)
 

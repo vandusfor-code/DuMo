@@ -11,6 +11,7 @@
     "dev": "node --watch src/index.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.112.2",
     "@whiskeysockets/baileys": "^7.0.0-rc14",
     "express": "^4.21.2",
     "node-cache": "^5.1.2",
