@@ -405,6 +405,120 @@ async function waitForConnected(session, maxSeconds = 20) {
   return session.sock && session.status === "CONNECTED";
 }
 
+const MEDIA_MAX_BYTES = 5 * 1024 * 1024;
+const MEDIA_FETCH_TIMEOUT_MS = 15_000;
+const ALLOWED_IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+function validateMediaUrl(raw) {
+  if (typeof raw !== "string" || !raw.trim()) throw new Error("mediaUrl requerida");
+  let url;
+  try {
+    url = new URL(raw.trim());
+  } catch {
+    throw new Error("mediaUrl inválida");
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new Error("mediaUrl debe ser http(s)");
+  }
+  return url.toString();
+}
+
+function inferImageMimeType(mediaUrl, headerMime) {
+  const normalized = String(headerMime ?? "")
+    .split(";")[0]
+    .trim()
+    .toLowerCase();
+  if (normalized && ALLOWED_IMAGE_MIMES.has(normalized)) return normalized;
+
+  const ext = path.extname(new URL(mediaUrl).pathname).toLowerCase();
+  if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
+  if (ext === ".png") return "image/png";
+  if (ext === ".webp") return "image/webp";
+  return "image/jpeg";
+}
+
+async function fetchImageFromUrl(mediaUrl) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), MEDIA_FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(mediaUrl, { signal: controller.signal, redirect: "follow" });
+    if (!res.ok) {
+      throw new Error(`No se pudo descargar imagen (HTTP ${res.status})`);
+    }
+
+    const contentLength = Number(res.headers.get("content-length") ?? 0);
+    if (contentLength > MEDIA_MAX_BYTES) {
+      throw new Error(`Imagen demasiado grande (máx ${MEDIA_MAX_BYTES} bytes)`);
+    }
+
+    const buffer = Buffer.from(await res.arrayBuffer());
+    if (buffer.length > MEDIA_MAX_BYTES) {
+      throw new Error(`Imagen demasiado grande (máx ${MEDIA_MAX_BYTES} bytes)`);
+    }
+
+    const mimeType = inferImageMimeType(
+      mediaUrl,
+      res.headers.get("content-type") ?? undefined,
+    );
+    if (!ALLOWED_IMAGE_MIMES.has(mimeType)) {
+      throw new Error(`Tipo de imagen no soportado (${mimeType})`);
+    }
+
+    return { buffer, mimeType };
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error("Timeout descargando imagen");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** @returns {Promise<SessionRuntime>} */
+async function getConnectedSession(channelId) {
+  const sessionId = `bridge-${channelId}`;
+  let session = sessions.get(sessionId);
+
+  if (!session && hasPersistedCreds(channelId)) {
+    session = bootstrapSession(channelId);
+  }
+
+  if (session && !session.sock && session.status !== "QR_PENDING") {
+    startBaileys(session).catch((err) => {
+      session.lastError = err instanceof Error ? err.message : String(err);
+      log.error({ err, channelId }, "startBaileys en outbound falló");
+    });
+  }
+
+  if (session && session.status !== "CONNECTED") {
+    const connected = await waitForConnected(session, 20);
+    if (!connected && session.status === "QR_PENDING") {
+      const err = new Error("Sesión requiere escanear QR de nuevo");
+      err.code = "QR_PENDING";
+      throw err;
+    }
+  }
+
+  if (!session?.sock) {
+    const err = new Error("Sesión no conectada");
+    err.code = "NOT_CONNECTED";
+    throw err;
+  }
+
+  return session;
+}
+
+function mapOutboundSessionError(err, res) {
+  if (err?.code === "QR_PENDING") {
+    return res.status(503).json({ error: err.message });
+  }
+  if (err?.code === "NOT_CONNECTED") {
+    return res.status(503).json({ error: err.message });
+  }
+  return null;
+}
+
 async function startBaileys(session) {
   if (session.starting) return;
   session.starting = true;
@@ -661,31 +775,13 @@ app.post("/send", auth, async (req, res) => {
   const { channelId, to, jid, text } = req.body ?? {};
   if (!channelId) return res.status(400).json({ error: "channelId requerido" });
 
-  const sessionId = `bridge-${channelId}`;
-  let session = sessions.get(sessionId);
-
-  if (!session && hasPersistedCreds(channelId)) {
-    session = bootstrapSession(channelId);
-  }
-
-  if (session && !session.sock && session.status !== "QR_PENDING") {
-    startBaileys(session).catch((err) => {
-      session.lastError = err instanceof Error ? err.message : String(err);
-      log.error({ err, channelId }, "startBaileys en /send falló");
-    });
-  }
-
-  if (session && session.status !== "CONNECTED") {
-    const connected = await waitForConnected(session, 20);
-    if (!connected && session.status === "QR_PENDING") {
-      return res.status(503).json({
-        error: "Sesión requiere escanear QR de nuevo",
-      });
-    }
-  }
-
-  if (!session?.sock) {
-    return res.status(503).json({ error: "Sesión no conectada" });
+  let session;
+  try {
+    session = await getConnectedSession(channelId);
+  } catch (err) {
+    const mapped = mapOutboundSessionError(err, res);
+    if (mapped) return mapped;
+    throw err;
   }
 
   try {
@@ -698,6 +794,68 @@ app.post("/send", auth, async (req, res) => {
     log.error({ err, channelId, to, jid }, "sendMessage falló");
     res.status(502).json({
       error: err instanceof Error ? err.message : "No se pudo enviar por WhatsApp Web",
+    });
+  }
+});
+
+app.post("/send-media", auth, async (req, res) => {
+  const { channelId, to, jid, mediaUrl, mimeType, caption } = req.body ?? {};
+  if (!channelId) return res.status(400).json({ error: "channelId requerido" });
+
+  let validatedUrl;
+  try {
+    validatedUrl = validateMediaUrl(mediaUrl);
+  } catch (err) {
+    return res.status(400).json({
+      error: err instanceof Error ? err.message : "mediaUrl inválida",
+    });
+  }
+
+  let session;
+  try {
+    session = await getConnectedSession(channelId);
+  } catch (err) {
+    const mapped = mapOutboundSessionError(err, res);
+    if (mapped) return mapped;
+    throw err;
+  }
+
+  try {
+    const targetJid = await resolveSendJid(session, { to, jid });
+    const { buffer, mimeType: fetchedMime } = await fetchImageFromUrl(validatedUrl);
+    const resolvedMime =
+      typeof mimeType === "string" && ALLOWED_IMAGE_MIMES.has(mimeType.toLowerCase())
+        ? mimeType.toLowerCase()
+        : fetchedMime;
+
+    log.info(
+      {
+        channelId,
+        targetJid,
+        inputJid: jid,
+        to,
+        bytes: buffer.length,
+        mimeType: resolvedMime,
+        hasCaption: Boolean(caption),
+      },
+      "enviando imagen QR",
+    );
+
+    const payload = {
+      image: buffer,
+      mimetype: resolvedMime,
+    };
+    if (typeof caption === "string" && caption.trim()) {
+      payload.caption = caption.trim();
+    }
+
+    const sent = await session.sock.sendMessage(targetJid, payload);
+    if (sent?.message) rememberMessage(sent);
+    res.json({ id: sent?.key?.id ?? `out-${Date.now()}`, jid: targetJid });
+  } catch (err) {
+    log.error({ err, channelId, to, jid, mediaUrl: validatedUrl }, "send-media falló");
+    res.status(502).json({
+      error: err instanceof Error ? err.message : "No se pudo enviar imagen por WhatsApp Web",
     });
   }
 });
