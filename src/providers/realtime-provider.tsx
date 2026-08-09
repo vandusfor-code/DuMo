@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { io, type Socket } from "socket.io-client";
 import { getClientToken } from "@/lib/auth/client-token";
+import { forceSessionLogout } from "@/lib/auth/force-logout";
 import { leadKeys } from "@/hooks/use-leads";
 import type { ChatMessage } from "@/types/conversation";
 
@@ -95,6 +96,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     socket.on("leads:conversation:updated", (payload: ConversationUpdatedEvent) => {
       if (!payload?.conversationId) return;
       invalidateForConversation(queryClient, payload.conversationId);
+    });
+
+    socket.on("session:revoked", () => {
+      forceSessionLogout("revoked");
     });
 
     socket.on("connect", () => {

@@ -30,4 +30,6 @@ export interface AdvisorPresenceUpdateResult {
   advisorId: string;
   presenceStatus: AdvisorPresenceStatus;
   updatedAt: string;
+  sessionRevoked?: boolean;
+  tokenVersion?: number;
 }

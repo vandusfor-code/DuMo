@@ -40,6 +40,7 @@ function mapRow(r: {
   avatar_url: string;
   company_id?: string | null;
   monthly_sales_goal?: number | null;
+  token_version?: number | null;
 }): AuthUser {
   return {
     id: r.id,
@@ -54,6 +55,7 @@ function mapRow(r: {
       r.monthly_sales_goal != null && r.monthly_sales_goal > 0
         ? Number(r.monthly_sales_goal)
         : null,
+    tokenVersion: Number(r.token_version ?? 0) || 0,
   };
 }
 
@@ -102,7 +104,7 @@ class PostgresAuthRepository implements AuthRepository {
     const q = login.trim().toLowerCase();
     const rows = await withQueryTimeout(
       sql`
-        SELECT id, username, email, password_hash, name, role, active, avatar_url, company_id
+        SELECT id, username, email, password_hash, name, role, active, avatar_url, company_id, token_version
         FROM users
         WHERE active = true
           AND (lower(email) = ${q} OR lower(username) = ${q})
@@ -121,17 +123,35 @@ class PostgresAuthRepository implements AuthRepository {
           active: boolean;
           avatar_url: string;
           company_id?: string | null;
+          token_version?: number | null;
         }
       | undefined;
     if (!row || !verifyPassword(password, row.password_hash)) return null;
-    return mapRow(row);
+
+    await sql`
+      UPDATE users SET
+        presence_status = CASE
+          WHEN presence_status = 'desconectado' THEN 'disponible'
+          ELSE presence_status
+        END,
+        last_seen_at = now()
+      WHERE id = ${row.id}
+    `;
+
+    const refreshed = await sql`
+      SELECT id, username, email, name, role, active, avatar_url, company_id, token_version
+      FROM users WHERE id = ${row.id} LIMIT 1
+    `;
+    const userRow = refreshed[0];
+    if (!userRow) return null;
+    return mapRow(userRow as Parameters<typeof mapRow>[0]);
   }
 
   async findById(id: string): Promise<AuthUser | null> {
     const sql = requireSql();
     const rows = await withQueryTimeout(
       sql`
-        SELECT id, username, email, name, role, active, avatar_url, company_id, monthly_sales_goal
+        SELECT id, username, email, name, role, active, avatar_url, company_id, monthly_sales_goal, token_version
         FROM users WHERE id = ${id} LIMIT 1
       `,
       5_000,
@@ -144,7 +164,7 @@ class PostgresAuthRepository implements AuthRepository {
   async listUsers(): Promise<AuthUser[]> {
     const sql = requireSql();
     const rows = await withDbRetry(() => sql`
-      SELECT id, username, email, name, role, active, avatar_url, company_id, monthly_sales_goal
+      SELECT id, username, email, name, role, active, avatar_url, company_id, monthly_sales_goal, token_version
       FROM users
       ORDER BY name ASC
     `);

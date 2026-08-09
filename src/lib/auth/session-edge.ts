@@ -45,6 +45,7 @@ export type EdgeSessionPayload = {
   /** Rol del usuario: permite que el middleware separe admin/asesora. */
   role?: string;
   companyId?: string;
+  tokenVersion?: number;
 };
 
 export async function verifySessionTokenEdge(
@@ -87,6 +88,7 @@ export async function createSessionTokenEdge(
   userId: string,
   role?: string,
   companyId?: string,
+  tokenVersion?: number,
 ): Promise<string> {
   const payload: EdgeSessionPayload = {
     userId,
@@ -94,6 +96,9 @@ export async function createSessionTokenEdge(
     companyId,
     exp: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SEC,
   };
+  if (tokenVersion !== undefined) {
+    payload.tokenVersion = tokenVersion;
+  }
   const body = toBase64Url(new TextEncoder().encode(JSON.stringify(payload)));
   const sig = await sign(body);
   return `${body}.${sig}`;

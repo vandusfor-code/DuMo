@@ -39,6 +39,7 @@ export type LeadsConversationUpdatedPayload = {
 
 type IoLike = {
   to: (room: string) => { emit: (event: string, payload: unknown) => void };
+  in: (room: string) => { disconnectSockets: (close?: boolean) => void };
 };
 
 function getIo(): IoLike | null {
@@ -67,4 +68,18 @@ export function emitLeadsMessageNew(payload: LeadsMessageNewPayload) {
 
 export function emitLeadsConversationUpdated(payload: LeadsConversationUpdatedPayload) {
   emitToLeadsRooms(payload, "leads:conversation:updated", payload);
+}
+
+export type SessionRevokedPayload = {
+  userId: string;
+  reason: "presence:desconectado" | "admin:forced";
+};
+
+/** Invalida sesión activa en el cliente y cierra sockets del asesor. */
+export function emitSessionRevoked(userId: string, reason: SessionRevokedPayload["reason"]) {
+  const io = getIo();
+  if (!io) return;
+  const payload: SessionRevokedPayload = { userId, reason };
+  io.to(`advisor:${userId}`).emit("session:revoked", payload);
+  io.in(`advisor:${userId}`).disconnectSockets(true);
 }

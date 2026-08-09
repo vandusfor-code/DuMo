@@ -30,10 +30,17 @@ export const adminLiveService = {
       updatedBy,
     );
 
+    if (result.sessionRevoked) {
+      const { emitSessionRevoked } = await import("@/server/realtime/emit");
+      emitSessionRevoked(advisorId, "presence:desconectado");
+    }
+
     return {
       advisorId,
       presenceStatus: result.presenceStatus,
       updatedAt: result.updatedAt,
+      sessionRevoked: result.sessionRevoked,
+      tokenVersion: result.tokenVersion,
     };
   },
 };

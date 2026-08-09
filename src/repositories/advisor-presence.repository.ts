@@ -13,7 +13,12 @@ export interface AdvisorPresenceRepository {
     advisorId: string,
     status: AdvisorPresenceStatus,
     updatedBy: string,
-  ): Promise<{ presenceStatus: AdvisorPresenceStatus; updatedAt: string }>;
+  ): Promise<{
+    presenceStatus: AdvisorPresenceStatus;
+    updatedAt: string;
+    tokenVersion: number;
+    sessionRevoked: boolean;
+  }>;
 }
 
 function requireSql() {
@@ -172,7 +177,12 @@ class PostgresAdvisorPresenceRepository implements AdvisorPresenceRepository {
     advisorId: string,
     status: AdvisorPresenceStatus,
     updatedBy: string,
-  ): Promise<{ presenceStatus: AdvisorPresenceStatus; updatedAt: string }> {
+  ): Promise<{
+    presenceStatus: AdvisorPresenceStatus;
+    updatedAt: string;
+    tokenVersion: number;
+    sessionRevoked: boolean;
+  }> {
     await ensureSchema();
     const sql = requireSql();
     const rows = await withDbRetry(() =>
@@ -180,14 +190,19 @@ class PostgresAdvisorPresenceRepository implements AdvisorPresenceRepository {
         {
           presence_status: AdvisorPresenceStatus;
           presence_updated_at: Date;
+          token_version: number;
         }[]
       >`
         UPDATE users
         SET presence_status = ${status},
             presence_updated_at = now(),
-            presence_updated_by = ${updatedBy}
+            presence_updated_by = ${updatedBy},
+            token_version = CASE
+              WHEN ${status} = 'desconectado' THEN token_version + 1
+              ELSE token_version
+            END
         WHERE id = ${advisorId}
-        RETURNING presence_status, presence_updated_at
+        RETURNING presence_status, presence_updated_at, token_version
       `,
     );
     const row = rows[0];
@@ -198,6 +213,8 @@ class PostgresAdvisorPresenceRepository implements AdvisorPresenceRepository {
         row.presence_updated_at instanceof Date
           ? row.presence_updated_at.toISOString()
           : new Date(String(row.presence_updated_at)).toISOString(),
+      tokenVersion: Number(row.token_version ?? 0),
+      sessionRevoked: status === "desconectado",
     };
   }
 }
