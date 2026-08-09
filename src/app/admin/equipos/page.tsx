@@ -65,7 +65,9 @@ export default function AdminEquiposPage() {
             }}
             onToggleStatus={(id, status) => setStatus.mutate({ id, status })}
             onDelete={(id) => remove.mutate(id)}
-            onDeleteAll={() => removeAll.mutateAsync()}
+            onDeleteAll={async () => {
+              await removeAll.mutateAsync();
+            }}
             deletingAll={removeAll.isPending}
           />
         </>

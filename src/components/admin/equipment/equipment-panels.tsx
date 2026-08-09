@@ -386,7 +386,7 @@ export function EquipmentCatalogTable({
                 <Button
                   key={p}
                   size="sm"
-                  variant={p === page ? "default" : "outline"}
+                  variant={p === page ? "primary" : "outline"}
                   className="min-w-9 px-2"
                   onClick={() => setPage(p)}
                 >

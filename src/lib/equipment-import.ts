@@ -177,7 +177,7 @@ export function downloadEquipmentCatalogXlsx(
     item.observations ?? "",
     item.status === "active" ? "Activo" : "Inactivo",
   ]);
-  const sheet = XLSX.utils.aoa_to_sheet([EXPORT_HEADERS, ...rows]);
+  const sheet = XLSX.utils.aoa_to_sheet([[...EXPORT_HEADERS], ...rows]);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, "Equipos");
   XLSX.writeFile(workbook, filename);
