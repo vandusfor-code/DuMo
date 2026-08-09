@@ -31,7 +31,7 @@ export function PinnedQuickReplies({
   onSent?: () => void;
 }) {
   const [panelOpen, setPanelOpen] = useState(false);
-  const { data: templates = [] } = useAdvisorQuickReplies();
+  const { data: templates = [], isLoading, isError } = useAdvisorQuickReplies();
   const templateSend = useTemplateSend({
     conversationId,
     to,
@@ -52,10 +52,28 @@ export function PinnedQuickReplies({
   const closePanel = () => setPanelOpen(false);
   const togglePanel = () => setPanelOpen((v) => !v);
 
+  if (isLoading) {
+    return (
+      <div className="mb-3">
+        <span className="text-[13px] font-semibold text-ink">Plantilla</span>
+        <p className="mt-2 text-[12px] text-muted">Cargando plantillas…</p>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="mb-3">
+        <span className="text-[13px] font-semibold text-ink">Plantilla</span>
+        <p className="mt-2 text-[12px] text-danger-ink">No se pudieron cargar las plantillas.</p>
+      </div>
+    );
+  }
+
   if (templates.length === 0) return null;
 
   return (
-    <div className="mb-3">
+    <div className="relative z-20 mb-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="text-[13px] font-semibold text-ink">Plantilla</span>
         <button
@@ -72,7 +90,7 @@ export function PinnedQuickReplies({
         </button>
       </div>
 
-      <div className="flex items-stretch gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex items-stretch gap-2">
         <div className="relative shrink-0">
           <button
             type="button"
@@ -106,20 +124,22 @@ export function PinnedQuickReplies({
           />
         </div>
 
-        {pinned.map((t, index) => (
-          <QuickReplyChip
-            key={t.id}
-            label={t.name}
-            compact
-            visual={getPinnedShortcutVisual({
-              categorySlug: t.categorySlug,
-              name: t.name,
-              index,
-            })}
-            disabled={disabled || templateSend.isSending || panelOpen}
-            onClick={() => void templateSend.handleSelect(t)}
-          />
-        ))}
+        <div className="flex min-w-0 flex-1 items-stretch gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {pinned.map((t, index) => (
+            <QuickReplyChip
+              key={t.id}
+              label={t.name}
+              compact
+              visual={getPinnedShortcutVisual({
+                categorySlug: t.categorySlug,
+                name: t.name,
+                index,
+              })}
+              disabled={disabled || templateSend.isSending || panelOpen}
+              onClick={() => void templateSend.handleSelect(t)}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -49,8 +49,8 @@ export function AllTemplatesPanel({
 
   const panelClass =
     placement === "dropdown"
-      ? "absolute left-0 top-full z-40 mt-1.5 w-[min(100vw-2rem,320px)]"
-      : "absolute left-0 right-0 top-full z-40 mt-1";
+      ? "absolute bottom-full left-0 z-50 mb-1.5 w-[min(100vw-2rem,320px)]"
+      : "absolute left-0 right-0 top-full z-50 mt-1";
 
   const handlePin = (template: AdvisorQuickReplyTemplate, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -74,7 +74,7 @@ export function AllTemplatesPanel({
       <button
         type="button"
         aria-label="Cerrar listado de plantillas"
-        className="fixed inset-0 z-30 cursor-default bg-transparent"
+        className="fixed inset-0 z-40 cursor-default bg-black/5"
         onClick={onClose}
       />
       <div

@@ -126,8 +126,8 @@ export function ChatInput({
   return (
     <div
       className={cn(
-        "relative shrink-0 border-t border-line bg-card pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]",
-        premium ? "px-4 py-3" : "px-4 py-3",
+        "relative shrink-0 overflow-visible border-t border-line bg-card pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]",
+        premium ? "z-20 px-4 py-3" : "px-4 py-3",
       )}
       onDragEnter={(e) => {
         e.preventDefault();
