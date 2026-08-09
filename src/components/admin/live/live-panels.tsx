@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import {
-  Clock,
+  Inbox,
   MessageCircle,
   Radio,
   TrendingUp,
@@ -116,14 +116,14 @@ export function LiveMetrics({ summary }: { summary: LiveSnapshot["summary"] }) {
         iconClass="bg-success-soft text-success-ink"
         label="Leads gestionados hoy"
         value={String(summary.leadsManagedToday)}
-        subtext="Total del equipo"
+        subtext="Tipificaciones del equipo hoy"
       />
       <MetricCard
-        icon={<Clock />}
-        iconClass="bg-canvas text-muted"
-        label="Tiempo promedio de conexión"
-        value={summary.avgConnectionTimeLabel ?? "—"}
-        subtext="Hoy"
+        icon={<Inbox />}
+        iconClass="bg-brand-soft text-brand"
+        label="Leads asignados ahora"
+        value={String(summary.leadsAssignedNow)}
+        subtext="Conversaciones con asesora asignada"
       />
       <MetricCard
         icon={<TrendingUp />}
@@ -230,6 +230,7 @@ export function LiveAdvisorsTable({ advisors }: { advisors: LiveAdvisorRow[] }) 
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             <TableHead className="pl-5">Asesora</TableHead>
+            <TableHead>Leads asignados hoy</TableHead>
             <TableHead>Leads gestionados hoy</TableHead>
             <TableHead>Tiempo de conexión</TableHead>
             <TableHead>Estado</TableHead>
@@ -239,7 +240,7 @@ export function LiveAdvisorsTable({ advisors }: { advisors: LiveAdvisorRow[] }) 
         <TableBody>
           {advisors.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={5} className="py-12 text-center text-muted">
+              <TableCell colSpan={6} className="py-12 text-center text-muted">
                 No hay asesoras activas.
               </TableCell>
             </TableRow>
@@ -258,6 +259,14 @@ export function LiveAdvisorsTable({ advisors }: { advisors: LiveAdvisorRow[] }) 
                       <AdvisorOnlineBadge online={advisor.isOnline} />
                     </div>
                   </div>
+                </TableCell>
+                <TableCell>
+                  <span className="text-[14px] text-ink">
+                    {advisor.leadsAssignedToday}{" "}
+                    <span className="text-muted">
+                      lead{advisor.leadsAssignedToday === 1 ? "" : "s"}
+                    </span>
+                  </span>
                 </TableCell>
                 <TableCell>
                   <span className="text-[14px] text-ink">

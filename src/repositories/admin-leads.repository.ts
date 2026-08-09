@@ -189,6 +189,7 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
       UPDATE lead_conversations SET
         assigned_advisor_id = ${advisor.id},
         assigned_advisor_name = ${advisor.name},
+        assigned_advisor_at = now(),
         admin_status = 'asignado'
       WHERE id = ${input.conversationId}
     `;
@@ -385,6 +386,7 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
         UPDATE lead_conversations c
         SET assigned_advisor_id = a.id,
             assigned_advisor_name = a.name,
+            assigned_advisor_at = now(),
             admin_status = 'asignado'
         FROM pending p, advisors a
         WHERE c.id = p.id

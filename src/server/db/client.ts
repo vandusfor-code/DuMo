@@ -10,6 +10,7 @@ import {
 } from "@/server/db/migrations/advisor-presence-schema";
 import { runTipificationMigrations, TIPIFICATION_REQUIRED_COLUMNS } from "@/server/db/migrations/tipifications-schema";
 import { runWebQrMigrations } from "@/server/db/migrations/web-qr-schema";
+import { runLeadAssignmentMigrations } from "@/server/db/migrations/lead-assignment-schema";
 
 let sqlSingleton: Sql | null = null;
 let schemaPromise: Promise<void> | null = null;
@@ -182,6 +183,7 @@ const REQUIRED_COLUMNS = [
   "lead_conversations.dumo_phone_id",
   "lead_conversations.assigned_advisor_id",
   "lead_conversations.assigned_advisor_name",
+  "lead_conversations.assigned_advisor_at",
   "lead_conversations.admin_status",
   "lead_conversations.last_message_direction",
   "lead_conversations.wa_chat_jid",
@@ -392,6 +394,7 @@ async function runMigrations(sql: Sql) {
     `;
     await tx`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS assigned_advisor_id text`;
     await tx`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS assigned_advisor_name text`;
+    await tx`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS assigned_advisor_at timestamptz`;
     await tx`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS admin_status text DEFAULT 'nuevo'`;
     await tx`UPDATE lead_conversations SET admin_status = 'nuevo' WHERE admin_status IS NULL`;
     await tx`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS last_message_direction text DEFAULT 'in'`;
@@ -502,6 +505,7 @@ async function runMigrations(sql: Sql) {
     await runQuickReplyAndTenantMigrations(tx);
     await runTipificationMigrations(tx);
     await runAdvisorPresenceMigrations(tx);
+    await runLeadAssignmentMigrations(tx);
     await runTeleprompterScriptMigrations(tx);
     await runWebQrMigrations(tx);
 

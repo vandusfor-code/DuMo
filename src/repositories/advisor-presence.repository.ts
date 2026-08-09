@@ -48,6 +48,7 @@ class PostgresAdvisorPresenceRepository implements AdvisorPresenceRepository {
           presence_status: string;
           is_online: boolean;
           gestiones_today: number;
+          assigned_today: number;
           sales_today: number;
         }[]
       >`
@@ -57,6 +58,14 @@ class PostgresAdvisorPresenceRepository implements AdvisorPresenceRepository {
           WHERE advisor_id IS NOT NULL
             AND to_char(created_at AT TIME ZONE 'America/Santiago', 'YYYY-MM-DD') = ${todayIso}
           GROUP BY advisor_id
+        ),
+        assigned_today AS (
+          SELECT assigned_advisor_id AS advisor_id, count(*)::int AS n
+          FROM lead_conversations
+          WHERE assigned_advisor_id IS NOT NULL
+            AND assigned_advisor_at IS NOT NULL
+            AND to_char(assigned_advisor_at AT TIME ZONE 'America/Santiago', 'YYYY-MM-DD') = ${todayIso}
+          GROUP BY assigned_advisor_id
         ),
         sales_today AS (
           SELECT advisor_id, count(*)::int AS n
@@ -76,9 +85,11 @@ class PostgresAdvisorPresenceRepository implements AdvisorPresenceRepository {
             AND u.presence_status <> 'desconectado'
           ) AS is_online,
           coalesce(g.n, 0)::int AS gestiones_today,
+          coalesce(at.n, 0)::int AS assigned_today,
           coalesce(s.n, 0)::int AS sales_today
         FROM users u
         LEFT JOIN gestiones_today g ON g.advisor_id = u.id
+        LEFT JOIN assigned_today at ON at.advisor_id = u.id
         LEFT JOIN sales_today s ON s.advisor_id = u.id
         WHERE u.role = 'asesora' AND u.active = true
         ORDER BY is_online DESC, u.name ASC
@@ -93,6 +104,7 @@ class PostgresAdvisorPresenceRepository implements AdvisorPresenceRepository {
           sales_yesterday: number;
           team_gestiones_today: number;
           team_sales_today: number;
+          leads_assigned_now: number;
         }[]
       >`
         WITH gestiones_today AS (
@@ -127,7 +139,12 @@ class PostgresAdvisorPresenceRepository implements AdvisorPresenceRepository {
           (SELECT n FROM gestiones_yesterday) AS gestiones_yesterday,
           (SELECT n FROM sales_yesterday) AS sales_yesterday,
           (SELECT n FROM gestiones_today) AS team_gestiones_today,
-          (SELECT n FROM sales_today) AS team_sales_today
+          (SELECT n FROM sales_today) AS team_sales_today,
+          (
+            SELECT count(*)::int
+            FROM lead_conversations
+            WHERE assigned_advisor_id IS NOT NULL
+          ) AS leads_assigned_now
       `,
       8_000,
     );
@@ -137,6 +154,7 @@ class PostgresAdvisorPresenceRepository implements AdvisorPresenceRepository {
       sales_yesterday: 0,
       team_gestiones_today: 0,
       team_sales_today: 0,
+      leads_assigned_now: 0,
     };
 
     const advisors = rows.map((row) => ({
@@ -145,6 +163,7 @@ class PostgresAdvisorPresenceRepository implements AdvisorPresenceRepository {
       avatarUrl: row.avatar_url ?? "",
       isOnline: row.is_online,
       presenceStatus: row.presence_status as AdvisorPresenceStatus,
+      leadsAssignedToday: row.assigned_today,
       leadsManagedToday: row.gestiones_today,
       connectionTimeLabel: null,
       connectionProgressPct: null,
@@ -164,6 +183,7 @@ class PostgresAdvisorPresenceRepository implements AdvisorPresenceRepository {
       summary: {
         connectedAdvisors,
         leadsManagedToday: team.team_gestiones_today,
+        leadsAssignedNow: team.leads_assigned_now,
         avgConnectionTimeLabel: null,
         teamProductivityPct,
         teamProductivityDeltaPct: teamProductivityPct - teamProductivityYesterday,

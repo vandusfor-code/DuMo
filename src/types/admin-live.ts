@@ -3,6 +3,7 @@ import type { AdvisorPresenceStatus } from "@/lib/advisor-presence";
 export interface LiveSummary {
   connectedAdvisors: number;
   leadsManagedToday: number;
+  leadsAssignedNow: number;
   avgConnectionTimeLabel: string | null;
   teamProductivityPct: number;
   teamProductivityDeltaPct: number;
@@ -14,6 +15,7 @@ export interface LiveAdvisorRow {
   avatarUrl: string;
   isOnline: boolean;
   presenceStatus: AdvisorPresenceStatus;
+  leadsAssignedToday: number;
   leadsManagedToday: number;
   /** Placeholder hasta etapa 6 (advisor_sessions). */
   connectionTimeLabel: string | null;
