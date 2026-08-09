@@ -4,6 +4,7 @@ import { SEED_ADMIN, seedAdminPasswordHash } from "@/lib/auth/seed-admin";
 import { DEFAULT_COMPANY_ID } from "@/types/tenant";
 import { QUICK_REPLY_REQUIRED_COLUMNS, runQuickReplyAndTenantMigrations } from "@/server/db/migrations/quick-reply-schema";
 import { runTeleprompterScriptMigrations } from "@/server/db/migrations/teleprompter-scripts-schema";
+import { runTipificationMigrations, TIPIFICATION_REQUIRED_COLUMNS } from "@/server/db/migrations/tipifications-schema";
 import { runWebQrMigrations } from "@/server/db/migrations/web-qr-schema";
 
 let sqlSingleton: Sql | null = null;
@@ -189,6 +190,7 @@ const REQUIRED_COLUMNS = [
   "lead_gestiones.conversation_id",
   "crm_clients.conversation_id",
   ...QUICK_REPLY_REQUIRED_COLUMNS,
+  ...TIPIFICATION_REQUIRED_COLUMNS,
 ];
 
 /** ¿Está el esquema completo? Una sola consulta al catálogo. */
@@ -271,6 +273,16 @@ async function ensureIncrementalMigrations(sql: Sql): Promise<void> {
     `;
     if (!webQrRows[0]?.exists) {
       await runWebQrMigrations(sql);
+    }
+
+    const tipificationRows = await sql<{ exists: boolean }[]>`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'tipifications'
+      ) AS exists
+    `;
+    if (!tipificationRows[0]?.exists) {
+      await runTipificationMigrations(sql);
     }
 
     // Columnas añadidas después de marcar schema_complete — reparación idempotente.
@@ -482,6 +494,7 @@ async function runMigrations(sql: Sql) {
     await ensureOfferSimulationsTable(tx);
 
     await runQuickReplyAndTenantMigrations(tx);
+    await runTipificationMigrations(tx);
     await runTeleprompterScriptMigrations(tx);
     await runWebQrMigrations(tx);
 
