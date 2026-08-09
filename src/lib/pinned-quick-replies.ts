@@ -9,9 +9,14 @@ import {
 import {
   MAX_PINNED_QUICK_REPLIES,
   PINNED_LIMIT_MESSAGE,
+  PINNED_QUICK_REPLIES_VISIBLE_IN_CHAT,
 } from "@/lib/pinned-quick-replies.constants";
 
-export { MAX_PINNED_QUICK_REPLIES, PINNED_LIMIT_MESSAGE };
+export {
+  MAX_PINNED_QUICK_REPLIES,
+  PINNED_LIMIT_MESSAGE,
+  PINNED_QUICK_REPLIES_VISIBLE_IN_CHAT,
+};
 
 export type PinnedShortcutVisual = {
   Icon: LucideIcon;

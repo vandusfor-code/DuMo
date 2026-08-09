@@ -165,6 +165,7 @@ export function ChatInput({
           conversationId={conversationId}
           to={to}
           customerName={customerName}
+          variant={variant}
           disabled={isSending}
           onInsertText={(text) => setValue(text)}
           onSent={() => setValue("")}
