@@ -1,4 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  assertConversationAccess,
+  ConversationAccessError,
+} from "@/lib/conversation-access";
 import { getTenantScope } from "@/lib/tenant-scope";
 import { quickReplySendService } from "@/services/quick-reply-send.service";
 
@@ -24,6 +28,15 @@ export async function POST(
 
     if (!conversationId || !to) {
       return NextResponse.json({ error: "conversationId y to son obligatorios." }, { status: 422 });
+    }
+
+    try {
+      await assertConversationAccess(conversationId, scope);
+    } catch (err) {
+      if (err instanceof ConversationAccessError) {
+        return NextResponse.json({ error: err.message }, { status: err.status });
+      }
+      throw err;
     }
 
     const result = await quickReplySendService.sendTemplate({

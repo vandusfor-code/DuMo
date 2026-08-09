@@ -1,4 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  assertConversationAccess,
+  ConversationAccessError,
+} from "@/lib/conversation-access";
 import { getTenantScope } from "@/lib/tenant-scope";
 import { leadsService } from "@/services/leads.service";
 import {
@@ -49,6 +53,15 @@ export async function POST(request: NextRequest) {
     }
     if (!conversationId || !to) {
       return NextResponse.json({ error: "conversationId y to son obligatorios." }, { status: 422 });
+    }
+
+    try {
+      await assertConversationAccess(conversationId, scope);
+    } catch (err) {
+      if (err instanceof ConversationAccessError) {
+        return NextResponse.json({ error: err.message }, { status: err.status });
+      }
+      throw err;
     }
 
     let mimeType = resolveMimeType(file);

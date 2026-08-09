@@ -1,6 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { adminLeadsService } from "@/services/admin-leads.service";
-import { authService } from "@/services/auth.service";
+import { advisorIdForConversations } from "@/lib/conversation-access";
+import { getTenantScope } from "@/lib/tenant-scope";
 import { leadsService } from "@/services/leads.service";
 
 export const runtime = "nodejs";
@@ -9,8 +10,12 @@ export const maxDuration = 20;
 
 export async function GET() {
   try {
-    const user = await authService.getSessionUser();
-    const advisorId = user?.role === "asesora" ? user.id : undefined;
+    const scope = await getTenantScope();
+    if (!scope) {
+      return NextResponse.json({ error: "No autenticado." }, { status: 401 });
+    }
+
+    const advisorId = advisorIdForConversations(scope);
 
     // La asignación corre DESPUÉS de responder: la bandeja nunca espera por
     // ella, así un problema de asignación no puede romper la sincronización.

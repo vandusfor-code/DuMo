@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiPost, apiPostForm } from "@/lib/api-client";
-import { advisorApiGet } from "@/lib/advisor-query";
+import { advisorApiGet, AdvisorFetchError } from "@/lib/advisor-query";
 import { salesScriptKeys } from "@/hooks/use-sales-script";
 import { latestGestionKeys } from "@/hooks/use-latest-gestion";
 import { crmClientKeys } from "@/hooks/use-crm-clients";
@@ -30,6 +30,18 @@ export function fetchConversationMessages(conversationId: string) {
   );
 }
 
+/** No conservar bandeja/mensajes tras 401/403 — evita mostrar datos de otra sesión. */
+function keepPlaceholderOnAuthError<T>(
+  prev: T | undefined,
+  prevQuery: { state: { error: unknown } } | undefined,
+): T | undefined {
+  const err = prevQuery?.state.error;
+  if (err instanceof AdvisorFetchError && (err.status === 401 || err.status === 403)) {
+    return undefined;
+  }
+  return prev;
+}
+
 export function useConversations() {
   return useQuery({
     queryKey: leadKeys.conversations,
@@ -38,7 +50,7 @@ export function useConversations() {
     refetchIntervalInBackground: true,
     staleTime: 3000,
     retry: 2,
-    placeholderData: (prev) => prev,
+    placeholderData: keepPlaceholderOnAuthError,
   });
 }
 
@@ -51,7 +63,7 @@ export function useConversationMessages(conversationId: string | null) {
     refetchIntervalInBackground: true,
     staleTime: 2000,
     retry: 2,
-    placeholderData: (prev) => prev,
+    placeholderData: keepPlaceholderOnAuthError,
   });
 }
 
