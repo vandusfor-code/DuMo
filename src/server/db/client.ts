@@ -296,6 +296,7 @@ async function ensureIncrementalMigrations(sql: Sql): Promise<void> {
     await sql`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS wa_chat_jid text`;
     await sql`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS last_message_direction text DEFAULT 'in'`;
     await runAdvisorPresenceMigrations(sql);
+    await runLeadAssignmentMigrations(sql);
   } catch (err) {
     console.error("[ensureIncrementalMigrations]", err);
   }
