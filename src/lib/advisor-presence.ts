@@ -19,3 +19,10 @@ export const ADVISOR_PRESENCE_LABELS: Record<AdvisorPresenceStatus, string> = {
 export function advisorReceivesLeads(status: AdvisorPresenceStatus): boolean {
   return status === "disponible";
 }
+
+/** Ventana usada hoy para “conectada” (auto-asignación y Live). */
+export const ADVISOR_ONLINE_WINDOW_MINUTES = 10;
+
+export function isAdvisorPresenceStatus(value: string): value is AdvisorPresenceStatus {
+  return (ADVISOR_PRESENCE_STATUSES as readonly string[]).includes(value);
+}
