@@ -1,10 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Search, Star } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { CategoriesModal } from "@/components/admin/plantillas/categories-modal";
 import { CategoryExplorer } from "@/components/admin/plantillas/category-explorer";
+import { TipificationsPanel } from "@/components/admin/plantillas/tipifications-panel";
 import {
   TemplateCard,
   TemplateListRow,
@@ -31,6 +33,40 @@ import {
   PINNED_LIMIT_MESSAGE,
 } from "@/lib/pinned-quick-replies.constants";
 import type { QuickReplyTemplate, UpdateQuickReplyTemplateInput } from "@/types/quick-reply";
+import { cn } from "@/lib/utils";
+
+type PlantillasTab = "plantillas" | "tipificaciones";
+
+function PlantillasModuleTabs({
+  active,
+  onChange,
+}: {
+  active: PlantillasTab;
+  onChange: (tab: PlantillasTab) => void;
+}) {
+  return (
+    <div className="inline-flex rounded-xl border border-line bg-card p-1">
+      {(
+        [
+          { id: "plantillas" as const, label: "Plantillas" },
+          { id: "tipificaciones" as const, label: "Tipificaciones" },
+        ] as const
+      ).map((tab) => (
+        <button
+          key={tab.id}
+          type="button"
+          onClick={() => onChange(tab.id)}
+          className={cn(
+            "rounded-lg px-4 py-2 text-[14px] font-medium transition-colors",
+            active === tab.id ? "bg-brand text-white" : "text-muted hover:text-brand",
+          )}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function sortTemplates(templates: QuickReplyTemplate[], sortMode: TemplateSortMode) {
   const rows = [...templates];
@@ -49,6 +85,32 @@ function sortTemplates(templates: QuickReplyTemplate[], sortMode: TemplateSortMo
 }
 
 export default function AdminPlantillasPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeTab: PlantillasTab =
+    searchParams.get("tab") === "tipificaciones" ? "tipificaciones" : "plantillas";
+
+  const setActiveTab = (tab: PlantillasTab) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === "plantillas") params.delete("tab");
+    else params.set("tab", tab);
+    const qs = params.toString();
+    router.replace(qs ? `/admin/plantillas?${qs}` : "/admin/plantillas");
+  };
+
+  return (
+    <div className="space-y-6">
+      <AdminPageHeader
+        title="Plantillas"
+        subtitle="Respuestas rápidas reutilizables para WhatsApp — texto, imágenes y secuencias compuestas."
+      />
+      <PlantillasModuleTabs active={activeTab} onChange={setActiveTab} />
+      {activeTab === "plantillas" ? <PlantillasTabContent /> : <TipificationsPanel />}
+    </div>
+  );
+}
+
+function PlantillasTabContent() {
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [viewMode, setViewMode] = useState<TemplateViewMode>("grid");
@@ -107,7 +169,6 @@ export default function AdminPlantillasPage() {
   if (isLoading || loadingCats) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-10 w-72" />
         <Skeleton className="h-32 w-full rounded-2xl" />
         <Skeleton className="h-40 w-full rounded-2xl" />
         <Skeleton className="h-96 w-full rounded-2xl" />
@@ -121,11 +182,6 @@ export default function AdminPlantillasPage() {
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader
-        title="Plantillas"
-        subtitle="Respuestas rápidas reutilizables para WhatsApp — texto, imágenes y secuencias compuestas."
-      />
-
       <Card className="p-4">
         <div className="flex flex-wrap items-center gap-3">
           <label className="relative min-w-[220px] flex-1">
