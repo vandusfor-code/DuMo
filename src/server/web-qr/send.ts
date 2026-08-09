@@ -3,7 +3,7 @@ import { webQrConversationId } from "@/lib/web-qr/conversation-id";
 import { normalizeWhatsAppPhoneDigits, resolveWhatsAppWebSendJid } from "@/lib/whatsapp/phone";
 import { getConversationRepository } from "@/repositories/conversation.repository";
 import { webQrRepository } from "@/repositories/web-qr.repository";
-import { bridgeSendText } from "@/server/web-qr/bridge-client";
+import { bridgeSendMedia, bridgeSendText } from "@/server/web-qr/bridge-client";
 import { ensureWebQrBridgeReady } from "@/server/web-qr/ensure-session";
 
 export async function sendWebQrText(input: {
@@ -39,6 +39,55 @@ export async function sendWebQrText(input: {
     createdAt: new Date().toISOString(),
     dumoPhoneId: input.channelId,
     messageType: "text",
+    companyId: input.companyId,
+    waChatJid: sent.jid ?? jid,
+  });
+
+  return sent;
+}
+
+export async function sendWebQrMedia(input: {
+  channelId: string;
+  conversationId: string;
+  to: string;
+  mediaUrl: string;
+  mimeType: string;
+  caption?: string;
+  mediaAssetId?: string;
+  companyId?: string;
+}): Promise<{ id: string }> {
+  const repo = getConversationRepository();
+  const storedJid = await repo.getWaChatJid(input.conversationId);
+  const phone =
+    normalizeWhatsAppPhoneDigits(
+      webQrConversationId(input.to).replace(/^webqr:/, "") || input.to,
+    );
+  const jid = resolveWhatsAppWebSendJid(phone, storedJid);
+
+  await ensureWebQrBridgeReady(input.channelId);
+
+  const sent = await bridgeSendMedia({
+    channelId: input.channelId,
+    jid,
+    mediaUrl: input.mediaUrl,
+    mimeType: input.mimeType,
+    caption: input.caption,
+  });
+
+  const preview = input.caption?.trim() || "Imagen";
+
+  await repo.saveMessage({
+    waMessageId: sent.id,
+    conversationId: input.conversationId,
+    phone,
+    customerName: "",
+    body: preview,
+    direction: "out",
+    createdAt: new Date().toISOString(),
+    dumoPhoneId: input.channelId,
+    messageType: "image",
+    mediaAssetId: input.mediaAssetId,
+    caption: input.caption,
     companyId: input.companyId,
     waChatJid: sent.jid ?? jid,
   });
