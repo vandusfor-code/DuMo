@@ -20,8 +20,9 @@ export interface IncomingMessage {
   createdAt: string; // ISO
   /** Número de DuMo (phone_number_id) por el que entró el mensaje. */
   dumoPhoneId?: string;
-  messageType?: "text" | "image";
+  messageType?: "text" | "image" | "audio";
   mediaAssetId?: string;
+  mediaUrl?: string;
   caption?: string;
   /** JID de WhatsApp Web para responder (solo canal WEB_QR). */
   waChatJid?: string;
@@ -207,6 +208,8 @@ class PostgresConversationRepository implements ConversationRepository {
     );
     return (rows as unknown as MsgRow[]).map((r) => {
       const isImage = r.message_type === "image" && Boolean(r.media_public_url);
+      const isAudio = r.message_type === "audio" && Boolean(r.media_public_url);
+      const mediaType = isImage ? "image" : isAudio ? "audio" : "text";
       return {
         id: r.id,
         conversationId: r.conversation_id,
@@ -214,10 +217,10 @@ class PostgresConversationRepository implements ConversationRepository {
         time: formatChatTime(isoTimestamp(r.created_at)),
         direction: r.direction === "out" ? "out" : "in",
         read: Boolean(r.read),
-        messageType: isImage ? "image" : "text",
-        mediaUrl: isImage ? (r.media_public_url ?? undefined) : undefined,
+        messageType: mediaType,
+        mediaUrl: isImage || isAudio ? (r.media_public_url ?? undefined) : undefined,
         caption: isImage ? (r.caption ?? undefined) : undefined,
-        mediaAssetId: isImage ? (r.media_asset_id ?? undefined) : undefined,
+        mediaAssetId: isImage || isAudio ? (r.media_asset_id ?? undefined) : undefined,
       };
     });
   }

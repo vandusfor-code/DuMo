@@ -56,9 +56,6 @@ export async function persistWebQrInbound(payload: BridgeInboundPayload): Promis
 
   const createdAt = new Date(payload.timestamp * 1000).toISOString();
 
-  let body = payload.text?.trim() ?? "";
-  let messageType: "text" | "image" = "text";
-
   const baseMessage = {
     waMessageId: payload.messageId,
     conversationId,
@@ -70,13 +67,25 @@ export async function persistWebQrInbound(payload: BridgeInboundPayload): Promis
     waChatJid: payload.senderJid?.trim() || undefined,
   };
 
+  if (payload.type === "audio" && payload.mediaUrl) {
+    await leadsService.receiveInboundAudioFromUrl({
+      ...baseMessage,
+      mediaUrl: payload.mediaUrl,
+      mimeType: payload.mimeType,
+      preview: payload.text?.trim(),
+      audioPtt: payload.audioPtt,
+    });
+    return;
+  }
+
+  let body = payload.text?.trim() ?? "";
+
   if (payload.type === "image" && payload.mediaUrl) {
-    messageType = "image";
     body = payload.caption?.trim() || "📷 Imagen";
     await leadsService.receiveMessage({
       ...baseMessage,
       body,
-      messageType,
+      messageType: "image",
     });
     return;
   }

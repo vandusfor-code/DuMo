@@ -29,8 +29,8 @@ export interface Conversation {
   online: boolean;
 }
 
-/** Un mensaje dentro del chat — solo texto e imágenes. */
-export type ChatMessageType = "text" | "image";
+/** Un mensaje dentro del chat — texto, imágenes y audios. */
+export type ChatMessageType = "text" | "image" | "audio";
 
 export interface ChatMessage {
   id: string;

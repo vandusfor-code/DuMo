@@ -2,8 +2,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getTenantScope } from "@/lib/tenant-scope";
 import { leadsService } from "@/services/leads.service";
 import {
+  assertSupportedAudioMime,
   assertSupportedImageMime,
+  inferAudioMimeFromFileName,
+  isSupportedAudioMime,
   isSupportedImageMime,
+  MAX_UPLOAD_AUDIO_BYTES,
   MAX_UPLOAD_IMAGE_BYTES,
   MAX_WHATSAPP_IMAGE_BYTES,
 } from "@/types/media";
@@ -11,6 +15,20 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+function resolveMimeType(file: File): string {
+  let mimeType = file.type?.trim() || "";
+  if (!mimeType || mimeType === "application/octet-stream") {
+    const lower = (file.name || "").toLowerCase();
+    if (lower.endsWith(".png")) mimeType = "image/png";
+    else if (lower.endsWith(".webp")) mimeType = "image/webp";
+    else if (lower.endsWith(".gif")) mimeType = "image/gif";
+    else if (lower.endsWith(".mp3")) mimeType = "audio/mpeg";
+    else if (lower.endsWith(".ogg") || lower.endsWith(".opus")) mimeType = "audio/ogg; codecs=opus";
+    else mimeType = "image/jpeg";
+  }
+  return mimeType;
+}
 
 export async function POST(request: NextRequest) {
   const scope = await getTenantScope();
@@ -32,17 +50,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "conversationId y to son obligatorios." }, { status: 422 });
     }
 
-    let mimeType = file.type?.trim() || "";
-    if (!mimeType || mimeType === "application/octet-stream") {
-      const lower = (file.name || "").toLowerCase();
-      if (lower.endsWith(".png")) mimeType = "image/png";
-      else if (lower.endsWith(".webp")) mimeType = "image/webp";
-      else if (lower.endsWith(".gif")) mimeType = "image/gif";
-      else mimeType = "image/jpeg";
+    let mimeType = resolveMimeType(file);
+    if (!isSupportedImageMime(mimeType) && !isSupportedAudioMime(mimeType)) {
+      const inferred = inferAudioMimeFromFileName(file.name || "");
+      if (inferred) mimeType = inferred;
     }
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    if (isSupportedAudioMime(mimeType)) {
+      if (file.size > MAX_UPLOAD_AUDIO_BYTES) {
+        return NextResponse.json(
+          { error: "El audio supera el límite de 16 MB." },
+          { status: 422 },
+        );
+      }
+      assertSupportedAudioMime(mimeType);
+      const result = await leadsService.sendAudioFromUpload({
+        conversationId,
+        to,
+        fileName: file.name || "audio.ogg",
+        mimeType,
+        data: buffer,
+        companyId: scope.companyId,
+        createdBy: scope.userId,
+      });
+      return NextResponse.json({ ok: true, ...result });
+    }
+
     if (!isSupportedImageMime(mimeType)) {
       return NextResponse.json(
-        { error: "Solo se permiten imágenes (JPG, PNG, WEBP, HEIC, etc.)." },
+        { error: "Solo se permiten imágenes (JPG, PNG, WEBP…) o audios (OGG/Opus, MP3)." },
         { status: 422 },
       );
     }
@@ -63,7 +101,6 @@ export async function POST(request: NextRequest) {
     }
 
     assertSupportedImageMime(mimeType);
-    const buffer = Buffer.from(await file.arrayBuffer());
     const result = await leadsService.sendImageFromUpload({
       conversationId,
       to,
@@ -78,7 +115,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
     console.error("[POST /api/whatsapp/send-media]", error);
-    const message = error instanceof Error ? error.message : "No se pudo enviar la imagen.";
+    const message = error instanceof Error ? error.message : "No se pudo enviar el archivo.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

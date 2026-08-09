@@ -18,7 +18,8 @@ type MessageNewEvent = {
   assignedAdvisorId?: string | null;
   text?: string;
   time?: string;
-  messageType?: "text" | "image";
+  messageType?: "text" | "image" | "audio";
+  mediaUrl?: string;
 };
 
 type ConversationUpdatedEvent = {
@@ -45,6 +46,7 @@ function appendMessageToCache(
       direction: payload.direction ?? "in",
       read: false,
       messageType: payload.messageType ?? "text",
+      mediaUrl: payload.mediaUrl,
     };
     return [...prev, row];
   };

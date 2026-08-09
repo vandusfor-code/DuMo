@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 import { isMessengerConversation } from "@/lib/messenger/conversation-id";
 
 /**
- * Composer del chat. Envía texto e imágenes por la Cloud API; el mensaje
+ * Composer del chat. Envía texto, imágenes y audios; el mensaje
  * se persiste como saliente y la bandeja se refresca sola.
  */
 export function ChatInput({
@@ -70,12 +70,8 @@ export function ChatInput({
   const hasText = value.trim().length > 0;
   const hasAttachment = Boolean(media.attachment);
 
-  const handleImageFile = (file: File) => {
-    const type = file.type || "";
-    const looksLikeImage =
-      type.startsWith("image/") || /\.(jpe?g|png|webp|gif)$/i.test(file.name || "");
-    if (!looksLikeImage) return;
-    media.setImageFile(file);
+  const handleMediaFile = (file: File) => {
+    media.setMediaFile(file);
   };
 
   const submit = () => {
@@ -86,7 +82,10 @@ export function ChatInput({
         {
           to,
           file: media.attachment.file,
-          caption: media.attachment.caption.trim() || undefined,
+          caption:
+            media.attachment.kind === "image"
+              ? media.attachment.caption.trim() || undefined
+              : undefined,
         },
         {
           onSuccess: () => {
@@ -161,17 +160,17 @@ export function ChatInput({
         onAttach={media.openFilePicker}
         onSubmit={submit}
         fileInputRef={media.fileInputRef}
-        onFileSelected={handleImageFile}
+        onFileSelected={handleMediaFile}
         dragActive={dragActive}
         uiTheme={uiTheme}
         onPaste={(e) => {
           const items = e.clipboardData?.items;
           if (!items) return;
           for (const item of items) {
-            if (item.type.startsWith("image/")) {
+            if (item.type.startsWith("image/") || item.type.startsWith("audio/")) {
               e.preventDefault();
               const file = item.getAsFile();
-              if (file) handleImageFile(file);
+              if (file) handleMediaFile(file);
               break;
             }
           }
@@ -180,7 +179,7 @@ export function ChatInput({
           e.preventDefault();
           setDragActive(false);
           const file = e.dataTransfer.files?.[0];
-          if (file) handleImageFile(file);
+          if (file) handleMediaFile(file);
         }}
       >
         <input

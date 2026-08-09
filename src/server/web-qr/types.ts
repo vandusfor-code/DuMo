@@ -33,6 +33,8 @@ export type BridgeInboundPayload = {
   type: "text" | "image" | "audio" | "document" | "video" | "unknown";
   text?: string;
   mediaUrl?: string;
+  mimeType?: string;
+  audioPtt?: boolean;
   caption?: string;
   customerName?: string;
 };

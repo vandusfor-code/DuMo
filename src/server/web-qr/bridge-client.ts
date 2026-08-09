@@ -102,6 +102,20 @@ export async function bridgeSendMedia(input: {
   });
 }
 
+export async function bridgeSendAudio(input: {
+  channelId: string;
+  to?: string;
+  jid?: string;
+  mediaUrl: string;
+  mimeType?: string;
+  ptt?: boolean;
+}): Promise<{ id: string; jid?: string }> {
+  return bridgeFetch("/send-audio", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 /** Prueba el webhook Railway → Vercel con el secreto de la sesión activa. */
 export async function bridgeTestWebhook(channelId: string): Promise<{
   ok: boolean;

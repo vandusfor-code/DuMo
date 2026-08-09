@@ -118,4 +118,36 @@ export const mediaService = {
   findById(companyId: string, id: string) {
     return getMediaRepository().findById(companyId, id);
   },
+
+  /** Registra un archivo ya subido (p. ej. bridge QR → Supabase) sin volver a subirlo. */
+  async registerExistingChatMedia(input: {
+    companyId: string;
+    publicUrl: string;
+    fileName: string;
+    mimeType: string;
+    sizeBytes?: number;
+    source?: MediaSource;
+    waMediaId?: string | null;
+    createdBy?: string | null;
+  }) {
+    const { parseSupabasePublicUrl } = await import("@/lib/media/supabase-public-url");
+    const { bucket, storagePath } = parseSupabasePublicUrl(input.publicUrl);
+    const id = newAssetId();
+    const mediaKind = inferMediaKindFromMime(input.mimeType) as MediaKind;
+
+    return getMediaRepository().create({
+      id,
+      companyId: input.companyId,
+      bucket,
+      storagePath,
+      publicUrl: input.publicUrl,
+      fileName: input.fileName,
+      mimeType: input.mimeType,
+      sizeBytes: input.sizeBytes ?? 0,
+      mediaKind,
+      source: input.source ?? "whatsapp_inbound",
+      waMediaId: input.waMediaId ?? null,
+      createdBy: input.createdBy ?? null,
+    });
+  },
 };

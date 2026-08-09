@@ -5,13 +5,34 @@ import { Loader2, Mic, Paperclip, Send, Smile, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type PendingImageAttachment = {
+  kind: "image";
   file: File;
   previewUrl: string;
   caption: string;
 };
 
+export type PendingAudioAttachment = {
+  kind: "audio";
+  file: File;
+  previewUrl: string;
+};
+
+export type PendingMediaAttachment = PendingImageAttachment | PendingAudioAttachment;
+
+function isAudioFile(file: File): boolean {
+  const type = file.type || "";
+  if (type.startsWith("audio/")) return true;
+  return /\.(ogg|opus|mp3|mpeg)$/i.test(file.name || "");
+}
+
+function isImageFile(file: File): boolean {
+  const type = file.type || "";
+  if (type.startsWith("image/")) return true;
+  return /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(file.name || "");
+}
+
 export function useMediaAttachment() {
-  const [attachment, setAttachment] = useState<PendingImageAttachment | null>(null);
+  const [attachment, setAttachment] = useState<PendingMediaAttachment | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const clearAttachment = useCallback(() => {
@@ -21,14 +42,23 @@ export function useMediaAttachment() {
     });
   }, []);
 
-  const setImageFile = useCallback((file: File) => {
-    const type = file.type || "";
-    const looksLikeImage =
-      type.startsWith("image/") || /\.(jpe?g|png|webp|gif)$/i.test(file.name || "");
-    if (!looksLikeImage) return;
+  const setMediaFile = useCallback((file: File) => {
+    if (isAudioFile(file)) {
+      setAttachment((prev) => {
+        if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
+        return {
+          kind: "audio",
+          file,
+          previewUrl: URL.createObjectURL(file),
+        };
+      });
+      return;
+    }
+    if (!isImageFile(file)) return;
     setAttachment((prev) => {
       if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
       return {
+        kind: "image",
         file,
         previewUrl: URL.createObjectURL(file),
         caption: "",
@@ -37,7 +67,9 @@ export function useMediaAttachment() {
   }, []);
 
   const setCaption = useCallback((caption: string) => {
-    setAttachment((prev) => (prev ? { ...prev, caption } : prev));
+    setAttachment((prev) =>
+      prev?.kind === "image" ? { ...prev, caption } : prev,
+    );
   }, []);
 
   const openFilePicker = useCallback(() => {
@@ -53,7 +85,8 @@ export function useMediaAttachment() {
   return {
     attachment,
     fileInputRef,
-    setImageFile,
+    setMediaFile,
+    setImageFile: setMediaFile,
     setCaption,
     clearAttachment,
     openFilePicker,
@@ -66,11 +99,37 @@ export function MediaAttachmentPreview({
   onRemove,
   disabled,
 }: {
-  attachment: PendingImageAttachment;
+  attachment: PendingMediaAttachment;
   onCaptionChange: (caption: string) => void;
   onRemove: () => void;
   disabled?: boolean;
 }) {
+  if (attachment.kind === "audio") {
+    return (
+      <div className="mb-3 rounded-2xl border border-line bg-canvas p-3">
+        <div className="relative">
+          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+          <audio
+            controls
+            preload="metadata"
+            src={attachment.previewUrl}
+            className="h-10 w-full max-w-full pr-8"
+          />
+          <button
+            type="button"
+            aria-label="Quitar audio"
+            disabled={disabled}
+            onClick={onRemove}
+            className="absolute -right-2 -top-2 grid size-7 place-items-center rounded-full bg-ink text-white shadow-md disabled:opacity-60"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+        <p className="mt-2 truncate text-[12px] text-muted">{attachment.file.name || "Audio"}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="mb-3 rounded-2xl border border-line bg-canvas p-3">
       <div className="relative inline-block">
@@ -147,7 +206,7 @@ export function ChatComposerControls({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,audio/ogg,audio/mpeg,audio/mp3,.ogg,.opus,.mp3"
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
@@ -167,7 +226,7 @@ export function ChatComposerControls({
       </button>
       <button
         type="button"
-        aria-label="Adjuntar imagen"
+        aria-label="Adjuntar imagen o audio"
         onClick={onAttach}
         disabled={isSending}
         className={cn(

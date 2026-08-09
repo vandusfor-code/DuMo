@@ -11,7 +11,8 @@ export type LeadsMessageNewPayload = {
   text?: string;
   time?: string;
   createdAt?: string;
-  messageType?: "text" | "image";
+  messageType?: "text" | "image" | "audio";
+  mediaUrl?: string;
 };
 
 export function messageNewPayloadFromIncoming(
@@ -27,6 +28,7 @@ export function messageNewPayloadFromIncoming(
     time: formatChatTime(msg.createdAt),
     createdAt: msg.createdAt,
     messageType: msg.messageType ?? "text",
+    mediaUrl: msg.mediaUrl,
   };
 }
 

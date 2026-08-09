@@ -967,6 +967,70 @@ app.post("/send-media", auth, async (req, res) => {
   }
 });
 
+app.post("/send-audio", auth, async (req, res) => {
+  const { channelId, to, jid, mediaUrl, mimeType, ptt } = req.body ?? {};
+  if (!channelId) return res.status(400).json({ error: "channelId requerido" });
+
+  let validatedUrl;
+  try {
+    validatedUrl = validateMediaUrl(mediaUrl);
+  } catch (err) {
+    return res.status(400).json({
+      error: err instanceof Error ? err.message : "mediaUrl inválida",
+    });
+  }
+
+  let session;
+  try {
+    session = await getConnectedSession(channelId);
+  } catch (err) {
+    const mapped = mapOutboundSessionError(err, res);
+    if (mapped) return mapped;
+    throw err;
+  }
+
+  try {
+    const targetJid = await resolveSendJid(session, { to, jid });
+    const { buffer, mimeType: fetchedMime } = await fetchAudioFromUrl(validatedUrl);
+    const asPtt = ptt !== false;
+    let resolvedMime;
+    try {
+      resolvedMime =
+        typeof mimeType === "string" && mimeType.trim()
+          ? assertAllowedInboundAudioMime(mimeType, asPtt)
+          : fetchedMime;
+    } catch {
+      resolvedMime = fetchedMime;
+    }
+
+    log.info(
+      {
+        channelId,
+        targetJid,
+        inputJid: jid,
+        to,
+        bytes: buffer.length,
+        mimeType: resolvedMime,
+        ptt: asPtt,
+      },
+      "enviando audio QR",
+    );
+
+    const sent = await session.sock.sendMessage(targetJid, {
+      audio: buffer,
+      mimetype: resolvedMime,
+      ptt: asPtt,
+    });
+    if (sent?.message) rememberMessage(sent);
+    res.json({ id: sent?.key?.id ?? `out-${Date.now()}`, jid: targetJid });
+  } catch (err) {
+    log.error({ err, channelId, to, jid, mediaUrl: validatedUrl }, "send-audio falló");
+    res.status(502).json({
+      error: err instanceof Error ? err.message : "No se pudo enviar audio por WhatsApp Web",
+    });
+  }
+});
+
 app.post("/test-webhook", auth, async (req, res) => {
   const { channelId } = req.body ?? {};
   if (!channelId) return res.status(400).json({ error: "channelId requerido" });

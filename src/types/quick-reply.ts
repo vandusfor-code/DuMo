@@ -125,8 +125,7 @@ export interface UpdateQuickReplyTemplateInput extends CreateQuickReplyTemplateI
 }
 
 export function inferMediaKindFromMime(mimeType: string): MediaKind {
-  if (!mimeType.startsWith("image/")) {
-    throw new Error("Solo se permiten imágenes en plantillas y chat.");
-  }
-  return "image";
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType.startsWith("audio/")) return "audio";
+  throw new Error("Tipo de archivo no soportado en chat.");
 }
