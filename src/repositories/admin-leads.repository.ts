@@ -18,6 +18,12 @@ import { formatChatTime } from "@/lib/format";
 import { resolveConversationChannel } from "@/lib/conversation-channel";
 import { isWebQrConversation } from "@/lib/web-qr/conversation-id";
 import { formatWhatsAppDisplayPhone, isLikelyWhatsAppLid } from "@/lib/whatsapp/phone";
+import {
+  ADVISOR_ONLINE_WINDOW_MINUTES,
+  ADVISOR_PRESENCE_LABELS,
+  advisorReceivesLeads,
+  type AdvisorPresenceStatus,
+} from "@/lib/advisor-presence";
 import { withLatency } from "@/lib/mock";
 import { getConfig, setConfig } from "@/server/db/app-config";
 import { ensureSchema, ensureSchemaForRead, getSql, hasDatabase, withDbRetry, withQueryTimeout } from "@/server/db/client";
@@ -167,6 +173,17 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
     const sql = requireSql();
     const advisor = await getAuthRepository().findById(input.advisorId);
     if (!advisor) throw new Error("Asesora no encontrada");
+
+    const presenceRows = await sql<{ presence_status: string }[]>`
+      SELECT presence_status FROM users WHERE id = ${advisor.id} LIMIT 1
+    `;
+    const presence = (presenceRows[0]?.presence_status ?? "disponible") as AdvisorPresenceStatus;
+    if (!advisorReceivesLeads(presence)) {
+      const label = ADVISOR_PRESENCE_LABELS[presence] ?? presence;
+      throw new Error(
+        `No se puede asignar manualmente: la asesora está en estado "${label}".`,
+      );
+    }
 
     await sql`
       UPDATE lead_conversations SET
@@ -333,12 +350,8 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
   /**
    * Asigna conversaciones sin asesora repartiéndolas en round-robin.
    *
-   * Una SOLA sentencia atómica: evita las condiciones de carrera entre
-   * instancias serverless (dos no pueden asignar el mismo lead) y elimina las
-   * ~5 consultas por conversación del enfoque anterior, que saturaban el pool.
-   *
-   * `onlyOnline=true` reparte entre las asesoras conectadas al CRM en los
-   * últimos 10 min; si no hay ninguna, se reintenta con todas las activas.
+   * Solo entra en el pool quien tenga `presence_status = 'disponible'`.
+   * `onlyOnline=true` limita además a last_seen en los últimos 10 min.
    */
   private async assignPendingRoundRobin(
     conversationId: string | null,
@@ -353,9 +366,13 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
                  (count(*) OVER ()) AS total
           FROM users
           WHERE role = 'asesora' AND active = true
+            AND presence_status = 'disponible'
             AND (
               ${onlyOnline}::boolean IS FALSE
-              OR (last_seen_at IS NOT NULL AND last_seen_at > now() - interval '10 minutes')
+              OR (
+                last_seen_at IS NOT NULL
+                AND last_seen_at > now() - make_interval(mins => ${ADVISOR_ONLINE_WINDOW_MINUTES})
+              )
             )
         ),
         pending AS (
@@ -372,6 +389,7 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
         FROM pending p, advisors a
         WHERE c.id = p.id
           AND c.assigned_advisor_id IS NULL
+          AND a.total > 0
           AND a.rn = (p.rn % a.total)
         RETURNING c.id, c.assigned_advisor_id
       `,
@@ -391,16 +409,50 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
     return rows.length;
   }
 
+  /**
+   * Auto-asignación con fallback inteligente:
+   * - Primero: conectadas y disponibles.
+   * - Si hay conectadas pero ninguna disponible (baño/almuerzo/desconectado): pendiente.
+   * - Si nadie conectado: reparte entre todas las activas disponibles (offline).
+   */
+  private async autoAssignWithFallback(conversationId: string | null): Promise<number> {
+    const assignedOnline = await this.assignPendingRoundRobin(conversationId, true);
+    if (assignedOnline > 0) return assignedOnline;
+
+    const sql = requireSql();
+    const counts = await withQueryTimeout(
+      sql<{ online_any: number; online_disponible: number }[]>`
+        SELECT
+          count(*) FILTER (
+            WHERE last_seen_at IS NOT NULL
+              AND last_seen_at > now() - make_interval(mins => ${ADVISOR_ONLINE_WINDOW_MINUTES})
+          )::int AS online_any,
+          count(*) FILTER (
+            WHERE presence_status = 'disponible'
+              AND last_seen_at IS NOT NULL
+              AND last_seen_at > now() - make_interval(mins => ${ADVISOR_ONLINE_WINDOW_MINUTES})
+          )::int AS online_disponible
+        FROM users
+        WHERE role = 'asesora' AND active = true
+      `,
+      3000,
+    );
+    const onlineAny = counts[0]?.online_any ?? 0;
+    const onlineDisponible = counts[0]?.online_disponible ?? 0;
+
+    if (onlineAny > 0 && onlineDisponible === 0) {
+      return 0;
+    }
+
+    return this.assignPendingRoundRobin(conversationId, false);
+  }
+
   /** Asigna una conversación concreta (la llama el webhook al entrar un mensaje). */
   async autoAssignIfNeeded(conversationId: string) {
     const settings = await this.getAutoAssignSettings();
     if (!settings.enabled) return;
     await ensureSchema();
-    const assigned = await this.assignPendingRoundRobin(conversationId, true);
-    if (assigned === 0) {
-      // Nadie conectado: reparte entre todas las asesoras activas.
-      await this.assignPendingRoundRobin(conversationId, false);
-    }
+    await this.autoAssignWithFallback(conversationId);
   }
 
   /**
@@ -414,10 +466,7 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
     const settings = await this.getAutoAssignSettings();
     if (!settings.enabled) return;
     await ensureSchema();
-    const assigned = await this.assignPendingRoundRobin(null, true);
-    if (assigned === 0) {
-      await this.assignPendingRoundRobin(null, false);
-    }
+    await this.autoAssignWithFallback(null);
   }
 
   async ensurePendingAssigned() {
