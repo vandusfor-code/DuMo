@@ -33,7 +33,7 @@ export function ChatHeader({ conversation }: { conversation: Conversation }) {
           </p>
           <p className="flex items-center gap-1.5 text-[13px] text-muted">
             {conversation.online && (
-              <span className="size-2 rounded-full bg-success" aria-hidden />
+              <span className="size-2 rounded-full border-2 border-white bg-online" aria-hidden />
             )}
             {conversation.channel === "messenger"
               ? conversation.online

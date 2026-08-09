@@ -65,8 +65,8 @@ function LeadsPageContent() {
         className={cn(
           "grid min-h-0 flex-1 gap-4 overflow-hidden transition-[grid-template-columns] duration-200 ease-out",
           listCollapsed
-            ? "lg:grid-cols-[72px_minmax(300px,540px)_minmax(440px,1fr)] xl:grid-cols-[72px_minmax(320px,560px)_minmax(480px,1fr)]"
-            : "lg:grid-cols-[minmax(280px,340px)_minmax(300px,540px)_minmax(440px,1fr)] xl:grid-cols-[360px_minmax(320px,560px)_minmax(480px,1fr)]",
+            ? "lg:grid-cols-[72px_minmax(0,1.75fr)_minmax(260px,0.95fr)] xl:grid-cols-[72px_minmax(0,1.85fr)_minmax(280px,0.9fr)]"
+            : "lg:grid-cols-[minmax(280px,340px)_minmax(0,1.75fr)_minmax(260px,0.95fr)] xl:grid-cols-[360px_minmax(0,1.85fr)_minmax(280px,0.9fr)]",
         )}
       >
         <SectionCard className="flex min-h-0 flex-col overflow-hidden">

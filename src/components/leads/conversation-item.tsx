@@ -39,7 +39,7 @@ export function ConversationItem({
           className="size-10 text-[13px]"
         />
         {conversation.online && (
-          <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-white bg-success" />
+          <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-white bg-online" />
         )}
       </div>
 

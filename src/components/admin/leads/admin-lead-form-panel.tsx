@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import {
   AlertCircle,
@@ -59,20 +59,41 @@ export function AdminLeadFormPanel({
   conversation,
   client,
   notes,
-  timeline,
+  timeline: _timeline,
 }: {
   conversation: AdminConversation;
   client: ClientProfile;
   notes: LeadNote[];
   timeline: LeadTimelineEvent[];
 }) {
+  void _timeline;
   const saveLead = useSaveAdminLead(conversation.id);
   const saveModeRef = useRef<SaveLeadAction>("script");
   const [activeTab, setActiveTab] = useState("gestion");
+  const [scriptTabUnlocked, setScriptTabUnlocked] = useState(false);
   const { data: fetchedScript } = useSalesScript(conversation.id);
   const script = saveLead.data?.script ?? fetchedScript ?? null;
   const methods = useForm<LeadFormValues>({ defaultValues: defaultsFor(conversation) });
   const type = useWatch({ control: methods.control, name: "type" });
+  const isVenta = type === "venta";
+  const showScriptTab = isVenta && (scriptTabUnlocked || Boolean(script));
+
+  useEffect(() => {
+    setScriptTabUnlocked(false);
+    setActiveTab("gestion");
+  }, [conversation.id]);
+
+  useEffect(() => {
+    if (!showScriptTab && activeTab === "script") {
+      setActiveTab("gestion");
+    }
+  }, [showScriptTab, activeTab]);
+
+  useEffect(() => {
+    if (!isVenta && activeTab === "script") {
+      setActiveTab("gestion");
+    }
+  }, [isVenta, activeTab]);
 
   const onSubmit = methods.handleSubmit(async (values) => {
     if (values.type === "venta") {
@@ -108,7 +129,11 @@ export function AdminLeadFormPanel({
     try {
       await saveLead.mutateAsync(input);
       methods.clearErrors("root");
-      setActiveTab("script");
+      const action = saveModeRef.current;
+      if (action === "script") {
+        setScriptTabUnlocked(true);
+        setActiveTab("script");
+      }
     } catch (error) {
       methods.setError("root", { message: formatSaveLeadApiError(error) });
     }
@@ -118,8 +143,8 @@ export function AdminLeadFormPanel({
     <FormProvider {...methods}>
       <form onSubmit={onSubmit} className="flex h-full flex-col">
         <div className="flex h-full flex-col">
-          <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
-            <p className="text-[15px] font-semibold text-ink">Gestión del cliente</p>
+          <div className="flex items-center justify-between border-b border-line px-4 py-3">
+            <p className="text-[14px] font-semibold text-ink">Gestión del cliente</p>
             {type === "venta" ? (
               <button
                 type="submit"
@@ -140,19 +165,20 @@ export function AdminLeadFormPanel({
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-h-0 flex-1 flex-col">
-            <div className="border-b border-line px-4 pt-3">
-              <TabsList className="w-full justify-start bg-transparent p-0">
+            <div className="border-b border-line px-3 pt-2.5">
+              <TabsList className="w-full justify-start gap-0.5 bg-transparent p-0">
                 <PanelTab value="gestion" icon={<ClipboardList className="size-4" />} label="Gestión" />
                 <PanelTab value="cliente" icon={<User className="size-4" />} label="Cliente" />
-                <PanelTab value="script" icon={<ScrollText className="size-4" />} label="Script" />
+                {showScriptTab ? (
+                  <PanelTab value="script" icon={<ScrollText className="size-4" />} label="Script" />
+                ) : null}
                 <PanelTab value="oferta" icon={<Sparkles className="size-4" />} label="Motor de Oferta" />
                 <PanelTab value="notas" icon={<MessageSquare className="size-4" />} label="Notas" />
-                <PanelTab value="historial" icon={<Clock className="size-4" />} label="Historial" />
               </TabsList>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto p-5">
-              <TabsContent value="gestion" className="space-y-5 outline-none">
+            <div className="min-h-0 flex-1 overflow-y-auto p-3 lg:p-4">
+              <TabsContent value="gestion" className="space-y-4 outline-none">
                 <ClientCard />
                 <LeadTypeSelect />
                 {type === "venta" && <SaleDetails />}
@@ -203,13 +229,15 @@ export function AdminLeadFormPanel({
                 <ClientHistoryCard client={client} />
               </TabsContent>
 
-              <TabsContent value="script" className="outline-none">
-                <SalesScriptTab
-                  script={script}
-                  gestionSaved={saveLead.isSuccess}
-                  unavailableReason={script ? null : saveLead.data?.scriptUnavailableReason}
-                />
-              </TabsContent>
+              {showScriptTab ? (
+                <TabsContent value="script" className="outline-none">
+                  <SalesScriptTab
+                    script={script}
+                    gestionSaved={saveLead.isSuccess}
+                    unavailableReason={script ? null : saveLead.data?.scriptUnavailableReason}
+                  />
+                </TabsContent>
+              ) : null}
 
               <TabsContent value="oferta" className="outline-none">
                 <OfferEngineTab conversationId={conversation.id} />
@@ -217,10 +245,6 @@ export function AdminLeadFormPanel({
 
               <TabsContent value="notas" className="outline-none">
                 <NotesTab conversationId={conversation.id} notes={notes} />
-              </TabsContent>
-
-              <TabsContent value="historial" className="outline-none">
-                <TimelineTab events={timeline} />
               </TabsContent>
             </div>
           </Tabs>
@@ -234,7 +258,7 @@ function PanelTab({ value, icon, label }: { value: string; icon: React.ReactNode
   return (
     <TabsTrigger
       value={value}
-      className="flex-1 gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2 pb-2.5 text-[13px] data-[state=active]:border-brand data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+      className="flex-1 gap-1 rounded-none border-b-2 border-transparent bg-transparent px-1.5 pb-2 text-[12px] data-[state=active]:border-brand data-[state=active]:bg-transparent data-[state=active]:shadow-none"
     >
       {icon}
       <span className="hidden sm:inline">{label}</span>
@@ -353,6 +377,7 @@ function NotesTab({ conversationId, notes }: { conversationId: string; notes: Le
   );
 }
 
+/** Reservado para reubicación futura (tab Historial removido del panel). */
 function TimelineTab({ events }: { events: LeadTimelineEvent[] }) {
   return (
     <ol className="space-y-5">

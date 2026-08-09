@@ -46,7 +46,7 @@ export function ConversationAvatarItem({
             </span>
           ) : null}
           {conversation.online ? (
-            <span className="absolute -bottom-0.5 -right-0.5 z-10 size-2.5 rounded-full border-2 border-white bg-success" />
+            <span className="absolute -bottom-0.5 -right-0.5 z-10 size-2.5 rounded-full border-2 border-white bg-online" />
           ) : null}
         </div>
       </div>

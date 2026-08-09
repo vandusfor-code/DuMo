@@ -37,7 +37,7 @@ export function AdminConversationItem({
         <div className="relative shrink-0">
           <InitialsAvatar initials={getInitials(conversation.customerName)} />
           {conversation.online && (
-            <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-white bg-success" />
+            <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-white bg-online" />
           )}
         </div>
         <div className="min-w-0 flex-1">

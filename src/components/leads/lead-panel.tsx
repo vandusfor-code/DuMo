@@ -75,6 +75,7 @@ export function LeadPanel({
   const type = useWatch({ control, name: "type" });
   const isVenta = type === "venta";
   const [activeTab, setActiveTab] = useState("gestion");
+  const [scriptTabUnlocked, setScriptTabUnlocked] = useState(false);
   const {
     data: fetchedScript,
     isLoading: isScriptLoading,
@@ -83,12 +84,25 @@ export function LeadPanel({
   } = useSalesScript(conversation.id);
   const script = savedScript ?? fetchedScript ?? null;
   const gestionSaved = hasSavedGestion || isSuccess;
+  const showScriptTab = isVenta && (scriptTabUnlocked || Boolean(script));
 
   useEffect(() => {
-    if (isSuccess && isVenta && lastSaveAction !== "tipify") {
+    setScriptTabUnlocked(false);
+    setActiveTab("gestion");
+  }, [conversation.id]);
+
+  useEffect(() => {
+    if (isSuccess && lastSaveAction === "script") {
+      setScriptTabUnlocked(true);
       setActiveTab("script");
     }
-  }, [isSuccess, isVenta, lastSaveAction]);
+  }, [isSuccess, lastSaveAction]);
+
+  useEffect(() => {
+    if (!showScriptTab && activeTab === "script") {
+      setActiveTab("gestion");
+    }
+  }, [showScriptTab, activeTab]);
 
   useEffect(() => {
     if (!isVenta && activeTab === "script") {
@@ -98,8 +112,8 @@ export function LeadPanel({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 items-center justify-between border-b border-line px-5 py-4">
-        <h2 className="text-[18px] font-semibold leading-[1.45] text-ink">Gestión del cliente</h2>
+      <div className="flex shrink-0 items-center justify-between border-b border-line px-4 py-3">
+        <h2 className="text-[16px] font-semibold leading-[1.45] text-ink">Gestión del cliente</h2>
         {isVenta ? (
           <button
             type="submit"
@@ -118,20 +132,19 @@ export function LeadPanel({
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="shrink-0 border-b border-line px-6 pt-4">
-          <TabsList className="h-auto w-full justify-start gap-1 bg-transparent p-0">
-            <PanelTab value="gestion" icon={<ClipboardList className="size-[18px]" />} label="Gestión" />
-            {isVenta ? (
-              <PanelTab value="script" icon={<ScrollText className="size-[18px]" />} label="Script" />
+        <div className="shrink-0 border-b border-line px-4 pt-3">
+          <TabsList className="h-auto w-full justify-start gap-0.5 bg-transparent p-0">
+            <PanelTab value="gestion" icon={<ClipboardList className="size-4" />} label="Gestión" />
+            {showScriptTab ? (
+              <PanelTab value="script" icon={<ScrollText className="size-4" />} label="Script" />
             ) : null}
-            <PanelTab value="oferta" icon={<Sparkles className="size-[18px]" />} label="Motor de Oferta" />
-            <PanelTab value="notas" icon={<MessageSquare className="size-[18px]" />} label="Notas" />
-            <PanelTab value="historial" icon={<Clock className="size-[18px]" />} label="Historial" />
+            <PanelTab value="oferta" icon={<Sparkles className="size-4" />} label="Motor de Oferta" />
+            <PanelTab value="notas" icon={<MessageSquare className="size-4" />} label="Notas" />
           </TabsList>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-4 lg:p-5 [&_input]:h-11 [&_input]:text-[14px] [&_textarea]:text-[14px]">
-          <TabsContent value="gestion" className="space-y-6 outline-none">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-3 lg:p-4 [&_input]:h-11 [&_input]:text-[14px] [&_textarea]:text-[14px]">
+          <TabsContent value="gestion" className="space-y-5 outline-none">
             <SectionCard>
               <SectionCardHeader title="Información general" />
               <SectionCardBody className="space-y-4 pt-0">
@@ -206,7 +219,7 @@ export function LeadPanel({
             />
           </TabsContent>
 
-          {isVenta ? (
+          {showScriptTab ? (
             <TabsContent value="script" className="outline-none">
               <SectionCard>
                 <SectionCardBody>
@@ -241,14 +254,6 @@ export function LeadPanel({
             </SectionCard>
           </TabsContent>
 
-          <TabsContent value="historial" className="outline-none">
-            <SectionCard>
-              <SectionCardHeader title="Historial" />
-              <SectionCardBody className="pt-0">
-                <HistoryTab conversation={conversation} />
-              </SectionCardBody>
-            </SectionCard>
-          </TabsContent>
         </div>
       </Tabs>
     </div>
@@ -268,7 +273,7 @@ function PanelTab({
     <TabsTrigger
       value={value}
       className={cn(
-        "gap-2 rounded-none border-b-2 border-transparent bg-transparent px-3 pb-3 text-[13px] font-medium text-muted",
+        "gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2 pb-2.5 text-[12px] font-medium text-muted",
         "transition-colors duration-200 data-[state=active]:border-brand data-[state=active]:text-ink",
         "data-[state=active]:bg-transparent data-[state=active]:shadow-none",
       )}
@@ -279,6 +284,7 @@ function PanelTab({
   );
 }
 
+/** Reservado para reubicación futura (tab Historial removido del panel). */
 function HistoryTab({ conversation }: { conversation: Conversation }) {
   const events = [
     {
