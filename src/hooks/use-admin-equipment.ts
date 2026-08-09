@@ -45,6 +45,14 @@ export function useDeleteEquipment() {
   });
 }
 
+export function useDeleteAllEquipment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiDelete<{ ok: boolean }>("/api/admin/equipment?all=1"),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "equipment"] }),
+  });
+}
+
 export function useBulkImportEquipment() {
   const qc = useQueryClient();
   return useMutation({

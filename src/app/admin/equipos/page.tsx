@@ -6,11 +6,13 @@ import {
   EquipmentCatalogTable,
   EquipmentDialog,
 } from "@/components/admin/equipment/equipment-panels";
+import { EquipmentMetrics } from "@/components/admin/equipment/equipment-metrics";
 import { EquipmentImportDialog } from "@/components/admin/equipment/equipment-import-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/shared/error-state";
 import {
   useCreateEquipment,
+  useDeleteAllEquipment,
   useDeleteEquipment,
   useEquipmentCatalog,
   useSetEquipmentStatus,
@@ -24,10 +26,13 @@ export default function AdminEquiposPage() {
   const update = useUpdateEquipment();
   const setStatus = useSetEquipmentStatus();
   const remove = useDeleteEquipment();
+  const removeAll = useDeleteAllEquipment();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<EquipmentCatalogItem | null>(null);
+
+  const items = data ?? [];
 
   return (
     <div>
@@ -42,23 +47,28 @@ export default function AdminEquiposPage() {
           message="Ocurrió un problema al consultar los equipos. Verifica tu conexión e intenta nuevamente."
           onRetry={() => refetch()}
         />
-      ) : isLoading || !data ? (
+      ) : isLoading && !data ? (
         <Skeleton className="h-64 rounded-card" />
       ) : (
-        <EquipmentCatalogTable
-          items={data}
-          onCreate={() => {
-            setEditing(null);
-            setDialogOpen(true);
-          }}
-          onImport={() => setImportOpen(true)}
-          onEdit={(item) => {
-            setEditing(item);
-            setDialogOpen(true);
-          }}
-          onToggleStatus={(id, status) => setStatus.mutate({ id, status })}
-          onDelete={(id) => remove.mutate(id)}
-        />
+        <>
+          <EquipmentMetrics items={items} />
+          <EquipmentCatalogTable
+            items={items}
+            onCreate={() => {
+              setEditing(null);
+              setDialogOpen(true);
+            }}
+            onImport={() => setImportOpen(true)}
+            onEdit={(item) => {
+              setEditing(item);
+              setDialogOpen(true);
+            }}
+            onToggleStatus={(id, status) => setStatus.mutate({ id, status })}
+            onDelete={(id) => remove.mutate(id)}
+            onDeleteAll={() => removeAll.mutateAsync()}
+            deletingAll={removeAll.isPending}
+          />
+        </>
       )}
 
       <EquipmentImportDialog open={importOpen} onClose={() => setImportOpen(false)} />

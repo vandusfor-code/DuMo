@@ -78,6 +78,11 @@ export async function DELETE(request: NextRequest) {
     if (!(await requireAdminSession())) {
       return NextResponse.json({ error: "No autorizado." }, { status: 403 });
     }
+    const deleteAll = request.nextUrl.searchParams.get("all") === "1";
+    if (deleteAll) {
+      await equipmentService.deleteAll();
+      return NextResponse.json({ ok: true });
+    }
     const id = request.nextUrl.searchParams.get("id");
     if (!id) return NextResponse.json({ error: "ID requerido." }, { status: 400 });
     await equipmentService.delete(id);

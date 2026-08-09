@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import { validateEquipmentCatalogInput } from "@/lib/equipment-catalog";
-import type { EquipmentBulkImportResult, EquipmentStatus, UpsertEquipmentInput } from "@/types/equipment";
+import type { EquipmentBulkImportResult, EquipmentCatalogItem, EquipmentStatus, UpsertEquipmentInput } from "@/types/equipment";
 
 export const EQUIPMENT_TEMPLATE_PATH = "/templates/plantilla-equipos-crm.xlsx";
 
@@ -137,4 +137,48 @@ export function parseEquipmentWorkbook(buffer: ArrayBuffer): EquipmentImportPrev
   }
 
   return results;
+}
+
+const EXPORT_HEADERS = [
+  "Nombre comercial",
+  "Marca",
+  "Modelo",
+  "Valor total",
+  "Valor del pie",
+  "Pie Cero",
+  "Cantidad de cuotas",
+  "Valor de cada cuota",
+  "Texto comercial",
+  "Color",
+  "Memoria",
+  "Promociones",
+  "Observaciones",
+  "Estado",
+] as const;
+
+/** Exporta el catálogo actual al mismo formato de columnas que la plantilla de importación. */
+export function downloadEquipmentCatalogXlsx(
+  items: EquipmentCatalogItem[],
+  filename = "catalogo-equipos.xlsx",
+) {
+  const rows = items.map((item) => [
+    item.commercialName,
+    item.brand,
+    item.model,
+    item.totalValue,
+    item.downPayment,
+    item.isPieCero ? "SI" : "NO",
+    item.installmentsCount,
+    item.installmentValue,
+    item.commercialText,
+    item.color ?? "",
+    item.memory ?? "",
+    item.promotions ?? "",
+    item.observations ?? "",
+    item.status === "active" ? "Activo" : "Inactivo",
+  ]);
+  const sheet = XLSX.utils.aoa_to_sheet([EXPORT_HEADERS, ...rows]);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, "Equipos");
+  XLSX.writeFile(workbook, filename);
 }
