@@ -12,11 +12,14 @@ import {
   ChatComposerControls,
   MediaAttachmentPreview,
   useMediaAttachment,
+  useVoiceRecorder,
+  VoiceRecordingIndicator,
 } from "@/components/messaging/chat-composer";
 import { PinnedQuickReplies } from "@/components/leads/premium/pinned-quick-replies";
 import type { ChatUiTheme } from "@/components/leads/premium/chat-theme";
 import { cn } from "@/lib/utils";
 import { isMessengerConversation } from "@/lib/messenger/conversation-id";
+import { isWebQrConversation } from "@/lib/web-qr/conversation-id";
 
 /**
  * Composer del chat. Envía texto, imágenes y audios; el mensaje
@@ -37,6 +40,7 @@ export function ChatInput({
 }) {
   const premium = uiTheme === "premium";
   const isMessenger = isMessengerConversation(conversationId);
+  const canRecord = isWebQrConversation(conversationId) && !isMessenger;
   const [value, setValue] = useState("");
   const [dragActive, setDragActive] = useState(false);
   const advisorSend = useSendMessage(conversationId);
@@ -48,6 +52,7 @@ export function ChatInput({
   const enableTemplates = variant === "advisor" && !premium;
   const showPinnedReplies = premium;
   const media = useMediaAttachment();
+  const voice = useVoiceRecorder((file) => media.setMediaFile(file));
   const picker = useTemplatePickerState();
   const templateSend = useTemplateSend({
     conversationId,
@@ -77,6 +82,11 @@ export function ChatInput({
   const submit = () => {
     if (isSending) return;
 
+    if (voice.isRecording) {
+      voice.stop();
+      return;
+    }
+
     if (media.attachment) {
       sendMedia.mutate(
         {
@@ -98,8 +108,14 @@ export function ChatInput({
     }
 
     const text = value.trim();
-    if (!text) return;
-    send.mutate({ to, text }, { onSuccess: () => setValue("") });
+    if (text) {
+      send.mutate({ to, text }, { onSuccess: () => setValue("") });
+      return;
+    }
+
+    if (canRecord) {
+      void voice.start();
+    }
   };
 
   const handleChange = (next: string) => {
@@ -138,11 +154,13 @@ export function ChatInput({
           attachment={media.attachment}
           onCaptionChange={media.setCaption}
           onRemove={media.clearAttachment}
-          disabled={isSending}
+          disabled={isSending || voice.isRecording}
         />
       ) : null}
 
-      {showPinnedReplies && !media.attachment ? (
+      {voice.isRecording ? <VoiceRecordingIndicator seconds={voice.seconds} /> : null}
+
+      {showPinnedReplies && !media.attachment && !voice.isRecording ? (
         <PinnedQuickReplies
           conversationId={conversationId}
           to={to}
@@ -157,6 +175,8 @@ export function ChatInput({
         hasText={hasText}
         hasAttachment={hasAttachment}
         isSending={isSending}
+        canRecord={canRecord}
+        isRecording={voice.isRecording}
         onAttach={media.openFilePicker}
         onSubmit={submit}
         fileInputRef={media.fileInputRef}
@@ -205,7 +225,7 @@ export function ChatInput({
                 ? "Escribe un mensaje o / para plantillas…"
                 : "Escribe un mensaje..."
           }
-          disabled={isSending}
+          disabled={isSending || voice.isRecording}
           className={cn(
             "w-full border border-border-strong bg-card text-[14px] text-ink outline-none transition-all duration-150",
             "placeholder:text-placeholder focus:border-brand focus:shadow-[0_0_0_4px_rgba(124,58,237,0.08)] disabled:opacity-60",
@@ -216,15 +236,17 @@ export function ChatInput({
         />
       </ChatComposerControls>
 
-      {(send.isError || sendMedia.isError) && (
+      {(send.isError || sendMedia.isError || voice.error) && (
         <p className="mt-2 text-[12px] text-danger-ink">
-          {send.error instanceof Error
-            ? send.error.message
-            : sendMedia.error instanceof Error
-              ? sendMedia.error.message
-              : isMessenger
-                ? "No se pudo enviar. Revisa la configuración de Messenger."
-                : "No se pudo enviar. Revisa la configuración de WhatsApp."}
+          {voice.error
+            ? voice.error
+            : send.error instanceof Error
+              ? send.error.message
+              : sendMedia.error instanceof Error
+                ? sendMedia.error.message
+                : isMessenger
+                  ? "No se pudo enviar. Revisa la configuración de Messenger."
+                  : "No se pudo enviar. Revisa la configuración de WhatsApp."}
         </p>
       )}
     </div>

@@ -42,7 +42,8 @@ export function isSupportedAudioMime(mimeType: string): boolean {
     base === "audio/ogg" ||
     base === "audio/opus" ||
     base === "audio/mpeg" ||
-    base === "audio/mp3"
+    base === "audio/mp3" ||
+    base === "audio/webm"
   );
 }
 
@@ -62,5 +63,6 @@ export function inferAudioMimeFromFileName(fileName: string): string | null {
   const lower = fileName.toLowerCase();
   if (lower.endsWith(".mp3")) return "audio/mpeg";
   if (lower.endsWith(".ogg") || lower.endsWith(".opus")) return "audio/ogg; codecs=opus";
+  if (lower.endsWith(".webm")) return "audio/webm";
   return null;
 }

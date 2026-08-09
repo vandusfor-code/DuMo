@@ -25,6 +25,7 @@ function resolveMimeType(file: File): string {
     else if (lower.endsWith(".gif")) mimeType = "image/gif";
     else if (lower.endsWith(".mp3")) mimeType = "audio/mpeg";
     else if (lower.endsWith(".ogg") || lower.endsWith(".opus")) mimeType = "audio/ogg; codecs=opus";
+    else if (lower.endsWith(".webm")) mimeType = "audio/webm";
     else mimeType = "image/jpeg";
   }
   return mimeType;

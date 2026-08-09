@@ -11,6 +11,7 @@ export const ALLOWED_INBOUND_AUDIO_MIMES = new Set([
   "audio/opus",
   "audio/mpeg",
   "audio/mp3",
+  "audio/webm",
 ]);
 
 export function getSupabaseUrl() {
@@ -59,6 +60,9 @@ export function normalizeInboundAudioMime(rawMime, ptt) {
   if (base === "audio/mpeg" || base === "audio/mp3") {
     return "audio/mpeg";
   }
+  if (base === "audio/webm") {
+    return "audio/webm";
+  }
   if (ptt) {
     return "audio/ogg; codecs=opus";
   }
@@ -75,6 +79,7 @@ export function extensionFromAudioMime(mimeType) {
   const m = String(mimeType ?? "").toLowerCase();
   if (m.includes("mpeg") || m.includes("mp3")) return "mp3";
   if (m.includes("ogg") || m.includes("opus")) return "ogg";
+  if (m.includes("webm")) return "webm";
   return "bin";
 }
 
