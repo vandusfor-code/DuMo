@@ -9,7 +9,7 @@ import {
   Clock,
   Loader2,
   MessageSquare,
-  Save,
+  Plus,
   ScrollText,
   Sparkles,
 } from "lucide-react";
@@ -110,9 +110,9 @@ export function LeadPanel({
             {isSaving ? (
               <Loader2 className="size-[18px] animate-spin" />
             ) : (
-              <Save className="size-[18px]" />
+              <Plus className="size-[18px]" />
             )}
-            Guardar venta
+            Nueva venta
           </button>
         ) : null}
       </div>

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import {
   AlertCircle,
   CheckCircle2,
   ClipboardList,
   Clock,
+  Loader2,
   MessageSquare,
   Pencil,
   Plus,
@@ -33,6 +34,7 @@ import {
 } from "@/hooks/use-admin-leads";
 import type { AdminConversation, ClientProfile, LeadNote, LeadTimelineEvent } from "@/types/admin-lead";
 import { EMPTY_LEAD_LINE, type LeadFormValues } from "@/types/lead-form";
+import type { SaveLeadAction } from "@/types/crm-client";
 import type { SaveLeadInput } from "@/types/lead";
 import {
   formatSaveLeadApiError,
@@ -65,6 +67,7 @@ export function AdminLeadFormPanel({
   timeline: LeadTimelineEvent[];
 }) {
   const saveLead = useSaveAdminLead(conversation.id);
+  const saveModeRef = useRef<SaveLeadAction>("script");
   const [activeTab, setActiveTab] = useState("gestion");
   const { data: fetchedScript } = useSalesScript(conversation.id);
   const script = saveLead.data?.script ?? fetchedScript ?? null;
@@ -99,6 +102,8 @@ export function AdminLeadFormPanel({
         values.type === "venta"
           ? values.lines.filter(isCompleteSaleLine).map(mapSaleLineForSave)
           : [],
+      registerSale: saveModeRef.current === "sale",
+      saveAction: saveModeRef.current,
     };
     try {
       await saveLead.mutateAsync(input);
@@ -115,13 +120,23 @@ export function AdminLeadFormPanel({
         <div className="flex h-full flex-col">
           <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
             <p className="text-[15px] font-semibold text-ink">Gestión del cliente</p>
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-[13px] font-medium text-brand transition-colors hover:bg-brand-soft"
-            >
-              <Plus className="size-4" />
-              Nueva conversación
-            </button>
+            {type === "venta" ? (
+              <button
+                type="submit"
+                disabled={saveLead.isPending}
+                onClick={() => {
+                  saveModeRef.current = "sale";
+                }}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-[13px] font-medium text-brand transition-colors hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {saveLead.isPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Plus className="size-4" />
+                )}
+                Nueva venta
+              </button>
+            ) : null}
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-h-0 flex-1 flex-col">
@@ -159,15 +174,28 @@ export function AdminLeadFormPanel({
                 {saveLead.isSuccess && (
                   <div className="flex items-center gap-2.5 rounded-xl border border-success/20 bg-success-soft px-4 py-3 text-[13px] text-success-ink">
                     <CheckCircle2 className="size-[18px]" />
-                    {script
-                      ? "Gestión guardada correctamente. El script de venta ya está disponible."
-                      : "Gestión guardada correctamente."}
+                    {saveLead.data?.sale
+                      ? script
+                        ? "Venta guardada correctamente. Ya aparece en Ventas y el script está disponible."
+                        : "Venta guardada correctamente. Ya aparece en Ventas."
+                      : script
+                        ? "Gestión guardada correctamente. El script de venta ya está disponible."
+                        : "Gestión guardada correctamente."}
                   </div>
                 )}
+                {saveLead.isSuccess && saveLead.data?.saleError ? (
+                  <div className="flex items-start gap-2.5 rounded-xl border border-warning/20 bg-warning-soft px-4 py-3 text-[13px] text-warning-ink">
+                    <AlertCircle className="mt-0.5 size-[18px] shrink-0" />
+                    <span>{saveLead.data.saleError}</span>
+                  </div>
+                ) : null}
                 <ActionButtons
                   isSaving={saveLead.isPending}
                   onCancel={() => methods.reset(defaultsFor(conversation))}
                   mode={type === "venta" ? "script" : "tipify"}
+                  onPrimaryAction={() => {
+                    saveModeRef.current = type === "venta" ? "script" : "tipify";
+                  }}
                 />
               </TabsContent>
 
