@@ -28,7 +28,7 @@ export function MessageShell({
             ? cn(
                 "rounded-[12px] px-3 py-1.5",
                 out
-                  ? "rounded-br-[4px] border border-line/80 bg-msg-out text-msg-out-text"
+                  ? "rounded-br-[4px] bg-msg-out text-msg-out-text"
                   : "rounded-bl-[4px] border border-msg-in/60 bg-msg-in text-msg-in-text",
                 isMedia && "border-0 bg-transparent p-0",
               )
