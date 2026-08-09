@@ -20,6 +20,10 @@ import {
 } from "@/hooks/use-quick-replies";
 import type { CreateQuickReplyTemplateInput, QuickReplyTemplate, UpdateQuickReplyTemplateInput } from "@/types/quick-reply";
 import { MAX_UPLOAD_IMAGE_BYTES, isSupportedImageMime } from "@/types/media";
+import {
+  MAX_PINNED_QUICK_REPLIES,
+  PINNED_LIMIT_MESSAGE,
+} from "@/lib/pinned-quick-replies.constants";
 import { cn } from "@/lib/utils";
 
 type TemplateContentKind = "text" | "image";
@@ -105,11 +109,13 @@ export default function AdminPlantillasPage() {
             Crear plantilla
           </Button>
         </div>
-        {pinnedCount > 0 ? (
-          <p className="mt-3 text-[13px] text-muted">
-            {pinnedCount} plantilla{pinnedCount === 1 ? "" : "s"} fijada{pinnedCount === 1 ? "" : "s"} — visible{pinnedCount === 1 ? "" : "s"} arriba del chat en Leads.
-          </p>
-        ) : null}
+        <p className="mt-3 text-[13px] text-muted">
+          Atajos fijados en chat:{" "}
+          <span className="font-medium text-ink">
+            {pinnedCount}/{MAX_PINNED_QUICK_REPLIES}
+          </span>
+          {pinnedCount >= MAX_PINNED_QUICK_REPLIES ? " — límite alcanzado." : "."}
+        </p>
       </Card>
 
       <div className="grid gap-3">
@@ -118,9 +124,21 @@ export default function AdminPlantillasPage() {
             key={t.id}
             template={t}
             pinLoading={togglePin.isPending}
-            onTogglePin={() =>
-              togglePin.mutate({ id: t.id, favorite: !t.favorite })
-            }
+            pinAtLimit={pinnedCount >= MAX_PINNED_QUICK_REPLIES}
+            onTogglePin={() => {
+              if (!t.favorite && pinnedCount >= MAX_PINNED_QUICK_REPLIES) {
+                window.alert(PINNED_LIMIT_MESSAGE);
+                return;
+              }
+              togglePin.mutate(
+                { id: t.id, favorite: !t.favorite },
+                {
+                  onError: (err) => {
+                    window.alert(err instanceof Error ? err.message : PINNED_LIMIT_MESSAGE);
+                  },
+                },
+              );
+            }}
             onEdit={() => setEditing(t)}
             onDelete={() => deleteTemplate.mutate(t.id)}
           />
@@ -135,6 +153,7 @@ export default function AdminPlantillasPage() {
       {createOpen ? (
         <TemplateFormDialog
           categories={categories}
+          pinnedCount={pinnedCount}
           onClose={() => setCreateOpen(false)}
           onSave={async (input) => {
             await createTemplate.mutateAsync(input);
@@ -147,6 +166,7 @@ export default function AdminPlantillasPage() {
         <TemplateFormDialog
           template={editing}
           categories={categories}
+          pinnedCount={pinnedCount}
           onClose={() => setEditing(null)}
           onSave={async (input) => {
             await updateTemplate.mutateAsync({ id: editing.id, data: input as UpdateQuickReplyTemplateInput });
@@ -161,12 +181,14 @@ export default function AdminPlantillasPage() {
 function TemplateRow({
   template,
   pinLoading,
+  pinAtLimit,
   onTogglePin,
   onEdit,
   onDelete,
 }: {
   template: QuickReplyTemplate;
   pinLoading: boolean;
+  pinAtLimit: boolean;
   onTogglePin: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -226,14 +248,21 @@ function TemplateRow({
         <button
           type="button"
           aria-label={template.favorite ? "Quitar del chat" : "Fijar en chat"}
-          title={template.favorite ? "Quitar del chat" : "Fijar en chat"}
-          disabled={pinLoading}
+          title={
+            !template.favorite && pinAtLimit
+              ? PINNED_LIMIT_MESSAGE
+              : template.favorite
+                ? "Quitar del chat"
+                : "Fijar en chat"
+          }
+          disabled={pinLoading || (!template.favorite && pinAtLimit)}
           onClick={onTogglePin}
           className={cn(
             "grid size-9 place-items-center rounded-lg transition-colors",
             template.favorite
               ? "bg-brand text-white hover:bg-brand-hover"
               : "text-muted hover:bg-brand-soft hover:text-brand",
+            !template.favorite && pinAtLimit && "cursor-not-allowed opacity-40 hover:bg-transparent hover:text-muted",
           )}
         >
           <Pin className={cn("size-4", template.favorite && "fill-current")} />
@@ -263,17 +292,21 @@ function TemplateRow({
 function TemplateFormDialog({
   template,
   categories,
+  pinnedCount,
   onClose,
   onSave,
 }: {
   template?: QuickReplyTemplate;
   categories: { id: string; name: string }[];
+  pinnedCount: number;
   onClose: () => void;
   onSave: (input: CreateQuickReplyTemplateInput) => Promise<void>;
 }) {
   const isEdit = Boolean(template);
   const firstTextItem = template?.activeVersion?.items?.find((i) => i.itemKind === "text");
   const firstMediaItem = template?.activeVersion?.items?.find((i) => i.itemKind === "media");
+  const pinSlotsFull = pinnedCount >= MAX_PINNED_QUICK_REPLIES;
+  const canPinMore = !pinSlotsFull || Boolean(template?.favorite);
 
   const [name, setName] = useState(template?.name ?? "");
   const [shortcut, setShortcut] = useState(template?.shortcut ?? "");
@@ -292,7 +325,9 @@ function TemplateFormDialog({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
-  const [pinInChat, setPinInChat] = useState(template?.favorite ?? true);
+  const [pinInChat, setPinInChat] = useState(
+    template?.favorite ?? (pinSlotsFull ? false : true),
+  );
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadMedia = useUploadTemplateMedia();
@@ -442,15 +477,26 @@ function TemplateFormDialog({
 
           {formError ? <p className="text-[13px] text-danger-ink">{formError}</p> : null}
 
-          <label className="flex cursor-pointer items-center gap-2 text-[14px] text-ink">
+          <label
+            className={cn(
+              "flex items-center gap-2 text-[14px] text-ink",
+              canPinMore ? "cursor-pointer" : "cursor-not-allowed opacity-60",
+            )}
+          >
             <input
               type="checkbox"
               checked={pinInChat}
+              disabled={!canPinMore}
               onChange={(e) => setPinInChat(e.target.checked)}
-              className="size-4 accent-brand"
+              className="size-4 accent-brand disabled:opacity-60"
             />
             Fijar en el chat
           </label>
+          {!canPinMore ? (
+            <p className="text-[12px] text-muted">
+              Ya hay {MAX_PINNED_QUICK_REPLIES} atajos fijados. Quita uno para fijar esta plantilla.
+            </p>
+          ) : null}
         </div>
         <div className="mt-5 flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose} disabled={saving}>
