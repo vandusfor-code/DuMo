@@ -1,5 +1,7 @@
 # DuMo — Checklist de variables de entorno (Fase 0)
 
+> **⚠️ Post-corte (desde 2026-08-08):** mantener **Vercel activo ≥ 7 días** (hasta ~15 ago 2026). No desactivar el proyecto Vercel — es la red de seguridad para rollback. Ver [`README.md`](../README.md) y [`railway-phase-7-cutover.md`](railway-phase-7-cutover.md).
+
 Copiar de Vercel → Railway CRM (mismo valor, especialmente `AUTH_SECRET`).
 
 ## Base de datos

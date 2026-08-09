@@ -1,6 +1,6 @@
 # Fase 7 — Corte final a Railway (producción)
 
-**Estado:** plan listo — **NO ejecutar** hasta luz verde explícita.
+**Estado:** ✅ **Corte declarado exitoso** — 2026-08-09T02:40:45Z (8 ago 2026, 9:40 PM UTC-5)
 
 **Contexto validado en staging (Fases 4–6):**
 - CRM Railway: `https://dumo-crm-production.up.railway.app`
@@ -106,6 +106,22 @@ Síntoma: mensajes QR nuevos van a Railway Postgres; usuarios en `du-mo.vercel.a
 **Pérdida de datos:** todo tráfico (UI + QR inbound) procesado en Railway desde el corte DNS hasta el rollback **no** estará en Supabase. Ventana típica a minimizar: **< 30 min** de observación post-corte antes de declarar éxito o rollback.
 
 **Vercel CRM:** sigue desplegado; no borrar el proyecto Vercel hasta **≥ 7 días** de estabilidad en Railway.
+
+---
+
+### ⚠️ Post-corte (2026-08-08) — rollback ya no es “sin pérdida”
+
+**Estado:** corte ejecutado. Tráfico de usuarios pasa por proxy Vercel → Railway CRM; BD activa = **Railway Postgres**. Supabase queda congelado como respaldo (~142 conv / ~787 msgs al momento del diff).
+
+| Ventana | Rollback “gratis” | Qué implica revertir |
+|---------|-------------------|----------------------|
+| **Antes** de cambiar webhook (Escenario A) | ✅ Sí | Prod 100% Vercel + Supabase; cero datos nuevos solo en Railway |
+| **Entre** webhook y DNS/proxy (Escenario B) | ⚠️ Parcial | Pierdes msgs QR solo en Railway en esa ventana |
+| **Después** del corte + proxy activo (ahora) | ❌ No | Revertir proxy + webhook devuelve UI a Supabase **antiguo**; **pierdes todo** lo escrito en Railway desde el corte (conversaciones/mensajes nuevos, cola procesada, etc.) |
+
+**Implicación práctica:** la red de seguridad Vercel (7 días) sigue siendo válida para **restaurar el stack anterior**, pero **no** para recuperar datos nuevos de Railway automáticamente. Un rollback post-corte requiere export selectivo desde Railway → Supabase (como hicimos al revés con los 20 msgs split-brain) o aceptar pérdida de la ventana Railway.
+
+**Proxy `beforeFiles` y rollback:** quitar rewrites en `next.config.ts` + redeploy Vercel → Vercel vuelve a servir Next.js propio con `DATABASE_URL1` → Supabase (sin cambios en env Vercel). También revertir `DUMO_WEBHOOK_URL` del bridge. Tiempo ~15–25 min (Escenario C). WebSocket vuelve a polling 45s en Vercel serverless.
 
 ---
 
@@ -273,3 +289,19 @@ curl.exe -s https://du-mo.vercel.app/api/system/queue
 - [ ] **48 h observación post-corte**: mismo corte DNS+webhook; mantener Vercel desplegado pero sin tráfico; no desactivar nada 48 h.
 
 **No ejecutar Fase 7 hasta tu luz verde explícita.**
+
+---
+
+## 8. Corte ejecutado — smoke tests prod (2026-08-08/09)
+
+**Hora corte declarado exitoso:** `2026-08-09T02:40:45Z` — sábado 8 ago 2026, **9:40 PM UTC-5 (Colombia)**
+
+| Paso | Prueba | Resultado |
+|------|--------|-----------|
+| 1 | `verify-web-qr-cutover.mjs` → `du-mo.vercel.app` | ✅ PASS — postgres, QR CONNECTED, webhook OK |
+| 2 | Login auth (401 + login real + bandeja) | ✅ PASS |
+| 3 | QR inbound real (`SMOKE-QR-IN` → `webqr:573148127388`) | ✅ PASS |
+| 4 | QR outbound real (`SMOKE-QR-OUT` → celular cliente) | ✅ PASS |
+| 5 | `realtime-multi-session-test.mjs` (3 sockets) | ✅ PASS — exit 0 |
+
+**Post-corte pendiente (T+7 días):** mantener Vercel desplegado; no desactivar Supabase; observación operativa 30–60 min recomendada el día del corte.

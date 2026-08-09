@@ -1,36 +1,30 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DuMo CRM
 
-## Getting Started
+Plataforma comercial interna (Leads, ventas, WhatsApp Web QR).
 
-First, run the development server:
+## Producción (post-corte Railway — 2026-08-08)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+| Item | Valor |
+|------|--------|
+| **URL usuarios** | https://du-mo.vercel.app |
+| **Backend activo** | Railway CRM + Postgres (`dumo-crm-production.up.railway.app`) |
+| **Corte declarado exitoso** | 2026-08-09T02:40:45Z (8 ago 2026, 9:40 PM UTC-5) |
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### ⚠️ No desactivar Vercel antes del **15 de agosto de 2026**
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Mantener el proyecto **Vercel desplegado y activo como mínimo 7 días** tras el corte (red de seguridad / rollback).  
+**No** pausar deploys, **no** borrar el proyecto, **no** cambiar `DATABASE_URL1` en Vercel hasta cumplir esa ventana.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Detalle completo: [`docs/railway-phase-7-cutover.md`](docs/railway-phase-7-cutover.md) (secciones rollback post-corte y T+7 días).
 
-## Learn More
+## Migración Railway (Fases 3–7)
 
-To learn more about Next.js, take a look at the following resources:
+| Fase | Doc |
+|------|-----|
+| Postgres | [`docs/railway-phase-3-postgres.md`](docs/railway-phase-3-postgres.md) |
+| CRM deploy | [`docs/railway-phase-4-crm.md`](docs/railway-phase-4-crm.md) |
+| WebSocket | [`docs/railway-phase-5-websocket.md`](docs/railway-phase-5-websocket.md) |
+| Cola BullMQ | [`docs/railway-phase-6-queue.md`](docs/railway-phase-6-queue.md) |
+| Corte prod | [`docs/railway-phase-7-cutover.md`](docs/railway-phase-7-cutover.md) |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Scripts útiles: `scripts/verify-web-qr-cutover.mjs`, `scripts/supabase-railway-diff.mjs`, `scripts/backup-db-supabase.mjs`.

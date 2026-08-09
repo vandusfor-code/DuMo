@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { io, type Socket } from "socket.io-client";
+import { getClientToken } from "@/lib/auth/client-token";
 import { leadKeys } from "@/hooks/use-leads";
 import type { ChatMessage } from "@/types/conversation";
 
@@ -71,9 +72,12 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    const socket = io({
+    const realtimeUrl = process.env.NEXT_PUBLIC_REALTIME_URL?.replace(/\/$/, "") || undefined;
+    const token = getClientToken();
+    const socket = io(realtimeUrl, {
       path: "/socket.io",
-      withCredentials: true,
+      withCredentials: !realtimeUrl,
+      auth: token ? { token } : undefined,
       transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionDelay: 1000,

@@ -12,7 +12,7 @@
 | ¿La pérdida de sesión QR (`persistedSessions: 0`) la causó Fase 1? | **No.** Fase 1 no modificó `services/web-qr-bridge/`. |
 | ¿Causa raíz identificada? | Falta de volumen persistente en Railway (disco efímero del contenedor). |
 | ¿Infra corregida? | **Sí (2026-08-08)** — volumen montado en `/data/sessions` en el servicio bridge. |
-| ¿Riesgo cerrado al 100%? | **No aún** — falta verificación funcional del operador (ver abajo). |
+| ¿Riesgo cerrado al 100%? | **Sí (2026-08-08)** — volumen verificado tras QR + redeploy + E2E. |
 
 ---
 
@@ -26,9 +26,7 @@
 | Redeploy de prueba → sesión sobrevive | ✅ **Verificado** (redeploy vía push `6a9f1b6`; post-redeploy `persistedSessions: 1`, status `CONNECTED`) |
 | Outbound QR probado end-to-end | ✅ Bridge `/send` 200 + tráfico real en Leads (`webqr:573181904896`) |
 
-Hasta completar las filas pendientes, asumir que el volumen está montado pero **no verificado en producción real**.
-
-**Actualización 2026-08-08:** verificación funcional completada — volumen OK, sesión sobrevive redeploy, QR E2E operativo.
+**Estado:** verificación funcional completada (2026-08-08) — volumen OK, sesión sobrevive redeploy, QR E2E operativo.
 
 ---
 
