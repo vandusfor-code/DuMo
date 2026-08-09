@@ -221,7 +221,7 @@ export function ChatInput({
           }}
           placeholder={
             premium
-              ? "Escribe un mensaje..."
+              ? "Escribe tu mensaje..."
               : enableTemplates
                 ? "Escribe un mensaje o / para plantillas…"
                 : "Escribe un mensaje..."

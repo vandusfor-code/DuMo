@@ -19,6 +19,7 @@ export function AllTemplatesPanel({
   allowPin,
   disabled,
   isSending,
+  placement = "bar",
 }: {
   open: boolean;
   onClose: () => void;
@@ -27,6 +28,8 @@ export function AllTemplatesPanel({
   allowPin?: boolean;
   disabled?: boolean;
   isSending?: boolean;
+  /** `dropdown` = anclado al botón Seleccionar plantilla; `bar` = ancho completo bajo la barra. */
+  placement?: "dropdown" | "bar";
 }) {
   const togglePin = useToggleQuickReplyPin();
 
@@ -43,6 +46,11 @@ export function AllTemplatesPanel({
   );
 
   if (!open) return null;
+
+  const panelClass =
+    placement === "dropdown"
+      ? "absolute left-0 top-full z-40 mt-1.5 w-[min(100vw-2rem,320px)]"
+      : "absolute left-0 right-0 top-full z-40 mt-1";
 
   const handlePin = (template: AdvisorQuickReplyTemplate, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -66,13 +74,16 @@ export function AllTemplatesPanel({
       <button
         type="button"
         aria-label="Cerrar listado de plantillas"
-        className="fixed inset-0 z-30 cursor-default bg-black/10"
+        className="fixed inset-0 z-30 cursor-default bg-transparent"
         onClick={onClose}
       />
       <div
         role="listbox"
         aria-label="Todas las plantillas"
-        className="absolute left-0 right-0 top-full z-40 mt-1 max-h-72 overflow-y-auto rounded-2xl border border-[#E8E8E8] bg-white py-1 shadow-lg"
+        className={cn(
+          panelClass,
+          "max-h-72 overflow-y-auto rounded-2xl border border-[#E8E8E8] bg-white py-1 shadow-lg",
+        )}
       >
         {sorted.length === 0 ? (
           <p className="px-4 py-3 text-[13px] text-muted">No hay plantillas disponibles.</p>
