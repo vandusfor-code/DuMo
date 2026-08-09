@@ -287,19 +287,31 @@ export function EquipmentCatalogTable({
           </div>
         </div>
 
+        <div className="px-4 pb-2 pt-3">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>Nombre comercial</TableHead>
-              <TableHead>Marca</TableHead>
-              <TableHead>Modelo</TableHead>
-              <TableHead>Valor total</TableHead>
-              <TableHead>Pie</TableHead>
-              <TableHead>Pie cero</TableHead>
-              <TableHead>Cuotas</TableHead>
-              <TableHead>Valor cuota</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="w-12" />
+            <TableRow className="border-0 bg-brand-soft hover:bg-brand-soft">
+              {(
+                [
+                  "Nombre comercial",
+                  "Marca",
+                  "Modelo",
+                  "Valor total",
+                  "Pie",
+                  "Pie cero",
+                  "Cuotas",
+                  "Valor cuota",
+                  "Estado",
+                ] as const
+              ).map((label) => (
+                <TableHead
+                  key={label}
+                  className="h-11 border-b border-brand/15 bg-brand-soft px-4 py-3 text-[12px] font-semibold text-brand"
+                >
+                  {label}
+                </TableHead>
+              ))}
+              <TableHead className="h-11 w-12 border-b border-brand/15 bg-brand-soft px-4 py-3" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -359,6 +371,7 @@ export function EquipmentCatalogTable({
             )}
           </TableBody>
         </Table>
+        </div>
 
         <div className="flex flex-col gap-3 border-t border-line px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-[13px] text-muted">
