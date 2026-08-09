@@ -1,6 +1,7 @@
 import "server-only";
 import {
   ADVISOR_ONLINE_WINDOW_MINUTES,
+  effectiveAdvisorPresenceStatus,
   type AdvisorPresenceStatus,
 } from "@/lib/advisor-presence";
 import { businessDateISO, previousBusinessDateISO } from "@/lib/date";
@@ -199,17 +200,21 @@ class PostgresAdvisorPresenceRepository implements AdvisorPresenceRepository {
       active_advisors_day: 0,
     };
 
-    const advisors = rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      avatarUrl: row.avatar_url ?? "",
-      isOnline: row.is_online,
-      presenceStatus: row.presence_status as AdvisorPresenceStatus,
-      leadsAssignedToday: row.assigned_today,
-      leadsManagedToday: row.gestiones_today,
-      connectionTimeLabel: null,
-      connectionProgressPct: null,
-    }));
+    const advisors = rows.map((row) => {
+      const isOnline = row.is_online;
+      const stored = row.presence_status as AdvisorPresenceStatus;
+      return {
+        id: row.id,
+        name: row.name,
+        avatarUrl: row.avatar_url ?? "",
+        isOnline,
+        presenceStatus: effectiveAdvisorPresenceStatus(isOnline, stored),
+        leadsAssignedToday: row.assigned_today,
+        leadsManagedToday: row.gestiones_today,
+        connectionTimeLabel: null,
+        connectionProgressPct: null,
+      };
+    });
 
     const connectedAdvisors = isToday
       ? advisors.filter((a) => a.isOnline).length

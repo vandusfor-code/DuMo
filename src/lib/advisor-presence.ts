@@ -26,3 +26,12 @@ export const ADVISOR_ONLINE_WINDOW_MINUTES = 10;
 export function isAdvisorPresenceStatus(value: string): value is AdvisorPresenceStatus {
   return (ADVISOR_PRESENCE_STATUSES as readonly string[]).includes(value);
 }
+
+/** Estado mostrado en Live: fuera de la ventana de conexión ⇒ desconectado. */
+export function effectiveAdvisorPresenceStatus(
+  isOnline: boolean,
+  stored: AdvisorPresenceStatus,
+): AdvisorPresenceStatus {
+  if (!isOnline) return "desconectado";
+  return stored;
+}
