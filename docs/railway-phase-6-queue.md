@@ -33,3 +33,11 @@ Sin `REDIS_URL`, el CRM procesa inline (comportamiento anterior).
 WEB_QR_WEBHOOK_SECRET=... node scripts/inbound-queue-burst-test.mjs
 AUTH_SECRET=... WEB_QR_WEBHOOK_SECRET=... node scripts/realtime-multi-session-test.mjs
 ```
+
+## Evidencia (staging, deploy a3fdf24f)
+
+- Redis addon en `ample-adventure`, `REDIS_URL` enlazado a `dumo-crm`
+- Log: `[inbound-worker] BullMQ consumer started (concurrency=1)`
+- `GET /api/system/queue` → `{ enabled: true, connected: true, counts: {...} }`
+- Ráfaga 8 mensajes QR: 8× `200` ~300ms con `queued:true`, DB +8 sin pérdidas
+- WebSocket: asesora recibe `message:new` (con texto) + `conversation:updated` tras auto-assign

@@ -65,7 +65,9 @@ Prueba `scripts/realtime-multi-session-test.mjs` — 3 sesiones simultáneas:
 | admin-tab-2 | supervisor | `leads:message:new` + `leads:conversation:updated` |
 | advisor-tab (ID real asignado) | asesora | `leads:conversation:updated` (tras auto-asignación) |
 
-Webhook inbound: `POST 200 {"ok":true}`. Asesora con ID ficticio recibe 0 eventos (permisos correctos).
+Webhook inbound: `POST 200 {"ok":true,"queued":true}` — procesamiento async vía BullMQ.
+
+**Fix re-emit (Fase 5):** tras auto-assign, asesora recibe `message:new` con texto + `conversation:updated` (verificado en deploy a3fdf24f).
 
 ## Manual (navegador)
 
