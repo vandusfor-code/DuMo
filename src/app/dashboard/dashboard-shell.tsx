@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { APP_SIDEBAR_OFFSET_CLASS } from "@/components/layout/app-shell.constants";
 import { Sidebar } from "@/components/layout/sidebar";
 import { AdvisorMessageNotifications } from "@/components/messaging/message-notification-listener";
 
@@ -30,8 +32,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <main
         className={
           fullBleed
-            ? "h-dvh overflow-hidden lg:pl-[260px]"
-            : "lg:pl-[260px]"
+            ? cn("h-dvh overflow-hidden", APP_SIDEBAR_OFFSET_CLASS)
+            : APP_SIDEBAR_OFFSET_CLASS
         }
       >
         <div
