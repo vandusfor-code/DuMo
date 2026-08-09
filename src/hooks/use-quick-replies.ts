@@ -70,7 +70,10 @@ export function useCreateQuickReplyTemplate() {
   return useMutation({
     mutationFn: (input: CreateQuickReplyTemplateInput) =>
       apiPost<QuickReplyTemplate>("/api/admin/plantillas", input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "plantillas"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "plantillas"] });
+      qc.invalidateQueries({ queryKey: ["leads", "plantillas"] });
+    },
   });
 }
 
