@@ -30,6 +30,7 @@ import {
   makeCacheableSignalKeyStore,
 } from "@whiskeysockets/baileys";
 import { processInboundAudioMessage } from "./inbound-audio.js";
+import { prepareWhatsAppAudio } from "./audio-transcode.js";
 import {
   assertAllowedInboundAudioMime,
   extensionFromAudioMime,
@@ -565,6 +566,8 @@ async function fetchAudioFromUrl(audioUrl) {
       if (ext === ".mp3") mimeType = assertAllowedInboundAudioMime("audio/mpeg", false);
       else if (ext === ".ogg" || ext === ".opus") {
         mimeType = assertAllowedInboundAudioMime("audio/ogg", true);
+      } else if (ext === ".webm") {
+        mimeType = assertAllowedInboundAudioMime("audio/webm", false);
       } else {
         throw new Error(
           `Formato de audio no compatible (${headerMime || ext || "desconocido"}). Usa OGG/Opus o MP3.`,
@@ -992,16 +995,18 @@ app.post("/send-audio", auth, async (req, res) => {
   try {
     const targetJid = await resolveSendJid(session, { to, jid });
     const { buffer, mimeType: fetchedMime } = await fetchAudioFromUrl(validatedUrl);
-    const asPtt = ptt !== false;
+    const wantPtt = ptt !== false;
     let resolvedMime;
     try {
       resolvedMime =
         typeof mimeType === "string" && mimeType.trim()
-          ? assertAllowedInboundAudioMime(mimeType, asPtt)
+          ? assertAllowedInboundAudioMime(mimeType, wantPtt)
           : fetchedMime;
     } catch {
       resolvedMime = fetchedMime;
     }
+
+    const prepared = await prepareWhatsAppAudio(buffer, resolvedMime, wantPtt);
 
     log.info(
       {
@@ -1009,17 +1014,19 @@ app.post("/send-audio", auth, async (req, res) => {
         targetJid,
         inputJid: jid,
         to,
-        bytes: buffer.length,
-        mimeType: resolvedMime,
-        ptt: asPtt,
+        bytesIn: buffer.length,
+        bytesOut: prepared.buffer.length,
+        mimeType: prepared.mimeType,
+        ptt: prepared.ptt,
+        transcoded: prepared.mimeType !== resolvedMime,
       },
       "enviando audio QR",
     );
 
     const sent = await session.sock.sendMessage(targetJid, {
-      audio: buffer,
-      mimetype: resolvedMime,
-      ptt: asPtt,
+      audio: prepared.buffer,
+      mimetype: prepared.mimeType,
+      ptt: prepared.ptt,
     });
     if (sent?.message) rememberMessage(sent);
     res.json({ id: sent?.key?.id ?? `out-${Date.now()}`, jid: targetJid });
