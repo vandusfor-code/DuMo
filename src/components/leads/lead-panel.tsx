@@ -14,6 +14,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { LeadTypeSelect } from "./lead-type-select";
 import { SaleDetails } from "./sale-details";
 import { ObservationField } from "./observation-field";
@@ -115,19 +116,14 @@ export function LeadPanel({
       <div className="flex shrink-0 items-center justify-between border-b border-line px-4 py-3">
         <h2 className="text-[16px] font-semibold leading-[1.45] text-ink">Gestión del cliente</h2>
         {isVenta ? (
-          <button
-            type="submit"
-            disabled={isSaving}
-            onClick={onSaveSale}
-            className="inline-flex h-10 items-center gap-2 rounded-btn bg-brand px-4 text-[13px] font-semibold text-white shadow-send transition-all duration-200 hover:scale-[1.02] hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
-          >
+          <Button type="submit" disabled={isSaving} onClick={onSaveSale}>
             {isSaving ? (
               <Loader2 className="size-[18px] animate-spin" />
             ) : (
               <Plus className="size-[18px]" />
             )}
             Nueva venta
-          </button>
+          </Button>
         ) : null}
       </div>
 

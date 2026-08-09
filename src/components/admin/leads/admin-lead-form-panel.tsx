@@ -146,21 +146,20 @@ export function AdminLeadFormPanel({
           <div className="flex items-center justify-between border-b border-line px-4 py-3">
             <p className="text-[14px] font-semibold text-ink">Gestión del cliente</p>
             {type === "venta" ? (
-              <button
+              <Button
                 type="submit"
                 disabled={saveLead.isPending}
                 onClick={() => {
                   saveModeRef.current = "sale";
                 }}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-[13px] font-medium text-brand transition-colors hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {saveLead.isPending ? (
-                  <Loader2 className="size-4 animate-spin" />
+                  <Loader2 className="size-[18px] animate-spin" />
                 ) : (
-                  <Plus className="size-4" />
+                  <Plus className="size-[18px]" />
                 )}
                 Nueva venta
-              </button>
+              </Button>
             ) : null}
           </div>
 
