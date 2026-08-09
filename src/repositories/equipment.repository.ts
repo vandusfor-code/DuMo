@@ -7,10 +7,14 @@ import type {
 } from "@/types/equipment";
 import { EQUIPMENT_CATALOG_MOCK } from "@/data/mock/equipment.mock";
 import { resolveEquipmentIsPieCero } from "@/lib/equipment-catalog";
-import { getConfig, setConfig } from "@/server/db/app-config";
+import {
+  EQUIPMENT_CATALOG_KEY,
+  EQUIPMENT_CATALOG_SEEDED_KEY,
+  getConfig,
+  hasConfigKey,
+  setConfig,
+} from "@/server/db/app-config";
 import { hasDatabase } from "@/server/db/client";
-
-const CATALOG_KEY = "equipment_catalog";
 
 export interface EquipmentRepository {
   listAll(): Promise<EquipmentCatalogItem[]>;
@@ -19,6 +23,7 @@ export interface EquipmentRepository {
   update(id: string, input: UpsertEquipmentInput): Promise<EquipmentCatalogItem>;
   setStatus(id: string, status: EquipmentStatus): Promise<EquipmentCatalogItem>;
   delete(id: string): Promise<void>;
+  deleteAll(): Promise<void>;
 }
 
 function normalizeItem(raw: EquipmentCatalogItem): EquipmentCatalogItem {
@@ -35,6 +40,10 @@ function normalizeItem(raw: EquipmentCatalogItem): EquipmentCatalogItem {
 
 function newEquipmentId() {
   return `eq-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function shouldSeedDevMockOnFirstRun(): boolean {
+  return process.env.NODE_ENV === "development";
 }
 
 class MockEquipmentRepository implements EquipmentRepository {
@@ -88,30 +97,50 @@ class MockEquipmentRepository implements EquipmentRepository {
   async delete(id: string) {
     this.items = this.items.filter((i) => i.id !== id);
   }
+
+  async deleteAll() {
+    this.items = [];
+  }
 }
 
 class PostgresEquipmentRepository implements EquipmentRepository {
   private cache: EquipmentCatalogItem[] | null = null;
 
-  private async load(): Promise<EquipmentCatalogItem[]> {
-    if (this.cache) return this.cache;
-    const stored = await getConfig<EquipmentCatalogItem[] | null>(CATALOG_KEY, null);
-    if (stored && stored.length > 0) {
-      this.cache = stored.map(normalizeItem);
-      return this.cache;
-    }
-    this.cache = [...EQUIPMENT_CATALOG_MOCK];
-    try {
-      await setConfig(CATALOG_KEY, this.cache);
-    } catch {
-      /* seed best-effort */
-    }
-    return this.cache;
+  private async markSeeded(): Promise<void> {
+    await setConfig(EQUIPMENT_CATALOG_SEEDED_KEY, true);
   }
 
-  private async save(items: EquipmentCatalogItem[]) {
+  private async persistCatalog(items: EquipmentCatalogItem[]): Promise<void> {
     this.cache = items.map(normalizeItem);
-    await setConfig(CATALOG_KEY, this.cache);
+    await setConfig(EQUIPMENT_CATALOG_KEY, this.cache);
+    await this.markSeeded();
+  }
+
+  /**
+   * Catálogo ya inicializado si:
+   * - flag equipment_catalog_seeded, o
+   * - existe fila app_config.equipment_catalog (incluso con []).
+   */
+  private async isCatalogInitialized(): Promise<boolean> {
+    const seeded = await getConfig(EQUIPMENT_CATALOG_SEEDED_KEY, false);
+    if (seeded) return true;
+    return hasConfigKey(EQUIPMENT_CATALOG_KEY);
+  }
+
+  private async load(): Promise<EquipmentCatalogItem[]> {
+    if (this.cache) return this.cache;
+
+    if (await this.isCatalogInitialized()) {
+      const stored = await getConfig<EquipmentCatalogItem[]>(EQUIPMENT_CATALOG_KEY, []);
+      this.cache = stored.map(normalizeItem);
+      await this.markSeeded();
+      return this.cache;
+    }
+
+    // Primera inicialización — mock solo en dev limpio; prod arranca vacío.
+    const initial = shouldSeedDevMockOnFirstRun() ? [...EQUIPMENT_CATALOG_MOCK] : [];
+    await this.persistCatalog(initial);
+    return this.cache!;
   }
 
   async listAll() {
@@ -138,7 +167,7 @@ class PostgresEquipmentRepository implements EquipmentRepository {
   async create(input: UpsertEquipmentInput) {
     const items = await this.load();
     const item = normalizeItem({ ...input, id: newEquipmentId() });
-    await this.save([...items, item]);
+    await this.persistCatalog([...items, item]);
     return item;
   }
 
@@ -148,7 +177,7 @@ class PostgresEquipmentRepository implements EquipmentRepository {
     if (idx === -1) throw new Error("Equipo no encontrado.");
     const next = [...items];
     next[idx] = normalizeItem({ ...input, id });
-    await this.save(next);
+    await this.persistCatalog(next);
     return next[idx];
   }
 
@@ -158,18 +187,20 @@ class PostgresEquipmentRepository implements EquipmentRepository {
     if (idx === -1) throw new Error("Equipo no encontrado.");
     const next = [...items];
     next[idx] = { ...next[idx], status };
-    await this.save(next);
+    await this.persistCatalog(next);
     return next[idx];
   }
 
   async delete(id: string) {
     const items = await this.load();
-    await this.save(items.filter((i) => i.id !== id));
+    await this.persistCatalog(items.filter((i) => i.id !== id));
+  }
+
+  async deleteAll() {
+    await this.persistCatalog([]);
   }
 }
 
 export function getEquipmentRepository(): EquipmentRepository {
-  return hasDatabase()
-    ? new PostgresEquipmentRepository()
-    : new MockEquipmentRepository();
+  return hasDatabase() ? new PostgresEquipmentRepository() : new MockEquipmentRepository();
 }

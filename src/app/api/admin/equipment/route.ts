@@ -1,8 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { withAdminFallback } from "@/lib/admin-api-fallbacks";
 import { requireAdminSession } from "@/lib/require-admin";
 import { equipmentService } from "@/services/equipment.service";
-import { EQUIPMENT_CATALOG_MOCK } from "@/data/mock/equipment.mock";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,12 +12,19 @@ export async function GET() {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
 
-  const data = await withAdminFallback(
-    () => equipmentService.listAll(),
-    [...EQUIPMENT_CATALOG_MOCK],
-    "GET /api/admin/equipment",
-  );
-  return NextResponse.json(data);
+  try {
+    const data = await equipmentService.listAll();
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error("[GET /api/admin/equipment]", error);
+    return NextResponse.json(
+      {
+        error:
+          "No se pudo cargar el catálogo de equipos. Verifica la conexión a la base de datos e intenta de nuevo.",
+      },
+      { status: 503 },
+    );
+  }
 }
 
 export async function POST(request: NextRequest) {

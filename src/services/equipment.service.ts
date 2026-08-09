@@ -55,6 +55,9 @@ export const equipmentService = {
   delete(id: string) {
     return getEquipmentRepository().delete(id);
   },
+  deleteAll() {
+    return getEquipmentRepository().deleteAll();
+  },
   bulkCreate(
     items: Array<{ rowNumber: number; equipment: UpsertEquipmentInput }>,
   ): Promise<EquipmentBulkImportResult> {

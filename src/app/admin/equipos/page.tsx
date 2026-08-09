@@ -37,7 +37,11 @@ export default function AdminEquiposPage() {
       />
 
       {isError && !data ? (
-        <ErrorState title="No se pudo cargar el catálogo" onRetry={() => refetch()} />
+        <ErrorState
+          title="No se pudo cargar el catálogo"
+          message="Ocurrió un problema al consultar los equipos. Verifica tu conexión e intenta nuevamente."
+          onRetry={() => refetch()}
+        />
       ) : isLoading || !data ? (
         <Skeleton className="h-64 rounded-card" />
       ) : (
