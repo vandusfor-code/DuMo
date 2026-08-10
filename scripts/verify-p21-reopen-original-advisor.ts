@@ -80,43 +80,52 @@ async function main() {
     }
     const negConvId = closedNeg.id;
 
-    console.log("\n--- Caso negativo: tipificador NO disponible ---");
+    console.log("\n--- Caso negativo P2.2: tipificador offline, nadie más disponible → pending ---");
 
     await sql`
       UPDATE users
       SET presence_status = 'desconectado', last_seen_at = now() - interval '15 minutes'
-      WHERE id = ${carolinaId}
+      WHERE role = 'asesora' AND active = true
     `;
 
-    const offline = await maybeReopenClosedConversationOnInbound(negConvId);
-    assert(
-      offline.reopened === false && offline.reason === "tipifier-unavailable",
-      `offline/desconectado → no reopen (${offline.reopened ? "reopened" : offline.reason})`,
-    );
-
-    const afterOffline = await sql`
-      SELECT inbox_state, reopened_at FROM lead_conversations WHERE id = ${negConvId} LIMIT 1
-    `;
-    assert(afterOffline[0]?.inbox_state === "closed", "sigue closed con tipificador offline");
-    assert(afterOffline[0]?.reopened_at == null, "reopened_at sigue null (no tocar hasta P2.2)");
-
+    const pendingConv = `webqr:57395${String(Date.now()).slice(-7)}`;
     await sql`
-      UPDATE users
-      SET presence_status = 'disponible', last_seen_at = now() - interval '15 minutes'
-      WHERE id = ${carolinaId}
+      INSERT INTO lead_conversations (
+        id, phone, customer_name, last_message, last_message_at, unread, status, online, inbox_state,
+        assigned_advisor_id, assigned_advisor_name, admin_status
+      ) VALUES (
+        ${pendingConv}, ${pendingConv.replace("webqr:", "")}, 'P21 pending', 'x', now(), 0, 'new', false, 'closed',
+        ${carolinaId}, ${carolina[0].name ?? "Carolina"}, 'asignado'
+      )
+      ON CONFLICT (id) DO UPDATE SET inbox_state = 'closed', reopened_at = NULL
+    `;
+    await sql`
+      INSERT INTO lead_gestiones (
+        id, conversation_id, phone, customer_name, rut, gestion_type, notes,
+        advisor_id, advisor_name, lines, created_at
+      ) VALUES (
+        ${`GEST-P21-P-${Date.now()}`}, ${pendingConv}, ${pendingConv.replace("webqr:", "")},
+        'P21 pending', '11111111-1', 'consulta', '', ${carolinaId}, 'Carolina', '[]', now()
+      )
     `;
 
-    const stale = await maybeReopenClosedConversationOnInbound(negConvId);
-    assert(
-      stale.reopened === false && stale.reason === "tipifier-unavailable",
-      `disponible pero last_seen >10min → no reopen (${stale.reopened ? "reopened" : stale.reason})`,
-    );
-
-    const afterStale = await sql`
-      SELECT inbox_state FROM lead_conversations WHERE id = ${negConvId} LIMIT 1
+    const offline = await maybeReopenClosedConversationOnInbound(pendingConv);
+    assert(offline.reopened === true && offline.assignVia === "pending", "nadie disponible → pending");
+    const afterOffline = await sql`
+      SELECT inbox_state, reopened_at, assigned_advisor_id FROM lead_conversations WHERE id = ${pendingConv} LIMIT 1
     `;
-    assert(afterStale[0]?.inbox_state === "closed", "sigue closed fuera de ventana 10 min");
+    assert(afterOffline[0]?.inbox_state === "active", "pending: active (no closed silencioso)");
+    assert(afterOffline[0]?.assigned_advisor_id == null, "pending: sin asesora hasta auto-assign");
 
+    console.log("\n--- Caso negativo legacy: receiveMessage persiste con tipificador offline ---");
+    await sql`
+      UPDATE lead_conversations SET inbox_state = 'closed', reopened_at = NULL, assigned_advisor_id = ${carolinaId}
+      WHERE id = ${negConvId}
+    `;
+    await sql`
+      UPDATE users SET presence_status = 'desconectado', last_seen_at = now() - interval '15 minutes'
+      WHERE role = 'asesora' AND active = true
+    `;
     const { leadsService } = await loadLeadsService();
     const msgCountBefore = await sql`
       SELECT count(*)::int AS n FROM lead_messages WHERE conversation_id = ${negConvId}
@@ -140,9 +149,13 @@ async function main() {
       (msgCountAfter[0]?.n ?? 0) > (msgCountBefore[0]?.n ?? 0),
       "mensaje entrante se persiste aunque no reabra",
     );
-    assert(afterMsg[0]?.inbox_state === "closed", "tras mensaje sin reopen: sigue closed (OK hasta P2.2)");
+    assert(afterMsg[0]?.inbox_state === "active", "receiveMessage con RR/pending: active (no closed silencioso)");
 
-    console.log("\n--- Caso positivo: tipificador disponible ---");
+    await sql`
+      UPDATE users SET presence_status = 'disponible', last_seen_at = now() WHERE id = ${carolinaId}
+    `;
+
+    console.log("\n--- Caso positivo P2.1: tipificador disponible ---");
 
     const closedPos =
       (await findClosedWithTipifier(sql, carolinaId)) ??
@@ -177,8 +190,8 @@ async function main() {
 
     const result = await maybeReopenClosedConversationOnInbound(posConvId);
     assert(
-      result.reopened === true,
-      `reopen conversación ${posConvId} → ${result.reopened ? result.advisorId : result.reason}`,
+      result.reopened === true && result.assignVia === "original-tipifier",
+      `reopen ${posConvId} → ${result.advisorId} via ${result.assignVia}`,
     );
 
     const row = await sql`

@@ -10,9 +10,16 @@ import {
 } from "@/repositories/inbox-lifecycle.repository";
 import { ensureSchema, getSql, withDbRetry } from "@/server/db/client";
 
+export type InboxReopenAssignVia = "original-tipifier" | "round-robin" | "pending";
+
 export type InboxReopenResult =
-  | { reopened: false; reason: "not-closed" | "no-tipifier" | "tipifier-unavailable" }
-  | { reopened: true; advisorId: string; advisorName: string };
+  | { reopened: false; reason: "not-closed" }
+  | {
+      reopened: true;
+      advisorId: string | null;
+      advisorName: string | null;
+      assignVia: InboxReopenAssignVia;
+    };
 
 async function isAdvisorConnectedAndDisponible(advisorId: string): Promise<{
   id: string;
@@ -65,9 +72,60 @@ async function reopenConversationToAdvisor(
   );
 }
 
+/** P2.2 — Reabre dejando sin asesora para que round-robin asigne o quede pendiente. */
+async function reopenUnassigned(conversationId: string): Promise<void> {
+  await ensureSchema();
+  const sql = getSql();
+  if (!sql) throw new Error("Base de datos no configurada");
+
+  await withDbRetry(() =>
+    sql`
+      UPDATE lead_conversations
+      SET inbox_state = 'active',
+          reopened_at = now(),
+          assigned_advisor_id = NULL,
+          assigned_advisor_name = NULL,
+          assigned_advisor_at = NULL,
+          admin_status = 'nuevo'
+      WHERE id = ${conversationId}
+    `,
+  );
+}
+
+async function getConversationAdvisor(
+  conversationId: string,
+): Promise<{ id: string; name: string } | null> {
+  await ensureSchema();
+  const sql = getSql();
+  if (!sql) return null;
+
+  const rows = await withDbRetry(() =>
+    sql<{ assigned_advisor_id: string | null; assigned_advisor_name: string | null }[]>`
+      SELECT assigned_advisor_id, assigned_advisor_name
+      FROM lead_conversations
+      WHERE id = ${conversationId}
+      LIMIT 1
+    `,
+  );
+  const id = rows[0]?.assigned_advisor_id;
+  if (!id) return null;
+  return { id, name: rows[0]?.assigned_advisor_name ?? "" };
+}
+
+async function emitReopen(conversationId: string, assignedAdvisorId: string | null): Promise<void> {
+  const { emitLeadsConversationUpdated } = await import("@/server/realtime/emit");
+  emitLeadsConversationUpdated({
+    conversationId,
+    assignedAdvisorId,
+    reason: "reopen",
+  });
+}
+
 /**
- * P2.1 — Si el cliente escribe en conversación cerrada, reabrir y reasignar
- * al tipificador original cuando está conectada y disponible.
+ * P2.1 + P2.2 — Inbound en conversación cerrada:
+ * 1) tipificador original disponible → reasignar a ella;
+ * 2) si no → round-robin a otra asesora disponible;
+ * 3) si nadie disponible → reabrir sin asesora (pendiente hasta auto-assign).
  */
 export async function maybeReopenClosedConversationOnInbound(
   conversationId: string,
@@ -78,23 +136,41 @@ export async function maybeReopenClosedConversationOnInbound(
   }
 
   const tipifier = await getLastGestionAdvisor(conversationId);
-  if (!tipifier) {
-    return { reopened: false, reason: "no-tipifier" };
+  if (tipifier) {
+    const original = await isAdvisorConnectedAndDisponible(tipifier.advisorId);
+    if (original) {
+      await reopenConversationToAdvisor(conversationId, original);
+      await emitReopen(conversationId, original.id);
+      return {
+        reopened: true,
+        advisorId: original.id,
+        advisorName: original.name,
+        assignVia: "original-tipifier",
+      };
+    }
   }
 
-  const advisor = await isAdvisorConnectedAndDisponible(tipifier.advisorId);
-  if (!advisor) {
-    return { reopened: false, reason: "tipifier-unavailable" };
+  await reopenUnassigned(conversationId);
+
+  const { adminLeadsService } = await import("@/services/admin-leads.service");
+  await adminLeadsService.autoAssignIfNeeded(conversationId);
+
+  const assigned = await getConversationAdvisor(conversationId);
+  if (assigned) {
+    await emitReopen(conversationId, assigned.id);
+    return {
+      reopened: true,
+      advisorId: assigned.id,
+      advisorName: assigned.name,
+      assignVia: "round-robin",
+    };
   }
 
-  await reopenConversationToAdvisor(conversationId, advisor);
-
-  const { emitLeadsConversationUpdated } = await import("@/server/realtime/emit");
-  emitLeadsConversationUpdated({
-    conversationId,
-    assignedAdvisorId: advisor.id,
-    reason: "reopen",
-  });
-
-  return { reopened: true, advisorId: advisor.id, advisorName: advisor.name };
+  await emitReopen(conversationId, null);
+  return {
+    reopened: true,
+    advisorId: null,
+    advisorName: null,
+    assignVia: "pending",
+  };
 }
