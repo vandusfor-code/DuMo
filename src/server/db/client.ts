@@ -9,6 +9,7 @@ import {
   runAdvisorPresenceMigrations,
 } from "@/server/db/migrations/advisor-presence-schema";
 import { runTipificationMigrations, runTipificationBehaviorMigrations, TIPIFICATION_REQUIRED_COLUMNS } from "@/server/db/migrations/tipifications-schema";
+import { runTipificationP16Migrations } from "@/server/db/migrations/tipification-p16-schema";
 import { runWebQrMigrations } from "@/server/db/migrations/web-qr-schema";
 import { runLeadAssignmentMigrations } from "@/server/db/migrations/lead-assignment-schema";
 import {
@@ -303,6 +304,7 @@ async function ensureIncrementalMigrations(sql: Sql): Promise<void> {
     await runAdvisorPresenceMigrations(sql);
     await runLeadAssignmentMigrations(sql);
     await runTipificationBehaviorMigrations(sql);
+    await runTipificationP16Migrations(sql);
     await runInboxStateMigrations(sql);
   } catch (err) {
     console.error("[ensureIncrementalMigrations]", err);
@@ -513,6 +515,7 @@ async function runMigrations(sql: Sql) {
 
     await runQuickReplyAndTenantMigrations(tx);
     await runTipificationMigrations(tx);
+    await runTipificationP16Migrations(tx);
     await runAdvisorPresenceMigrations(tx);
     await runLeadAssignmentMigrations(tx);
     await runTeleprompterScriptMigrations(tx);

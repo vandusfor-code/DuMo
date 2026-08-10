@@ -116,7 +116,7 @@ export const DEFAULT_TIPIFICATION_SEEDS: TipificationSeed[] = [
 export const DEFAULT_TIPIFICATION_SLUGS = DEFAULT_TIPIFICATION_SEEDS.map((t) => t.slug);
 
 /**
- * P1.6 — plan congelado (ejecutar en P1.6, no antes).
+ * P1.6 — ejecutado vía runTipificationP16Migrations.
  * Historial existente de deuda_wom / deuda_compania_donante no se reasigna.
  */
 export const P16_TIPIFICATION_PLAN = {
