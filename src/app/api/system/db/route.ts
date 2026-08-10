@@ -90,7 +90,7 @@ export async function GET() {
       WHERE table_schema = 'public'
         AND table_name IN (
           'users', 'lead_conversations', 'lead_messages', 'app_config',
-          'accounting_expenses', 'sales', 'sale_lines', 'commission_payments', 'lead_gestiones', 'crm_clients'
+          'accounting_expenses', 'sales', 'sale_lines', 'commission_payments', 'lead_gestiones', 'crm_clients', 'lead_follow_ups'
         )
       ORDER BY table_name
     `;

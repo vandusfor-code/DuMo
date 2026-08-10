@@ -132,4 +132,6 @@ export type SaveLeadResult = {
   inboxState?: import("./inbox-state").InboxState;
   /** yyyy-mm-dd persistido en lead_gestiones.follow_up_date. */
   followUpDate?: string | null;
+  /** P4.0 — fila creada en lead_follow_ups. */
+  followUpCreated?: boolean;
 };

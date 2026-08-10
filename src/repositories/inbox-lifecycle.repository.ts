@@ -6,6 +6,7 @@ export type InboxLifecycleApplyResult = {
   inboxClosed: boolean;
   inboxState: InboxState;
   followUpDate: string | null;
+  followUpCreated: boolean;
 };
 
 export async function setConversationInboxState(

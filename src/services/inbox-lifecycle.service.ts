@@ -4,6 +4,7 @@ import {
   resolveTipificationBehavior,
   shouldCloseInboxAfterSave,
 } from "@/lib/tipification-follow-up";
+import { upsertFollowUpFromGestion } from "@/repositories/follow-up.repository";
 import {
   getConversationInboxState,
   getGestionFollowUpDate,
@@ -65,6 +66,14 @@ export async function applyInboxLifecycleAfterSave(
     await setGestionFollowUpDate(input.gestionId, null);
   }
 
+  let followUpCreated = false;
+  if (behavior.createsFollowUp && persistedFollowUpDate) {
+    followUpCreated = await upsertFollowUpFromGestion(input.gestionId, persistedFollowUpDate);
+    if (!followUpCreated) {
+      throw new Error("No se pudo registrar el seguimiento en la cola de pendientes.");
+    }
+  }
+
   if (closeInbox) {
     await setConversationInboxState(input.conversationId, "closed");
   }
@@ -77,6 +86,7 @@ export async function applyInboxLifecycleAfterSave(
     inboxClosed: closeInbox,
     inboxState,
     followUpDate: persistedFollowUpDate,
+    followUpCreated,
   };
 }
 

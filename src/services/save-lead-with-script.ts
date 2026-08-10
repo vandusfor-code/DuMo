@@ -42,6 +42,7 @@ export async function saveLeadWithScript(
   let inboxClosed = false;
   let inboxState: InboxState = "active";
   let followUpDatePersisted: string | null = null;
+  let followUpCreated = false;
 
   const companyId = DEFAULT_COMPANY_ID;
   const isSaleFlow = await tipificationService.triggersSaleFlowForSlug(companyId, input.type);
@@ -178,8 +179,12 @@ export async function saveLeadWithScript(
     inboxClosed = lifecycle.inboxClosed;
     inboxState = lifecycle.inboxState;
     followUpDatePersisted = lifecycle.followUpDate;
+    followUpCreated = lifecycle.followUpCreated;
   } catch (error) {
     console.error("[saveLeadWithScript] inbox lifecycle apply failed", error);
+    if (error instanceof Error && error.message.includes("seguimiento")) {
+      throw error;
+    }
   }
 
   const result: SaveLeadResult = {
@@ -194,6 +199,7 @@ export async function saveLeadWithScript(
     inboxClosed,
     inboxState,
     followUpDate: followUpDatePersisted,
+    followUpCreated,
   };
 
   logScriptSaveCheckpoint("saveLeadWithScript · antes de responder", {
