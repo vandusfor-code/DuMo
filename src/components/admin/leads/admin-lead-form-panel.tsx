@@ -44,7 +44,13 @@ import {
 } from "@/lib/lead-save";
 import { validateLeadFormBeforeSave } from "@/lib/lead-form-validation";
 import { useSaleFlowType, useTipificationCatalog } from "@/hooks/use-tipification-catalog";
+import {
+  clearPendingTipificationLabel,
+  commitTipificationLabel,
+  useSyncPendingTipificationLabel,
+} from "@/hooks/use-pending-tipification-label";
 import { useWatch } from "react-hook-form";
+import { useQueryClient } from "@tanstack/react-query";
 
 function defaultsFor(c: AdminConversation): LeadFormValues {
   return {
@@ -78,6 +84,8 @@ export function AdminLeadFormPanel({
   const { data: fetchedScript } = useSalesScript(conversation.id);
   const script = saveLead.data?.script ?? fetchedScript ?? null;
   const methods = useForm<LeadFormValues>({ defaultValues: defaultsFor(conversation) });
+  const queryClient = useQueryClient();
+  useSyncPendingTipificationLabel(conversation.id, methods.control);
   const type = useWatch({ control: methods.control, name: "type" });
   const isSaleFlow = useSaleFlowType(type);
   const { triggersSaleFlow, catalog } = useTipificationCatalog();
@@ -140,6 +148,7 @@ export function AdminLeadFormPanel({
     };
     try {
       await saveLead.mutateAsync(input);
+      commitTipificationLabel(queryClient, conversation.id, values.type, catalog);
       methods.clearErrors("root");
       methods.clearErrors("followUpDate");
       const action = saveModeRef.current;

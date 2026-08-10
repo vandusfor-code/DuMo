@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import type { AdminAdvisor, AdminConversation } from "@/types/admin-lead";
 import { AdminLeadStatusBadge } from "./admin-conversation-filters";
 import { ConversationTipificationBadge } from "@/components/leads/conversation-tipification-badge";
+import { useDisplayTipification } from "@/hooks/use-pending-tipification-label";
 
 export function AdminConversationItem({
   conversation,
@@ -27,6 +28,7 @@ export function AdminConversationItem({
   onSelect: () => void;
   onAssign: (advisorId: string) => void;
 }) {
+  const displayTipification = useDisplayTipification(conversation);
   return (
     <div
       className={cn(
@@ -60,8 +62,8 @@ export function AdminConversationItem({
             )}
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-            {conversation.latestTipification ? (
-              <ConversationTipificationBadge tipification={conversation.latestTipification} />
+            {displayTipification ? (
+              <ConversationTipificationBadge tipification={displayTipification} />
             ) : null}
             <AdminLeadStatusBadge status={conversation.status} />
             {conversation.assignedAdvisor && (

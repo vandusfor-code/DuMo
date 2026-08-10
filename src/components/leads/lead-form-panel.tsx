@@ -16,7 +16,13 @@ import {
 } from "@/lib/lead-save";
 import { validateLeadFormBeforeSave } from "@/lib/lead-form-validation";
 import { useTipificationCatalog } from "@/hooks/use-tipification-catalog";
+import {
+  clearPendingTipificationLabel,
+  commitTipificationLabel,
+  useSyncPendingTipificationLabel,
+} from "@/hooks/use-pending-tipification-label";
 import { useForm, FormProvider } from "react-hook-form";
+import { useQueryClient } from "@tanstack/react-query";
 
 /**
  * Owns the commercial-management form. Mounted with `key={conversation.id}` by
@@ -28,9 +34,12 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
   const gestionDraft = useLatestGestionDraft(conversation.id);
   const saveModeRef = useRef<SaveLeadAction>("close");
   const { triggersSaleFlow, catalog } = useTipificationCatalog();
+  const queryClient = useQueryClient();
   const methods = useForm<LeadFormValues>({
     defaultValues: draftToFormValues({ conversation }),
   });
+
+  useSyncPendingTipificationLabel(conversation.id, methods.control);
 
   useEffect(() => {
     if (gestionDraft.isLoading) return;
@@ -78,6 +87,7 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
     };
     try {
       await saveLead.mutateAsync(input);
+      commitTipificationLabel(queryClient, conversation.id, values.type, catalog);
       methods.clearErrors("root");
       methods.clearErrors("followUpDate");
     } catch (error) {
@@ -111,9 +121,10 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
           onClose={() => {
             saveModeRef.current = "close";
           }}
-          onCancel={() =>
-            methods.reset(draftToFormValues({ conversation, draft: gestionDraft.data }))
-          }
+          onCancel={() => {
+            clearPendingTipificationLabel(queryClient, conversation.id);
+            methods.reset(draftToFormValues({ conversation, draft: gestionDraft.data }));
+          }}
         />
       </form>
     </FormProvider>

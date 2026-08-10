@@ -5,6 +5,7 @@ import { getInitials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Conversation } from "@/types/conversation";
 import { ConversationTipificationBadge } from "./conversation-tipification-badge";
+import { useDisplayTipification } from "@/hooks/use-pending-tipification-label";
 
 /** ConversationCard — tarjeta compacta de conversación. */
 export function ConversationItem({
@@ -16,6 +17,7 @@ export function ConversationItem({
   active: boolean;
   onClick: () => void;
 }) {
+  const displayTipification = useDisplayTipification(conversation);
   const statusLabel = conversation.online
     ? "En línea"
     : conversation.unread > 0
@@ -55,9 +57,9 @@ export function ConversationItem({
                 <span className="ml-1.5 text-[10px] font-medium text-warning-ink">Web</span>
               ) : null}
             </p>
-            {conversation.latestTipification ? (
+            {displayTipification ? (
               <div className="mt-1">
-                <ConversationTipificationBadge tipification={conversation.latestTipification} />
+                <ConversationTipificationBadge tipification={displayTipification} />
               </div>
             ) : null}
           </div>
