@@ -1,6 +1,7 @@
 import "server-only";
 import type { AdvisorScope } from "@/lib/advisor-scope";
 import { leadGestionToNewSaleInput } from "@/lib/lead-save";
+import { resolveAdvisorScopeForLeadSave } from "@/lib/resolve-advisor-scope-for-lead";
 import { getLeadRepository } from "@/repositories/leads.repository";
 import { salesScriptService } from "@/services/sales-script.service";
 import { salesService } from "@/services/sales.service";
@@ -29,8 +30,9 @@ export async function saveLeadWithScript(
   input: SaveLeadInput,
   scope?: AdvisorScope | null,
 ): Promise<SaveLeadResult> {
-  const lead = await getLeadRepository().saveLead(input, scope);
-  const advisor = scope ? { name: scope.name, email: "" } : undefined;
+  const effectiveScope = await resolveAdvisorScopeForLeadSave(input.conversationId, scope);
+  const lead = await getLeadRepository().saveLead(input, effectiveScope);
+  const advisor = effectiveScope ? { name: effectiveScope.name, email: "" } : undefined;
   let script = null;
   let scriptUnavailableReason: string | null = null;
   let sale = null;
@@ -52,7 +54,10 @@ export async function saveLeadWithScript(
     saveAction !== "close" &&
     isSaleFlow &&
     input.lines.length > 0;
-  const shouldRegisterSale = saveAction === "sale" && isSaleFlow && input.lines.length > 0;
+  const shouldRegisterSale =
+    (saveAction === "sale" || saveAction === "script") &&
+    isSaleFlow &&
+    input.lines.length > 0;
 
   if (shouldGenerateScript) {
     const main = input.lines[0];
@@ -121,19 +126,22 @@ export async function saveLeadWithScript(
     }
   }
 
-  if (shouldRegisterSale && scope) {
+  if (shouldRegisterSale && effectiveScope) {
     const saleInput = leadGestionToNewSaleInput(input, saleFlowOptions);
     if (saleInput) {
       try {
-        sale = await salesService.create(saleInput, scope);
+        sale = await salesService.create(saleInput, effectiveScope);
       } catch (error) {
         console.error("[saveLeadWithScript] sale registration failed", error);
         saleError = "La gestión se guardó, pero no se pudo registrar en Mis Ventas.";
       }
     }
+  } else if (shouldRegisterSale && !effectiveScope) {
+    saleError =
+      "La gestión se guardó, pero no se pudo registrar en Mis Ventas (asigna una asesora al chat).";
   }
 
-  if (scope) {
+  if (effectiveScope) {
     try {
       await crmClientsService.upsertFromGestion({
         conversationId: input.conversationId,
@@ -141,8 +149,8 @@ export async function saveLeadWithScript(
         rut: input.rut,
         phone: input.phone,
         gestionType: input.type,
-        advisorId: scope.id,
-        advisorName: scope.name,
+        advisorId: effectiveScope.id,
+        advisorName: effectiveScope.name,
         hasSale: Boolean(sale),
       });
       clientSaved = true;
@@ -151,9 +159,9 @@ export async function saveLeadWithScript(
       clientError =
         "La gestión se guardó, pero no se pudo registrar en Clientes. Revisa la pantalla Clientes en unos segundos.";
     }
-  } else {
+  } else if (shouldRegisterSale) {
     clientError =
-      "La gestión se guardó, pero no se pudo vincular a tu cartera (sesión sin rol de asesora).";
+      "La gestión se guardó, pero no se pudo vincular a Clientes (sin asesora asignada al chat).";
   }
 
   try {

@@ -29,7 +29,7 @@ export function ActionButtons({
         ) : (
           <ScrollText className="size-[18px]" />
         )}
-        {isClose ? "Guardar y cerrar" : "Generar Script"}
+        {isClose ? "Guardar y cerrar" : "Guardar venta y generar script"}
       </Button>
     </div>
   );

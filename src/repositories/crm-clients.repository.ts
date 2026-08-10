@@ -111,7 +111,7 @@ class PostgresCrmClientsRepository implements CrmClientsRepository {
           g.gestion_type,
           ${scope.id},
           ${scope.name},
-          (g.gestion_type = 'venta'),
+          false,
           g.created_at,
           g.created_at
         FROM (

@@ -99,7 +99,10 @@ export function shouldCloseInboxAfterSave(input: {
   if (!input.behavior.closesInbox) return false;
 
   if (input.behavior.triggersSaleFlow) {
-    return input.saveAction === "sale" && input.saleRegistered;
+    return (
+      input.saleRegistered &&
+      (input.saveAction === "sale" || input.saveAction === "script")
+    );
   }
 
   return input.saveAction === "close" || input.saveAction === "tipify";

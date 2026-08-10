@@ -215,11 +215,13 @@ export function AdminLeadFormPanel({
                     <CheckCircle2 className="size-[18px]" />
                     {saveLead.data?.sale
                       ? script
-                        ? "Venta guardada correctamente. Ya aparece en Ventas y el script está disponible."
-                        : "Venta guardada correctamente. Ya aparece en Ventas."
-                      : script
-                        ? "Gestión guardada correctamente. El script de venta ya está disponible."
-                        : "Gestión guardada correctamente."}
+                        ? "Venta guardada en Mis Ventas. El script de la llamada ya está disponible."
+                        : "Venta guardada correctamente. Ya aparece en Mis Ventas."
+                      : isSaleFlow
+                        ? "Gestión guardada. No se pudo registrar la venta en Mis Ventas."
+                        : script
+                          ? "Gestión guardada correctamente. El script de venta ya está disponible."
+                          : "Gestión guardada correctamente."}
                   </div>
                 )}
                 {saveLead.isSuccess && saveLead.data?.saleError ? (

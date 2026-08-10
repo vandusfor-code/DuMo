@@ -39,12 +39,12 @@ assert(
 );
 
 assert(
-  !shouldCloseInboxAfterSave({
+  shouldCloseInboxAfterSave({
     behavior: ventaBehavior,
     saveAction: "script",
     saleRegistered: true,
   }),
-  "venta + solo script → NO cierra bandeja",
+  "venta + script con venta OK → cierra bandeja",
 );
 
 assert(

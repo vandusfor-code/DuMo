@@ -202,6 +202,12 @@ export function LeadPanel({
                   ? clientSaved
                     ? "Cliente tipificado correctamente. Ya aparece en Clientes."
                     : "Gestión guardada correctamente."
+                  : lastSaveAction === "script" || lastSaveAction === "sale"
+                  ? saleRegistered
+                    ? script
+                      ? "Venta guardada en Mis Ventas. El script de la llamada ya está disponible."
+                      : "Venta guardada correctamente. Ya aparece en Mis Ventas."
+                    : "Gestión guardada. No se pudo registrar la venta en Mis Ventas."
                   : saleRegistered
                     ? script
                       ? "Venta guardada en Mis Ventas. El script de la llamada ya está disponible."
