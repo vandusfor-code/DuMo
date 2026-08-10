@@ -2,6 +2,7 @@ import "server-only";
 import { ADMIN_DASHBOARD_MOCK } from "@/data/mock/admin-dashboard.mock";
 import { COMMERCIAL_PLANS_MOCK, COMMERCIAL_SETTINGS_MOCK } from "@/data/mock/commercial-config.mock";
 import type { AdminCommissionResult } from "@/types/admin-commission";
+import type { AdminPendientesResult } from "@/types/admin-pendientes";
 import type { AdminSalesResult } from "@/types/admin-sale";
 import type { AccountingResult } from "@/types/accounting";
 import type { AdvisorsResult } from "@/types/admin-advisor";
@@ -17,6 +18,20 @@ const EMPTY_SALES_SUMMARY = {
 
 export function emptyAdminSalesResult(): AdminSalesResult {
   return { rows: [], total: 0, summary: { ...EMPTY_SALES_SUMMARY } };
+}
+
+export function emptyAdminPendientesResult(): AdminPendientesResult {
+  return {
+    rows: [],
+    total: 0,
+    summary: {
+      totalPending: 0,
+      deuda: 0,
+      permanencia: 0,
+      seguimiento: 0,
+      byType: [],
+    },
+  };
 }
 
 export function emptyAdminCommissionsResult(): AdminCommissionResult {

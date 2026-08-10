@@ -21,18 +21,44 @@ export async function runLeadFollowUpsMigrations(tx: MigrationSql): Promise<void
       follow_up_date date NOT NULL,
       status text NOT NULL DEFAULT 'pending',
       created_at timestamptz NOT NULL DEFAULT now(),
-      completed_at timestamptz
+      completed_at timestamptz,
+      origin_advisor_id text,
+      owner_advisor_id text,
+      module text NOT NULL DEFAULT 'pendientes'
     )
+  `;
+
+  await tx`ALTER TABLE lead_follow_ups ADD COLUMN IF NOT EXISTS origin_advisor_id text`;
+  await tx`ALTER TABLE lead_follow_ups ADD COLUMN IF NOT EXISTS owner_advisor_id text`;
+  await tx`ALTER TABLE lead_follow_ups ADD COLUMN IF NOT EXISTS module text NOT NULL DEFAULT 'pendientes'`;
+
+  await tx`
+    UPDATE lead_follow_ups
+    SET origin_advisor_id = advisor_id
+    WHERE origin_advisor_id IS NULL AND advisor_id IS NOT NULL
+  `;
+
+  await tx`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'lead_follow_ups_status_check'
+      ) THEN
+        ALTER TABLE lead_follow_ups DROP CONSTRAINT lead_follow_ups_status_check;
+      END IF;
+      ALTER TABLE lead_follow_ups ADD CONSTRAINT lead_follow_ups_status_check
+        CHECK (status IN ('pending', 'completed', 'cancelled', 'transferred'));
+    END $$
   `;
 
   await tx`
     DO $$
     BEGIN
       IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint WHERE conname = 'lead_follow_ups_status_check'
+        SELECT 1 FROM pg_constraint WHERE conname = 'lead_follow_ups_module_check'
       ) THEN
-        ALTER TABLE lead_follow_ups ADD CONSTRAINT lead_follow_ups_status_check
-          CHECK (status IN ('pending', 'completed', 'cancelled'));
+        ALTER TABLE lead_follow_ups ADD CONSTRAINT lead_follow_ups_module_check
+          CHECK (module IN ('pendientes', 'recuperacion'));
       END IF;
     END $$
   `;

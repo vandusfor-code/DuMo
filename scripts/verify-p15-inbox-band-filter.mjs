@@ -28,8 +28,13 @@ const base = (
   "http://localhost:3000"
 ).replace(/\/$/, "");
 
+const requireRealLogin = process.argv.includes("--require-real-login");
+const advisorLoginFilter =
+  process.argv.find((a) => a.startsWith("--advisor="))?.slice("--advisor=".length) ?? null;
+
 const ADMIN_LOGIN = process.env.PROD_ADMIN_LOGIN ?? "duvan.ramos";
 const ADMIN_PASSWORD = process.env.PROD_ADMIN_PASSWORD ?? "100299";
+const CAROLINA_PASSWORD = process.env.P21_CAROLINA_PASSWORD ?? "Carolina2026!";
 const SESSION_COOKIE = "dumo_session";
 
 function loadEnvFile(name) {
@@ -51,6 +56,7 @@ function loadEnvFile(name) {
 }
 
 loadEnvFile(".env.local");
+loadEnvFile(".env.production.local");
 
 const AUTH_SECRET = process.env.AUTH_SECRET?.trim();
 const DATABASE_URL = process.env.DATABASE_URL1?.trim() ?? process.env.DATABASE_URL?.trim();
@@ -136,7 +142,7 @@ async function main() {
     const [{ active_total }] =
       await sql`SELECT COUNT(*)::int AS active_total FROM lead_conversations WHERE inbox_state = 'active'`;
 
-    const advisors = await sql`
+    let advisors = await sql`
       SELECT u.id, u.name, u.username, u.token_version,
              COUNT(c.id) FILTER (WHERE c.inbox_state = 'active')::int AS active_count,
              COUNT(c.id) FILTER (WHERE c.inbox_state = 'closed')::int AS closed_count,
@@ -149,6 +155,28 @@ async function main() {
       ORDER BY active_count DESC
       LIMIT 5
     `;
+
+    if (advisorLoginFilter) {
+      const pinned = advisors.filter(
+        (a) => a.username.toLowerCase() === advisorLoginFilter.toLowerCase(),
+      );
+      if (pinned.length === 0) {
+        const [row] = await sql`
+          SELECT u.id, u.name, u.username, u.token_version,
+                 COUNT(c.id) FILTER (WHERE c.inbox_state = 'active')::int AS active_count,
+                 COUNT(c.id) FILTER (WHERE c.inbox_state = 'closed')::int AS closed_count,
+                 COUNT(c.id)::int AS total_assigned
+          FROM users u
+          LEFT JOIN lead_conversations c ON c.assigned_advisor_id = u.id
+          WHERE u.role = 'asesora' AND u.active = true AND u.username ILIKE ${advisorLoginFilter}
+          GROUP BY u.id, u.name, u.username, u.token_version
+        `;
+        if (!row) throw new Error(`Asesora ${advisorLoginFilter} no encontrada o sin chats.`);
+        advisors = [row];
+      } else {
+        advisors = pinned;
+      }
+    }
 
     if (advisors.length === 0) {
       throw new Error("No hay asesoras con conversaciones activas asignadas en BD.");
@@ -221,10 +249,18 @@ async function main() {
     console.log("=== 4) Asesora — sesión cookie + bandeja (cookie-only) ===");
     let advisorSession;
     let advisorLoginVia = "api";
+    const advisorPassword =
+      advisor.username.toLowerCase() === "carolina.wom"
+        ? CAROLINA_PASSWORD
+        : ADMIN_PASSWORD;
     try {
-      advisorSession = await loginWithCookie(advisor.username, ADMIN_PASSWORD);
-      console.log("  Login API OK:", advisor.username);
+      advisorSession = await loginWithCookie(advisor.username, advisorPassword);
+      console.log("  Login API OK:", advisor.username, "(POST /api/auth/login)");
     } catch (err) {
+      if (requireRealLogin) {
+        console.error("  Login API FALLO (require-real-login):", err.message);
+        process.exit(1);
+      }
       advisorLoginVia = "cookie firmada (AUTH_SECRET + tokenVersion BD)";
       const cookieHeader = sessionCookieHeader(
         advisor.id,
@@ -343,11 +379,18 @@ async function main() {
     if (!closedTestOk) failures.push("conversación cerrada no excluida");
     if (!hasForm) failures.push("login page sin contenido SSR");
 
+    if (requireRealLogin && advisorLoginVia !== "api") {
+      failures.push("require-real-login pero sesión asesora no fue vía API");
+    }
+
     if (failures.length) {
       console.error("FALLOS P1.5:", failures.join("; "));
       process.exit(1);
     }
-    console.log("OK — P1.5 verificado (login + admin/supervisor sin filtro + asesora solo activas).");
+    const realNote = requireRealLogin ? " [sesión asesora vía login API real]" : "";
+    console.log(
+      `OK — P1.5 verificado (login + admin/supervisor sin filtro + asesora solo activas)${realNote}.`,
+    );
   } finally {
     await sql.end({ timeout: 5 });
   }

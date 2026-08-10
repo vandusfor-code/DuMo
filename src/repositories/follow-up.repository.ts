@@ -10,6 +10,9 @@ function rowToLeadFollowUp(row: {
   conversation_id: string;
   advisor_id: string | null;
   advisor_name: string;
+  origin_advisor_id?: string | null;
+  owner_advisor_id?: string | null;
+  module?: string;
   customer_name: string;
   phone: string;
   tipification_slug: string;
@@ -25,6 +28,9 @@ function rowToLeadFollowUp(row: {
     conversationId: row.conversation_id,
     advisorId: row.advisor_id,
     advisorName: row.advisor_name,
+    originAdvisorId: row.origin_advisor_id ?? row.advisor_id,
+    ownerAdvisorId: row.owner_advisor_id ?? null,
+    module: (row.module ?? "pendientes") as LeadFollowUp["module"],
     customerName: row.customer_name,
     phone: row.phone,
     tipificationSlug: row.tipification_slug,
@@ -67,6 +73,8 @@ export async function upsertFollowUpFromGestion(
         conversation_id,
         advisor_id,
         advisor_name,
+        origin_advisor_id,
+        module,
         customer_name,
         phone,
         tipification_slug,
@@ -81,6 +89,8 @@ export async function upsertFollowUpFromGestion(
         g.conversation_id,
         g.advisor_id,
         g.advisor_name,
+        g.advisor_id,
+        'pendientes',
         g.customer_name,
         g.phone,
         g.gestion_type,
@@ -94,9 +104,12 @@ export async function upsertFollowUpFromGestion(
         tipification_slug = EXCLUDED.tipification_slug,
         advisor_id = EXCLUDED.advisor_id,
         advisor_name = EXCLUDED.advisor_name,
+        origin_advisor_id = COALESCE(lead_follow_ups.origin_advisor_id, EXCLUDED.origin_advisor_id),
         customer_name = EXCLUDED.customer_name,
         phone = EXCLUDED.phone,
+        module = 'pendientes',
         status = 'pending',
+        owner_advisor_id = NULL,
         completed_at = NULL
       RETURNING id
     `,

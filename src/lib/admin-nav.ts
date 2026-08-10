@@ -1,6 +1,7 @@
 import {
   BarChart3,
   CircleDollarSign,
+  Clock,
   Contact,
   FileBarChart,
   FileText,
@@ -32,6 +33,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { label: "Ventas", href: "/admin/ventas", icon: BarChart3 },
   { label: "Asesoras", href: "/admin/asesoras", icon: Users },
   { label: "Leads", href: "/admin/leads", icon: MessagesSquare },
+  { label: "Pendientes", href: "/admin/pendientes", icon: Clock },
   { label: "Live", href: "/admin/live", icon: Radio },
   { label: "Clientes", href: "/admin/clientes", icon: Contact },
   { label: "Comisiones", href: "/admin/comisiones", icon: CircleDollarSign },

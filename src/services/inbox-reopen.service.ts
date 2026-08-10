@@ -50,7 +50,7 @@ async function isAdvisorConnectedAndDisponible(advisorId: string): Promise<{
   return { id: row.id, name: row.name };
 }
 
-async function reopenConversationToAdvisor(
+export async function reopenConversationToAdvisor(
   conversationId: string,
   advisor: { id: string; name: string },
 ): Promise<void> {

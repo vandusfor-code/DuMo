@@ -1,4 +1,6 @@
-export type LeadFollowUpStatus = "pending" | "completed" | "cancelled";
+export type LeadFollowUpStatus = "pending" | "completed" | "cancelled" | "transferred";
+
+export type LeadFollowUpModule = "pendientes" | "recuperacion";
 
 export interface LeadFollowUp {
   id: string;
@@ -7,6 +9,9 @@ export interface LeadFollowUp {
   conversationId: string;
   advisorId: string | null;
   advisorName: string;
+  originAdvisorId: string | null;
+  ownerAdvisorId: string | null;
+  module: LeadFollowUpModule;
   customerName: string;
   phone: string;
   tipificationSlug: string;
