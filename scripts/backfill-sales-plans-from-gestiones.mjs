@@ -43,7 +43,8 @@ const sql = postgres(DATABASE_URL, { max: 1, prepare: false });
 
 try {
   const configRows = await sql`SELECT value FROM app_config WHERE key = 'commercial_plans'`;
-  const plans = JSON.parse(configRows[0]?.value ?? "[]");
+  const rawPlans = configRows[0]?.value;
+  const plans = typeof rawPlans === "string" ? JSON.parse(rawPlans) : Array.isArray(rawPlans) ? rawPlans : [];
   const planById = new Map(plans.filter((p) => p.status === "active").map((p) => [p.id, p]));
 
   const emptySales = await sql`

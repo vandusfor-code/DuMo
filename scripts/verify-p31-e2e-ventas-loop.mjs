@@ -109,7 +109,8 @@ async function main() {
     console.log("Base:", base);
 
     const plansRow = await sql`SELECT value FROM app_config WHERE key = 'commercial_plans'`;
-    const plans = JSON.parse(plansRow[0]?.value ?? "[]");
+    const rawPlans = plansRow[0]?.value;
+    const plans = typeof rawPlans === "string" ? JSON.parse(rawPlans) : Array.isArray(rawPlans) ? rawPlans : [];
     const plan = plans.find((p) => p.id === "plan-003" && p.status === "active") ?? plans[0];
     if (!plan) throw new Error("Sin planes en config comercial");
     const expectedDumo = Number(plan.dumoValue ?? 0);
