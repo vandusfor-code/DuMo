@@ -16,10 +16,7 @@ import {
   INBOX_LIFECYCLE_REQUIRED_COLUMNS,
   runInboxStateMigrations,
 } from "@/server/db/migrations/inbox-lifecycle-schema";
-import {
-  LEAD_FOLLOW_UPS_TABLE,
-  runLeadFollowUpsMigrations,
-} from "@/server/db/migrations/lead-follow-ups-schema";
+import { runLeadFollowUpsMigrations } from "@/server/db/migrations/lead-follow-ups-schema";
 
 let sqlSingleton: Sql | null = null;
 let schemaPromise: Promise<void> | null = null;
@@ -311,15 +308,7 @@ async function ensureIncrementalMigrations(sql: Sql): Promise<void> {
     await runTipificationP16Migrations(sql);
     await runInboxStateMigrations(sql);
 
-    const followUpTable = await sql<{ exists: boolean }[]>`
-      SELECT EXISTS (
-        SELECT 1 FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name = ${LEAD_FOLLOW_UPS_TABLE}
-      ) AS exists
-    `;
-    if (!followUpTable[0]?.exists) {
-      await runLeadFollowUpsMigrations(sql);
-    }
+    await runLeadFollowUpsMigrations(sql);
   } catch (err) {
     console.error("[ensureIncrementalMigrations]", err);
   }
