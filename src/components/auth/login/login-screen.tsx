@@ -4,7 +4,7 @@ import { LoginBackground } from "./login-background";
 import { LoginFormPanel } from "./login-form-panel";
 import { LoginHeroPanel } from "./login-hero-panel";
 
-export function LoginScreen() {
+export function LoginScreen({ nextPath }: { nextPath?: string | null }) {
   return (
     <div className="relative flex min-h-dvh w-full flex-col overflow-x-hidden bg-[#FAFAFC] lg:h-dvh lg:overflow-hidden">
       <LoginBackground />
@@ -15,7 +15,7 @@ export function LoginScreen() {
             <LoginHeroPanel />
           </div>
           <div className="order-2 lg:order-2">
-            <LoginFormPanel />
+            <LoginFormPanel nextPath={nextPath ?? null} />
           </div>
         </div>
       </div>

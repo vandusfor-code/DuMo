@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { useSearchParams } from "next/navigation";
 import { clearClientToken } from "@/lib/auth/client-token";
 
 /**
@@ -9,14 +8,12 @@ import { clearClientToken } from "@/lib/auth/client-token";
  * (/logout → /login?signedOut=1). No borrar en redirecciones por fallo
  * transitorio de auth evita perder el Bearer de respaldo.
  */
-export function LogoutCleanup() {
-  const searchParams = useSearchParams();
-
+export function LogoutCleanup({ signedOut }: { signedOut?: boolean }) {
   useEffect(() => {
-    if (searchParams.get("signedOut") === "1") {
+    if (signedOut) {
       clearClientToken();
     }
-  }, [searchParams]);
+  }, [signedOut]);
 
   return null;
 }
