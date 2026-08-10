@@ -4,6 +4,7 @@ import { CONVERSATIONS_MOCK, getMockMessages } from "@/data/mock/leads.mock";
 import { withLatency } from "@/lib/mock";
 import { formatChatTime } from "@/lib/format";
 import { resolveConversationChannel } from "@/lib/conversation-channel";
+import { parseInboxState } from "@/types/inbox-state";
 import { isMessengerConversation } from "@/lib/messenger/conversation-id";
 import { isWebQrConversation, webQrConversationId } from "@/lib/web-qr/conversation-id";
 import { formatWhatsAppDisplayPhone, isLikelyWhatsAppLid, normalizeWhatsAppPhoneDigits } from "@/lib/whatsapp/phone";
@@ -124,6 +125,7 @@ type ConvRow = {
   unread: number;
   status: string;
   online: boolean;
+  inbox_state?: string;
 };
 
 type MsgRow = {
@@ -160,6 +162,7 @@ class PostgresConversationRepository implements ConversationRepository {
           ? sql`
               SELECT * FROM lead_conversations
               WHERE assigned_advisor_id = ${advisorId}
+                AND inbox_state = 'active'
               ORDER BY last_message_at DESC
             `
           : sql`
@@ -186,6 +189,7 @@ class PostgresConversationRepository implements ConversationRepository {
         unread: Number(r.unread) || 0,
         status: toStatus(r.status),
         online: Boolean(r.online),
+        inboxState: parseInboxState(r.inbox_state),
       };
     });
   }

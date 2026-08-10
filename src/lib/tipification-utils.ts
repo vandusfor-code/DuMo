@@ -1,6 +1,6 @@
-import { DEFAULT_TIPIFICATION_SEEDS } from "@/lib/tipification-seeds";
+import { DEFAULT_TIPIFICATION_SEEDS, P16_TIPIFICATION_PLAN } from "@/lib/tipification-seeds";
 import { LEAD_TYPE_LABELS, type LeadType } from "@/types/lead";
-import type { Tipification } from "@/types/tipification";
+import { TIPIFICATION_BADGE_COLORS, type Tipification } from "@/types/tipification";
 
 /** Respaldo si la API de tipificaciones no responde — equivalente al enum histórico. */
 export function fallbackTriggersSaleFlow(slug: string): boolean {
@@ -9,13 +9,25 @@ export function fallbackTriggersSaleFlow(slug: string): boolean {
 
 export function buildFallbackTipificationCatalog(companyId = "company-default"): Tipification[] {
   const now = new Date().toISOString();
-  return DEFAULT_TIPIFICATION_SEEDS.map((seed) => ({
+  const badge = TIPIFICATION_BADGE_COLORS.in_progress;
+  const legacy = DEFAULT_TIPIFICATION_SEEDS.map((seed) => ({
     ...seed,
     companyId,
     createdAt: now,
     updatedAt: now,
     createdBy: "system",
   }));
+  const p16Inserts = P16_TIPIFICATION_PLAN.inserts.map((insert) => ({
+    ...insert,
+    ...badge,
+    companyId,
+    triggersSaleFlow: false,
+    status: "active" as const,
+    createdAt: now,
+    updatedAt: now,
+    createdBy: "system",
+  }));
+  return [...legacy, ...p16Inserts].sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 export function triggersSaleFlowFromCatalog(

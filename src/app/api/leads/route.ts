@@ -8,6 +8,8 @@ import { advisorScopeFromUser } from "@/lib/advisor-scope";
 import { authService } from "@/services/auth.service";
 import { leadsService } from "@/services/leads.service";
 import { saveLeadSchema } from "@/lib/schemas/save-lead.schema";
+import { resolveFollowUpDateForSave, validateFollowUpDateForCloseAction } from "@/lib/tipification-follow-up";
+import { tipificationService } from "@/services/tipification.service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,12 +45,30 @@ export async function POST(request: NextRequest) {
       throw err;
     }
 
+    const catalog = await tipificationService.listActive(scope);
+    const followUpValidationError = validateFollowUpDateForCloseAction({
+      slug: parsed.data.type,
+      catalog,
+      followUpDate: parsed.data.followUpDate,
+      saveAction: parsed.data.saveAction,
+    });
+    if (followUpValidationError) {
+      return NextResponse.json({ error: followUpValidationError }, { status: 422 });
+    }
+
+    const resolvedFollowUp = resolveFollowUpDateForSave({
+      slug: parsed.data.type,
+      catalog,
+      followUpDate: parsed.data.followUpDate,
+    });
+
     const user = await authService.getSessionUser();
     const advisorScope = advisorScopeFromUser(user);
     const result = await leadsService.saveLead({
       ...parsed.data,
       saveAction: parsed.data.saveAction,
       registerSale: parsed.data.registerSale,
+      followUpDate: resolvedFollowUp.followUpDate,
     }, advisorScope);
     return NextResponse.json(result, { status: 201 });
   } catch (error) {

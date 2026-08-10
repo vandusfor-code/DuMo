@@ -1,5 +1,7 @@
 import "server-only";
 import { getConversationRepository } from "@/repositories/conversation.repository";
+import { getConversationInboxState } from "@/repositories/inbox-lifecycle.repository";
+import { advisorBandejaIncludesInboxState } from "@/lib/inbox-band-filter";
 import type { TenantScope } from "@/lib/tenant-scope";
 
 export class ConversationAccessError extends Error {
@@ -38,5 +40,10 @@ export async function assertConversationAccess(
   }
   if (assignedAdvisorId !== scope.userId) {
     throw new ConversationAccessError("No autorizado para esta conversación.", 403);
+  }
+
+  const inboxState = await getConversationInboxState(conversationId);
+  if (inboxState && !advisorBandejaIncludesInboxState(inboxState)) {
+    throw new ConversationAccessError("Conversación no encontrada.", 404);
   }
 }

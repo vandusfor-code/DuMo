@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { LeadTypeSelect } from "./lead-type-select";
 import { SaleDetails } from "./sale-details";
 import { ObservationField } from "./observation-field";
+import { FollowUpDateField } from "./follow-up-date-field";
 import { ActionButtons } from "./action-buttons";
 import { ClientIdentityFields, ClientPhoneField } from "./client-card";
 import { SalesScriptTab } from "./sales-script-tab";
@@ -54,7 +55,7 @@ export function LeadPanel({
   clientSaved = false,
   onSaveSale,
   onGenerateScript,
-  onTipify,
+  onClose,
 }: {
   conversation: Conversation;
   isSaving: boolean;
@@ -65,7 +66,7 @@ export function LeadPanel({
   onCancel: () => void;
   onSaveSale: () => void;
   onGenerateScript: () => void;
-  onTipify: () => void;
+  onClose: () => void;
   savedScript?: GeneratedSalesScript | null;
   scriptUnavailableReason?: string | null;
   saleError?: string | null;
@@ -154,6 +155,7 @@ export function LeadPanel({
                   {type ? <DynamicTipificationBadge slug={type} /> : null}
                 </div>
                 <LeadTypeSelect />
+                {!isSaleFlow ? <FollowUpDateField /> : null}
               </SectionCardBody>
             </SectionCard>
 
@@ -192,7 +194,11 @@ export function LeadPanel({
             {isSuccess && !clientError && (
               <div className="flex items-center gap-2.5 rounded-card border border-success/20 bg-success-soft px-4 py-3 text-[13px] text-success-ink">
                 <CheckCircle2 className="size-[18px]" />
-                {lastSaveAction === "tipify"
+                {lastSaveAction === "close"
+                  ? clientSaved
+                    ? "Gestión guardada y cerrada. El cliente quedó tipificado."
+                    : "Gestión guardada y cerrada correctamente."
+                  : lastSaveAction === "tipify"
                   ? clientSaved
                     ? "Cliente tipificado correctamente. Ya aparece en Clientes."
                     : "Gestión guardada correctamente."
@@ -212,8 +218,8 @@ export function LeadPanel({
             <ActionButtons
               isSaving={isSaving}
               onCancel={onCancel}
-              mode={isSaleFlow ? "script" : "tipify"}
-              onPrimaryAction={isSaleFlow ? onGenerateScript : onTipify}
+              mode={isSaleFlow ? "script" : "close"}
+              onPrimaryAction={isSaleFlow ? onGenerateScript : onClose}
             />
           </TabsContent>
 

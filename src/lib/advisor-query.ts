@@ -1,3 +1,13 @@
+/**
+ * Fetch del área asesora.
+ *
+ * IMPORTANTE: antes devolvía un fallback vacío ante cualquier error, así que un
+ * 401/500/timeout se veía como "conversación sin mensajes" — una falla
+ * invisible en la función más crítica del CRM. Ahora lanza el error: React
+ * Query conserva los últimos datos buenos y la UI puede avisar y reintentar.
+ *
+ * Solo cookie httpOnly — no Authorization: Bearer (evita token stale en localStorage).
+ */
 
 export class AdvisorFetchError extends Error {
   constructor(

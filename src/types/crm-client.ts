@@ -22,4 +22,4 @@ export type CrmClientFilters = {
   to?: string;
 };
 
-export type SaveLeadAction = "tipify" | "script" | "sale";
+export type SaveLeadAction = "tipify" | "script" | "sale" | "close";

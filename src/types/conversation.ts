@@ -1,3 +1,7 @@
+import type { InboxState } from "@/types/inbox-state";
+
+export type { InboxState } from "@/types/inbox-state";
+
 /** Estado comercial de la conversación (usado por los filtros). */
 export type ConversationStatus = "new" | "in_progress" | "converted" | "lost";
 
@@ -27,6 +31,8 @@ export interface Conversation {
   unread: number;
   status: ConversationStatus;
   online: boolean;
+  /** P1.2 — visible en bandeja activa vs cerrada (filtro en P1.5). */
+  inboxState?: InboxState;
 }
 
 /** Un mensaje dentro del chat — texto, imágenes y audios. */

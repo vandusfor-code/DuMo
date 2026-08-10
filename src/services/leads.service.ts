@@ -108,8 +108,19 @@ export const leadsService = {
   async receiveMessage(msg: IncomingMessage): Promise<void> {
     const repo = getConversationRepository();
     const assignedBefore = await repo.getAssignedAdvisorId(msg.conversationId);
+    let wasClosed = false;
+    if (msg.direction === "in") {
+      const { getConversationInboxState } = await import("@/repositories/inbox-lifecycle.repository");
+      wasClosed = (await getConversationInboxState(msg.conversationId)) === "closed";
+    }
     await repo.saveMessage(msg);
     if (msg.direction === "in") {
+      if (wasClosed) {
+        const { maybeReopenClosedConversationOnInbound } = await import(
+          "@/services/inbox-reopen.service"
+        );
+        await maybeReopenClosedConversationOnInbound(msg.conversationId);
+      }
       const { adminLeadsService } = await import("@/services/admin-leads.service");
       await adminLeadsService.autoAssignIfNeeded(msg.conversationId);
       const assignedAfter = await repo.getAssignedAdvisorId(msg.conversationId);

@@ -1,5 +1,8 @@
 import { NextResponse, after } from "next/server";
-import { assertConversationAccess, ConversationAccessError } from "@/lib/conversation-access";
+import {
+  assertConversationAccess,
+  ConversationAccessError,
+} from "@/lib/conversation-access";
 import { getAdvisorTenantScope } from "@/lib/tenant-scope";
 import { leadsService } from "@/services/leads.service";
 

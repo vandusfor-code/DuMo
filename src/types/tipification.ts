@@ -6,6 +6,13 @@ export const TIPIFICATION_BADGE_COLORS = {
 
 export type TipificationStatus = "active" | "inactive";
 
+/** Cómo se calcula la fecha de seguimiento al tipificar. */
+export type TipificationFollowUpMode =
+  | "none"
+  | "fixed"
+  | "manual"
+  | "manual_suggested";
+
 export interface Tipification {
   id: string;
   companyId: string;
@@ -15,6 +22,13 @@ export interface Tipification {
   badgeText: string;
   sortOrder: number;
   triggersSaleFlow: boolean;
+  /** Si true, la gestión puede sacar el chat de la bandeja activa (P1). */
+  closesInbox: boolean;
+  /** Si true, crea fila en lead_follow_ups (P4). */
+  createsFollowUp: boolean;
+  followUpMode: TipificationFollowUpMode;
+  /** Días para modo fixed o sugerencia en manual_suggested (ej. deuda +7). */
+  followUpDefaultDays: number | null;
   status: TipificationStatus;
   createdAt: string;
   updatedAt: string;
@@ -28,6 +42,10 @@ export type CreateTipificationInput = {
   badgeText: string;
   sortOrder?: number;
   triggersSaleFlow?: boolean;
+  closesInbox?: boolean;
+  createsFollowUp?: boolean;
+  followUpMode?: TipificationFollowUpMode;
+  followUpDefaultDays?: number | null;
   status?: TipificationStatus;
 };
 
