@@ -1,9 +1,6 @@
 import { NextResponse, after } from "next/server";
-import {
-  assertConversationAccess,
-  ConversationAccessError,
-} from "@/lib/conversation-access";
-import { getTenantScope } from "@/lib/tenant-scope";
+import { assertConversationAccess, ConversationAccessError } from "@/lib/conversation-access";
+import { getAdvisorTenantScope } from "@/lib/tenant-scope";
 import { leadsService } from "@/services/leads.service";
 
 export const runtime = "nodejs";
@@ -14,7 +11,7 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const scope = await getTenantScope();
+  const scope = await getAdvisorTenantScope();
   if (!scope) {
     return NextResponse.json({ error: "No autenticado." }, { status: 401 });
   }

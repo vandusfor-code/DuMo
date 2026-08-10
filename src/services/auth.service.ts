@@ -69,10 +69,13 @@ export const authService = {
   },
 
   async getSessionUser(): Promise<AuthUser | null> {
-    // Cookie o cabecera Bearer (respaldo si el navegador no guarda cookies).
     const { getSessionToken } = await import("@/lib/require-admin");
     const token = await getSessionToken();
     if (!token) return null;
+    return this.getSessionUserFromToken(token);
+  },
+
+  async getSessionUserFromToken(token: string): Promise<AuthUser | null> {
     const payload = await resolveSessionPayload(token);
     if (!payload) return null;
 

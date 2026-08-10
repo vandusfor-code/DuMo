@@ -1,12 +1,3 @@
-/**
- * Fetch del área asesora.
- *
- * IMPORTANTE: antes devolvía un fallback vacío ante cualquier error, así que un
- * 401/500/timeout se veía como "conversación sin mensajes" — una falla
- * invisible en la función más crítica del CRM. Ahora lanza el error: React
- * Query conserva los últimos datos buenos y la UI puede avisar y reintentar.
- */
-import { authHeader } from "@/lib/auth/client-token";
 
 export class AdvisorFetchError extends Error {
   constructor(
@@ -30,7 +21,10 @@ export async function advisorApiGet<T>(url: string, timeoutMs = 15_000): Promise
   try {
     const res = await fetch(url, {
       credentials: "include",
-      headers: { Accept: "application/json", ...authHeader() },
+      // Solo cookie httpOnly — nunca Authorization: Bearer en asesora.
+      // Un token viejo en localStorage (p. ej. sesión admin) podía mandar otro
+      // userId/rol y mostrar la bandeja completa del CRM.
+      headers: { Accept: "application/json" },
       signal: controller.signal,
       cache: "no-store",
     });
@@ -61,3 +55,53 @@ export const ADVISOR_QUERY_OPTIONS = {
   refetchOnWindowFocus: true,
   staleTime: 20_000,
 } as const;
+
+async function advisorFetch<T>(url: string, init: RequestInit & { timeoutMs?: number } = {}): Promise<T> {
+  const { timeoutMs = 15_000, ...rest } = init;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      ...rest,
+      credentials: "include",
+      headers: { ...(rest.headers as Record<string, string>) },
+      signal: controller.signal,
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      throw new AdvisorFetchError(
+        `No se pudo completar (error ${res.status}). Reintentando…`,
+        res.status,
+      );
+    }
+    if (res.status === 204) return undefined as T;
+    return (await res.json()) as T;
+  } catch (err) {
+    if (err instanceof AdvisorFetchError) throw err;
+    throw new AdvisorFetchError(
+      err instanceof Error && err.name === "AbortError"
+        ? "La conexión tardó demasiado. Reintentando…"
+        : "Sin conexión con el servidor. Reintentando…",
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export function advisorApiPost<T>(url: string, body: unknown, timeoutMs = 15_000): Promise<T> {
+  return advisorFetch<T>(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+    timeoutMs,
+  });
+}
+
+export function advisorApiPostForm<T>(url: string, form: FormData, timeoutMs = 60_000): Promise<T> {
+  return advisorFetch<T>(url, {
+    method: "POST",
+    body: form,
+    timeoutMs,
+    headers: { Accept: "application/json" },
+  });
+}
