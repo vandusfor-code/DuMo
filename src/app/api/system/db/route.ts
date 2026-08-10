@@ -173,9 +173,52 @@ export async function GET() {
       ) AS ok
     `;
 
+    let authLoginProbe: {
+      ok: boolean;
+      columns?: string[];
+      missing?: string[];
+      selectTest?: boolean;
+      error?: string;
+    } | null = null;
+    try {
+      const authCols = await sql`
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'users'
+          AND column_name IN ('token_version', 'presence_status', 'last_seen_at')
+        ORDER BY column_name
+      `;
+      const present = authCols.map((r) => String(r.column_name));
+      const required = ["token_version", "presence_status", "last_seen_at"];
+      const missing = required.filter((c) => !present.includes(c));
+      let selectTest = false;
+      if (missing.length === 0) {
+        await sql`
+          SELECT id FROM users
+          WHERE active = true
+            AND (lower(email) = '___probe___' OR lower(username) = '___probe___')
+          LIMIT 1
+        `;
+        selectTest = true;
+      }
+      authLoginProbe = {
+        ok: missing.length === 0 && selectTest,
+        columns: present,
+        missing,
+        selectTest,
+      };
+    } catch (e) {
+      authLoginProbe = {
+        ok: false,
+        error: e instanceof Error ? e.message : String(e),
+      };
+    }
+
     return NextResponse.json({
       adminListTest,
       readTest,
+      authLoginProbe,
       lastMessage: lastMessage[0] ?? null,
       hasMediaAssetsTable: Boolean((mediaTable[0] as { ok?: boolean })?.ok),
       configured: true,

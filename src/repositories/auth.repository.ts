@@ -128,15 +128,20 @@ class PostgresAuthRepository implements AuthRepository {
       | undefined;
     if (!row || !verifyPassword(password, row.password_hash)) return null;
 
-    await sql`
-      UPDATE users SET
-        presence_status = CASE
-          WHEN presence_status = 'desconectado' THEN 'disponible'
-          ELSE presence_status
-        END,
-        last_seen_at = now()
-      WHERE id = ${row.id}
-    `;
+    try {
+      await sql`
+        UPDATE users SET
+          presence_status = CASE
+            WHEN presence_status = 'desconectado' THEN 'disponible'
+            ELSE presence_status
+          END,
+          last_seen_at = now()
+        WHERE id = ${row.id}
+      `;
+    } catch (err) {
+      // No bloquear login si la migración de presencia aún no corrió en prod.
+      console.error("[authenticate] presence touch failed", err);
+    }
 
     const refreshed = await sql`
       SELECT id, username, email, name, role, active, avatar_url, company_id, token_version
