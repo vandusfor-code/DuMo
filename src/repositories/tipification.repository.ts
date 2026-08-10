@@ -1,5 +1,6 @@
 import "server-only";
 import { DEFAULT_TIPIFICATION_SEEDS } from "@/lib/tipification-seeds";
+import { TIPIFICATION_BEHAVIOR_DEFAULTS, parseTipificationFollowUpMode } from "@/lib/tipification-behavior";
 import { slugifyTipificationName } from "@/lib/tipification-colors";
 import { getSql, hasDatabase } from "@/server/db/client";
 import { DEFAULT_COMPANY_ID } from "@/types/tenant";
@@ -22,6 +23,7 @@ export interface TipificationRepository {
 }
 
 function mapRow(r: Record<string, unknown>): Tipification {
+  const defaultDaysRaw = r.follow_up_default_days;
   return {
     id: String(r.id),
     companyId: String(r.company_id),
@@ -31,6 +33,19 @@ function mapRow(r: Record<string, unknown>): Tipification {
     badgeText: String(r.badge_text),
     sortOrder: Number(r.sort_order) || 0,
     triggersSaleFlow: Boolean(r.triggers_sale_flow),
+    closesInbox:
+      r.closes_inbox === undefined || r.closes_inbox === null
+        ? TIPIFICATION_BEHAVIOR_DEFAULTS.closesInbox
+        : Boolean(r.closes_inbox),
+    createsFollowUp:
+      r.creates_follow_up === undefined || r.creates_follow_up === null
+        ? TIPIFICATION_BEHAVIOR_DEFAULTS.createsFollowUp
+        : Boolean(r.creates_follow_up),
+    followUpMode: parseTipificationFollowUpMode(r.follow_up_mode),
+    followUpDefaultDays:
+      defaultDaysRaw === undefined || defaultDaysRaw === null
+        ? null
+        : Number(defaultDaysRaw),
     status: String(r.status) === "inactive" ? "inactive" : "active",
     createdAt: new Date(String(r.created_at)).toISOString(),
     updatedAt: new Date(String(r.updated_at)).toISOString(),
@@ -92,6 +107,11 @@ class MockTipificationRepository implements TipificationRepository {
       badgeText: input.badgeText,
       sortOrder: input.sortOrder ?? mockStore.length + 1,
       triggersSaleFlow: input.triggersSaleFlow ?? false,
+      closesInbox: input.closesInbox ?? TIPIFICATION_BEHAVIOR_DEFAULTS.closesInbox,
+      createsFollowUp: input.createsFollowUp ?? TIPIFICATION_BEHAVIOR_DEFAULTS.createsFollowUp,
+      followUpMode: input.followUpMode ?? TIPIFICATION_BEHAVIOR_DEFAULTS.followUpMode,
+      followUpDefaultDays:
+        input.followUpDefaultDays ?? TIPIFICATION_BEHAVIOR_DEFAULTS.followUpDefaultDays,
       status: input.status ?? "active",
       createdAt: now,
       updatedAt: now,
@@ -113,6 +133,13 @@ class MockTipificationRepository implements TipificationRepository {
       badgeText: input.badgeText ?? current.badgeText,
       sortOrder: input.sortOrder ?? current.sortOrder,
       triggersSaleFlow: input.triggersSaleFlow ?? current.triggersSaleFlow,
+      closesInbox: input.closesInbox ?? current.closesInbox,
+      createsFollowUp: input.createsFollowUp ?? current.createsFollowUp,
+      followUpMode: input.followUpMode ?? current.followUpMode,
+      followUpDefaultDays:
+        input.followUpDefaultDays !== undefined
+          ? input.followUpDefaultDays
+          : current.followUpDefaultDays,
       status: input.status ?? current.status,
       updatedAt: new Date().toISOString(),
     };
@@ -203,11 +230,18 @@ class PostgresTipificationRepository implements TipificationRepository {
     const rows = await this.sql<Record<string, unknown>[]>`
       INSERT INTO tipifications (
         id, company_id, slug, name, badge_bg, badge_text,
-        sort_order, triggers_sale_flow, status, created_by
+        sort_order, triggers_sale_flow,
+        closes_inbox, creates_follow_up, follow_up_mode, follow_up_default_days,
+        status, created_by
       )
       VALUES (
         ${id}, ${companyId}, ${slug}, ${input.name.trim()}, ${input.badgeBg}, ${input.badgeText},
-        ${sortOrder}, ${input.triggersSaleFlow ?? false}, ${input.status ?? "active"}, ${createdBy}
+        ${sortOrder}, ${input.triggersSaleFlow ?? false},
+        ${input.closesInbox ?? TIPIFICATION_BEHAVIOR_DEFAULTS.closesInbox},
+        ${input.createsFollowUp ?? TIPIFICATION_BEHAVIOR_DEFAULTS.createsFollowUp},
+        ${input.followUpMode ?? TIPIFICATION_BEHAVIOR_DEFAULTS.followUpMode},
+        ${input.followUpDefaultDays ?? null},
+        ${input.status ?? "active"}, ${createdBy}
       )
       RETURNING *
     `;
@@ -226,6 +260,14 @@ class PostgresTipificationRepository implements TipificationRepository {
         badge_text = ${input.badgeText ?? current.badgeText},
         sort_order = ${input.sortOrder ?? current.sortOrder},
         triggers_sale_flow = ${input.triggersSaleFlow ?? current.triggersSaleFlow},
+        closes_inbox = ${input.closesInbox ?? current.closesInbox},
+        creates_follow_up = ${input.createsFollowUp ?? current.createsFollowUp},
+        follow_up_mode = ${input.followUpMode ?? current.followUpMode},
+        follow_up_default_days = ${
+          input.followUpDefaultDays !== undefined
+            ? input.followUpDefaultDays
+            : current.followUpDefaultDays
+        },
         status = ${input.status ?? current.status},
         updated_at = now()
       WHERE company_id = ${companyId} AND id = ${id}

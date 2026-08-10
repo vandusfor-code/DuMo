@@ -8,9 +8,13 @@ import {
   ADVISOR_PRESENCE_REQUIRED_COLUMNS,
   runAdvisorPresenceMigrations,
 } from "@/server/db/migrations/advisor-presence-schema";
-import { runTipificationMigrations, TIPIFICATION_REQUIRED_COLUMNS } from "@/server/db/migrations/tipifications-schema";
+import { runTipificationMigrations, runTipificationBehaviorMigrations, TIPIFICATION_REQUIRED_COLUMNS } from "@/server/db/migrations/tipifications-schema";
 import { runWebQrMigrations } from "@/server/db/migrations/web-qr-schema";
 import { runLeadAssignmentMigrations } from "@/server/db/migrations/lead-assignment-schema";
+import {
+  INBOX_LIFECYCLE_REQUIRED_COLUMNS,
+  runInboxStateMigrations,
+} from "@/server/db/migrations/inbox-lifecycle-schema";
 
 let sqlSingleton: Sql | null = null;
 let schemaPromise: Promise<void> | null = null;
@@ -187,6 +191,7 @@ const REQUIRED_COLUMNS = [
   "lead_conversations.admin_status",
   "lead_conversations.last_message_direction",
   "lead_conversations.wa_chat_jid",
+  ...INBOX_LIFECYCLE_REQUIRED_COLUMNS,
   "lead_messages.conversation_id",
   "connected_numbers.access_token",
   "lead_notes.conversation_id",
@@ -297,6 +302,8 @@ async function ensureIncrementalMigrations(sql: Sql): Promise<void> {
     await sql`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS last_message_direction text DEFAULT 'in'`;
     await runAdvisorPresenceMigrations(sql);
     await runLeadAssignmentMigrations(sql);
+    await runTipificationBehaviorMigrations(sql);
+    await runInboxStateMigrations(sql);
   } catch (err) {
     console.error("[ensureIncrementalMigrations]", err);
   }
@@ -400,6 +407,7 @@ async function runMigrations(sql: Sql) {
     await tx`UPDATE lead_conversations SET admin_status = 'nuevo' WHERE admin_status IS NULL`;
     await tx`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS last_message_direction text DEFAULT 'in'`;
     await tx`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS wa_chat_jid text`;
+    await runInboxStateMigrations(tx);
     await tx`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at timestamptz`;
     await tx`ALTER TABLE users ADD COLUMN IF NOT EXISTS monthly_sales_goal integer`;
     await tx`

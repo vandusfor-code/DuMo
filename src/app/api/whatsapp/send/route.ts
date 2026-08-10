@@ -4,7 +4,7 @@ import {
   assertConversationAccess,
   ConversationAccessError,
 } from "@/lib/conversation-access";
-import { getTenantScope } from "@/lib/tenant-scope";
+import { getAdvisorTenantScope } from "@/lib/tenant-scope";
 import { leadsService } from "@/services/leads.service";
 
 export const runtime = "nodejs";
@@ -17,7 +17,7 @@ const sendSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const scope = await getTenantScope();
+  const scope = await getAdvisorTenantScope();
   if (!scope) {
     return NextResponse.json({ error: "No autenticado." }, { status: 401 });
   }

@@ -3,7 +3,7 @@ import {
   assertConversationAccess,
   ConversationAccessError,
 } from "@/lib/conversation-access";
-import { getTenantScope } from "@/lib/tenant-scope";
+import { getAdvisorTenantScope } from "@/lib/tenant-scope";
 import { salesScriptService } from "@/services/sales-script.service";
 
 export const runtime = "nodejs";
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 /** Último script de venta generado para una conversación. */
 export async function GET(request: NextRequest) {
-  const scope = await getTenantScope();
+  const scope = await getAdvisorTenantScope();
   if (!scope) {
     return NextResponse.json({ error: "No autenticado." }, { status: 401 });
   }

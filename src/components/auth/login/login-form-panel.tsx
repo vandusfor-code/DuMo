@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { LoginLogo } from "./login-logo";
 import { ApiError, apiPost } from "@/lib/api-client";
-import { saveClientToken } from "@/lib/auth/client-token";
+import { saveClientToken, clearClientToken } from "@/lib/auth/client-token";
 
 const container = {
   hidden: { opacity: 0 },
@@ -92,6 +92,7 @@ export function LoginFormPanel({ nextPath }: { nextPath?: string | null }) {
         { login, password },
       );
       // Respaldo por si el navegador no guarda la cookie de sesión.
+      clearClientToken();
       saveClientToken(res.token);
       // `next` solo se respeta si pertenece al área del rol del usuario; si no,
       // manda el destino por rol (evita que un admin caiga en /dashboard).

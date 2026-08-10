@@ -12,8 +12,11 @@ import { getScriptUnavailableReason, isScriptEligible } from "@/lib/sales-script
 import { getScriptBuildError } from "@/lib/sales-script/builder";
 import { getDeliveryConfigurationRepository } from "@/repositories/delivery-configuration.repository";
 import { tipificationService } from "@/services/tipification.service";
+import { getTipificationRepository } from "@/repositories/tipification.repository";
+import { applyInboxLifecycleAfterSave } from "@/services/inbox-lifecycle.service";
 import { DEFAULT_COMPANY_ID } from "@/types/tenant";
 import type { SaveLeadInput } from "@/types/lead";
+import type { InboxState } from "@/types/inbox-state";
 import type { SaveLeadResult } from "@/types/sales-script";
 
 const SCRIPT_DEBUG = "[script-debug]";
@@ -34,6 +37,9 @@ export async function saveLeadWithScript(
   let saleError: string | null = null;
   let clientSaved = false;
   let clientError: string | null = null;
+  let inboxClosed = false;
+  let inboxState: InboxState = "active";
+  let followUpDatePersisted: string | null = null;
 
   const companyId = DEFAULT_COMPANY_ID;
   const isSaleFlow = await tipificationService.triggersSaleFlowForSlug(companyId, input.type);
@@ -42,7 +48,10 @@ export async function saveLeadWithScript(
   const saveAction: SaveLeadAction =
     input.saveAction ?? (input.registerSale ? "sale" : "script");
   const shouldGenerateScript =
-    saveAction !== "tipify" && isSaleFlow && input.lines.length > 0;
+    saveAction !== "tipify" &&
+    saveAction !== "close" &&
+    isSaleFlow &&
+    input.lines.length > 0;
   const shouldRegisterSale = saveAction === "sale" && isSaleFlow && input.lines.length > 0;
 
   if (shouldGenerateScript) {
@@ -147,6 +156,24 @@ export async function saveLeadWithScript(
       "La gestión se guardó, pero no se pudo vincular a tu cartera (sesión sin rol de asesora).";
   }
 
+  try {
+    const catalog = await getTipificationRepository().listActive(DEFAULT_COMPANY_ID);
+    const lifecycle = await applyInboxLifecycleAfterSave({
+      gestionId: lead.id,
+      conversationId: input.conversationId,
+      slug: input.type,
+      saveAction,
+      followUpDate: input.followUpDate,
+      saleRegistered: Boolean(sale),
+      catalog,
+    });
+    inboxClosed = lifecycle.inboxClosed;
+    inboxState = lifecycle.inboxState;
+    followUpDatePersisted = lifecycle.followUpDate;
+  } catch (error) {
+    console.error("[saveLeadWithScript] inbox lifecycle apply failed", error);
+  }
+
   const result: SaveLeadResult = {
     lead,
     script,
@@ -156,6 +183,9 @@ export async function saveLeadWithScript(
     saveAction,
     clientSaved,
     clientError,
+    inboxClosed,
+    inboxState,
+    followUpDate: followUpDatePersisted,
   };
 
   logScriptSaveCheckpoint("saveLeadWithScript · antes de responder", {

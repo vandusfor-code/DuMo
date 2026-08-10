@@ -24,7 +24,15 @@ const sql = postgres(url, { ssl: url.includes("localhost") ? false : "require", 
 
 try {
   const rows = await sql`
-    SELECT slug, name, badge_bg, badge_text, triggers_sale_flow, sort_order
+    SELECT
+      slug,
+      name,
+      triggers_sale_flow,
+      sort_order,
+      closes_inbox,
+      creates_follow_up,
+      follow_up_mode,
+      follow_up_default_days
     FROM tipifications
     WHERE company_id = 'company-default'
     ORDER BY sort_order ASC
@@ -33,7 +41,7 @@ try {
   console.log(`Tipificaciones en BD: ${rows.length}`);
   for (const row of rows) {
     console.log(
-      `  ${row.sort_order}. ${row.slug} (${row.name}) — saleFlow=${row.triggers_sale_flow} — ${row.badge_bg}/${row.badge_text}`,
+      `  ${row.sort_order}. ${row.slug} — closes=${row.closes_inbox} followUp=${row.creates_follow_up} mode=${row.follow_up_mode} days=${row.follow_up_default_days ?? "null"} saleFlow=${row.triggers_sale_flow}`,
     );
   }
 

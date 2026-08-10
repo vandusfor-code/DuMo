@@ -1,10 +1,12 @@
 import { TIPIFICATION_BADGE_COLORS, type Tipification } from "@/types/tipification";
 
-/** Catálogo inicial equivalente al enum LeadType + LEAD_TYPE_LABELS. */
-export const DEFAULT_TIPIFICATION_SEEDS: Omit<
+type TipificationSeed = Omit<
   Tipification,
   "companyId" | "createdAt" | "updatedAt" | "createdBy"
->[] = [
+>;
+
+/** Catálogo inicial — matriz P0.3 (8 slugs legacy; nuevos slugs en P1.6). */
+export const DEFAULT_TIPIFICATION_SEEDS: TipificationSeed[] = [
   {
     id: "tipif-venta",
     slug: "venta",
@@ -12,6 +14,10 @@ export const DEFAULT_TIPIFICATION_SEEDS: Omit<
     ...TIPIFICATION_BADGE_COLORS.active,
     sortOrder: 1,
     triggersSaleFlow: true,
+    closesInbox: true,
+    createsFollowUp: false,
+    followUpMode: "none",
+    followUpDefaultDays: null,
     status: "active",
   },
   {
@@ -21,6 +27,10 @@ export const DEFAULT_TIPIFICATION_SEEDS: Omit<
     ...TIPIFICATION_BADGE_COLORS.in_progress,
     sortOrder: 2,
     triggersSaleFlow: false,
+    closesInbox: true,
+    createsFollowUp: false,
+    followUpMode: "none",
+    followUpDefaultDays: null,
     status: "active",
   },
   {
@@ -30,6 +40,10 @@ export const DEFAULT_TIPIFICATION_SEEDS: Omit<
     ...TIPIFICATION_BADGE_COLORS.in_progress,
     sortOrder: 3,
     triggersSaleFlow: false,
+    closesInbox: true,
+    createsFollowUp: true,
+    followUpMode: "manual",
+    followUpDefaultDays: null,
     status: "active",
   },
   {
@@ -39,6 +53,10 @@ export const DEFAULT_TIPIFICATION_SEEDS: Omit<
     ...TIPIFICATION_BADGE_COLORS.in_progress,
     sortOrder: 4,
     triggersSaleFlow: false,
+    closesInbox: true,
+    createsFollowUp: false,
+    followUpMode: "none",
+    followUpDefaultDays: null,
     status: "active",
   },
   {
@@ -48,6 +66,10 @@ export const DEFAULT_TIPIFICATION_SEEDS: Omit<
     ...TIPIFICATION_BADGE_COLORS.in_progress,
     sortOrder: 5,
     triggersSaleFlow: false,
+    closesInbox: true,
+    createsFollowUp: true,
+    followUpMode: "manual",
+    followUpDefaultDays: null,
     status: "active",
   },
   {
@@ -57,6 +79,10 @@ export const DEFAULT_TIPIFICATION_SEEDS: Omit<
     ...TIPIFICATION_BADGE_COLORS.in_progress,
     sortOrder: 6,
     triggersSaleFlow: false,
+    closesInbox: true,
+    createsFollowUp: true,
+    followUpMode: "manual",
+    followUpDefaultDays: null,
     status: "active",
   },
   {
@@ -66,6 +92,10 @@ export const DEFAULT_TIPIFICATION_SEEDS: Omit<
     ...TIPIFICATION_BADGE_COLORS.in_progress,
     sortOrder: 7,
     triggersSaleFlow: false,
+    closesInbox: true,
+    createsFollowUp: false,
+    followUpMode: "none",
+    followUpDefaultDays: null,
     status: "active",
   },
   {
@@ -75,8 +105,87 @@ export const DEFAULT_TIPIFICATION_SEEDS: Omit<
     ...TIPIFICATION_BADGE_COLORS.in_progress,
     sortOrder: 8,
     triggersSaleFlow: false,
+    closesInbox: true,
+    createsFollowUp: false,
+    followUpMode: "none",
+    followUpDefaultDays: null,
     status: "active",
   },
 ];
 
 export const DEFAULT_TIPIFICATION_SLUGS = DEFAULT_TIPIFICATION_SEEDS.map((t) => t.slug);
+
+/**
+ * P1.6 — plan congelado (ejecutar en P1.6, no antes).
+ * Historial existente de deuda_wom / deuda_compania_donante no se reasigna.
+ */
+export const P16_TIPIFICATION_PLAN = {
+  updates: [
+    {
+      id: "tipif-1786266090816-rcnnvl",
+      slug: "permanencia",
+      closesInbox: true,
+      createsFollowUp: true,
+      followUpMode: "manual" as const,
+      followUpDefaultDays: null,
+    },
+    {
+      id: "tipif-1786266069311-tim48d",
+      slug: "deuda_wom",
+      closesInbox: true,
+      createsFollowUp: true,
+      followUpMode: "manual_suggested" as const,
+      followUpDefaultDays: 7,
+    },
+    {
+      id: "tipif-1786266123898-r5mu78",
+      slug: "deuda_compania_donante",
+      closesInbox: true,
+      createsFollowUp: true,
+      followUpMode: "manual_suggested" as const,
+      followUpDefaultDays: 7,
+    },
+  ],
+  inserts: [
+    {
+      id: "tipif-deuda",
+      slug: "deuda",
+      name: "Deuda",
+      sortOrder: 9,
+      closesInbox: true,
+      createsFollowUp: true,
+      followUpMode: "manual_suggested" as const,
+      followUpDefaultDays: 7,
+    },
+    {
+      id: "tipif-sin-cupo",
+      slug: "sin_cupo",
+      name: "Sin cupo",
+      sortOrder: 10,
+      closesInbox: true,
+      createsFollowUp: true,
+      followUpMode: "manual" as const,
+      followUpDefaultDays: null,
+    },
+    {
+      id: "tipif-no-responde",
+      slug: "no_responde",
+      name: "No responde",
+      sortOrder: 11,
+      closesInbox: true,
+      createsFollowUp: true,
+      followUpMode: "fixed" as const,
+      followUpDefaultDays: 2,
+    },
+    {
+      id: "tipif-cliente-indica-fecha",
+      slug: "cliente_indica_fecha",
+      name: "Cliente indica fecha",
+      sortOrder: 12,
+      closesInbox: true,
+      createsFollowUp: true,
+      followUpMode: "manual" as const,
+      followUpDefaultDays: null,
+    },
+  ],
+} as const;

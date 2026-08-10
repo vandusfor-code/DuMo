@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getTenantScope } from "@/lib/tenant-scope";
+import { getAdvisorTenantScope } from "@/lib/tenant-scope";
 import { adminLiveService } from "@/services/admin-live.service";
 
 export const runtime = "nodejs";
@@ -8,7 +8,7 @@ export const maxDuration = 15;
 
 /** Asesora (o cualquier usuario autenticado): cambia su propio estado de presencia. */
 export async function PATCH(request: NextRequest) {
-  const scope = await getTenantScope();
+  const scope = await getAdvisorTenantScope();
   if (!scope) {
     return NextResponse.json({ error: "No autenticado." }, { status: 401 });
   }

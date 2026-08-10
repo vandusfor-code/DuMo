@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { LeadTypeSelect } from "@/components/leads/lead-type-select";
 import { SaleDetails } from "@/components/leads/sale-details";
 import { ObservationField } from "@/components/leads/observation-field";
+import { FollowUpDateField } from "@/components/leads/follow-up-date-field";
 import { ActionButtons } from "@/components/leads/action-buttons";
 import { ClientCard } from "@/components/leads/client-card";
 import { SalesScriptTab } from "@/components/leads/sales-script-tab";
@@ -41,6 +42,7 @@ import {
   isCompleteSaleLine,
   mapSaleLineForSave,
 } from "@/lib/lead-save";
+import { validateLeadFormBeforeSave } from "@/lib/lead-form-validation";
 import { useSaleFlowType, useTipificationCatalog } from "@/hooks/use-tipification-catalog";
 import { useWatch } from "react-hook-form";
 
@@ -52,6 +54,7 @@ function defaultsFor(c: AdminConversation): LeadFormValues {
     type: "venta",
     observations: "",
     internalNotes: "",
+    followUpDate: "",
     lines: [{ ...EMPTY_LEAD_LINE }],
   };
 }
@@ -69,7 +72,7 @@ export function AdminLeadFormPanel({
 }) {
   void _timeline;
   const saveLead = useSaveAdminLead(conversation.id);
-  const saveModeRef = useRef<SaveLeadAction>("script");
+  const saveModeRef = useRef<SaveLeadAction>("close");
   const [activeTab, setActiveTab] = useState("gestion");
   const [scriptTabUnlocked, setScriptTabUnlocked] = useState(false);
   const { data: fetchedScript } = useSalesScript(conversation.id);
@@ -77,7 +80,7 @@ export function AdminLeadFormPanel({
   const methods = useForm<LeadFormValues>({ defaultValues: defaultsFor(conversation) });
   const type = useWatch({ control: methods.control, name: "type" });
   const isSaleFlow = useSaleFlowType(type);
-  const { triggersSaleFlow } = useTipificationCatalog();
+  const { triggersSaleFlow, catalog } = useTipificationCatalog();
   const showScriptTab = isSaleFlow && (scriptTabUnlocked || Boolean(script));
 
   useEffect(() => {
@@ -98,15 +101,21 @@ export function AdminLeadFormPanel({
   }, [isSaleFlow, activeTab]);
 
   const onSubmit = methods.handleSubmit(async (values) => {
-    if (triggersSaleFlow(values.type)) {
-      const completeLines = values.lines.filter(isCompleteSaleLine);
-      if (completeLines.length === 0) {
-        methods.setError("root", {
-          message:
-            "Completa al menos una línea con número, tipo de venta, plan, región y comuna.",
-        });
-        return;
+    const validation = validateLeadFormBeforeSave({
+      values,
+      saveAction: saveModeRef.current,
+      catalog,
+      triggersSaleFlow,
+      isCompleteSaleLine,
+    });
+
+    if (!validation.ok) {
+      if (validation.field) {
+        methods.setError(validation.field, { message: validation.message });
+      } else {
+        methods.setError("root", { message: validation.message });
       }
+      return;
     }
 
     const notesParts = [
@@ -127,10 +136,12 @@ export function AdminLeadFormPanel({
           : [],
       registerSale: saveModeRef.current === "sale",
       saveAction: saveModeRef.current,
+      followUpDate: validation.followUpDate,
     };
     try {
       await saveLead.mutateAsync(input);
       methods.clearErrors("root");
+      methods.clearErrors("followUpDate");
       const action = saveModeRef.current;
       if (action === "script") {
         setScriptTabUnlocked(true);
@@ -182,6 +193,7 @@ export function AdminLeadFormPanel({
               <TabsContent value="gestion" className="space-y-4 outline-none">
                 <ClientCard />
                 <LeadTypeSelect />
+                {!isSaleFlow ? <FollowUpDateField /> : null}
                 {isSaleFlow && <SaleDetails />}
                 <ObservationField
                   name="observations"
@@ -219,9 +231,9 @@ export function AdminLeadFormPanel({
                 <ActionButtons
                   isSaving={saveLead.isPending}
                   onCancel={() => methods.reset(defaultsFor(conversation))}
-                  mode={isSaleFlow ? "script" : "tipify"}
+                  mode={isSaleFlow ? "script" : "close"}
                   onPrimaryAction={() => {
-                    saveModeRef.current = isSaleFlow ? "script" : "tipify";
+                    saveModeRef.current = isSaleFlow ? "script" : "close";
                   }}
                 />
               </TabsContent>

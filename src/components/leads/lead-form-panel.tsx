@@ -14,6 +14,7 @@ import {
   isCompleteSaleLine,
   mapSaleLineForSave,
 } from "@/lib/lead-save";
+import { validateLeadFormBeforeSave } from "@/lib/lead-form-validation";
 import { useTipificationCatalog } from "@/hooks/use-tipification-catalog";
 import { useForm, FormProvider } from "react-hook-form";
 
@@ -25,8 +26,8 @@ import { useForm, FormProvider } from "react-hook-form";
 export function LeadFormPanel({ conversation }: { conversation: Conversation }) {
   const saveLead = useSaveLead(conversation.id);
   const gestionDraft = useLatestGestionDraft(conversation.id);
-  const saveModeRef = useRef<SaveLeadAction>("script");
-  const { triggersSaleFlow } = useTipificationCatalog();
+  const saveModeRef = useRef<SaveLeadAction>("close");
+  const { triggersSaleFlow, catalog } = useTipificationCatalog();
   const methods = useForm<LeadFormValues>({
     defaultValues: draftToFormValues({ conversation }),
   });
@@ -38,15 +39,21 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
   }, [conversation.id, gestionDraft.data?.gestionId, gestionDraft.isLoading]);
 
   const onSubmit = methods.handleSubmit(async (values) => {
-    if (triggersSaleFlow(values.type)) {
-      const completeLines = values.lines.filter(isCompleteSaleLine);
-      if (completeLines.length === 0) {
-        methods.setError("root", {
-          message:
-            "Completa al menos una línea con número, tipo de venta, plan, región y comuna.",
-        });
-        return;
+    const validation = validateLeadFormBeforeSave({
+      values,
+      saveAction: saveModeRef.current,
+      catalog,
+      triggersSaleFlow,
+      isCompleteSaleLine,
+    });
+
+    if (!validation.ok) {
+      if (validation.field) {
+        methods.setError(validation.field, { message: validation.message });
+      } else {
+        methods.setError("root", { message: validation.message });
       }
+      return;
     }
 
     const notesParts = [
@@ -67,10 +74,12 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
           : [],
       registerSale: saveModeRef.current === "sale",
       saveAction: saveModeRef.current,
+      followUpDate: validation.followUpDate,
     };
     try {
       await saveLead.mutateAsync(input);
       methods.clearErrors("root");
+      methods.clearErrors("followUpDate");
     } catch (error) {
       methods.setError("root", { message: formatSaveLeadApiError(error) });
     }
@@ -99,8 +108,8 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
           onGenerateScript={() => {
             saveModeRef.current = "script";
           }}
-          onTipify={() => {
-            saveModeRef.current = "tipify";
+          onClose={() => {
+            saveModeRef.current = "close";
           }}
           onCancel={() =>
             methods.reset(draftToFormValues({ conversation, draft: gestionDraft.data }))

@@ -70,6 +70,7 @@ export function draftToFormValues(input: {
     type: input.draft?.type ?? "venta",
     observations,
     internalNotes,
+    followUpDate: "",
     lines: mapStoredLinesToForm(input.draft?.lines),
   };
 }
