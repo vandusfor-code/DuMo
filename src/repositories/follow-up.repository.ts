@@ -118,6 +118,25 @@ export async function upsertFollowUpFromGestion(
   return Boolean(result[0]?.id);
 }
 
+/** Marca el seguimiento activo en Recuperación como completado (P5). */
+export async function completeActiveRecuperacionFollowUp(conversationId: string): Promise<boolean> {
+  const sql = getSql();
+  if (!sql) throw new Error("Base de datos no configurada");
+
+  const result = await withDbRetry(() =>
+    sql<{ id: string }[]>`
+      UPDATE lead_follow_ups
+      SET status = 'completed', completed_at = now()
+      WHERE conversation_id = ${conversationId}
+        AND module = 'recuperacion'
+        AND status <> 'completed'
+      RETURNING id
+    `,
+  );
+
+  return Boolean(result[0]?.id);
+}
+
 export async function getFollowUpByGestionId(gestionId: string): Promise<LeadFollowUp | null> {
   const sql = getSql();
   if (!sql) return null;

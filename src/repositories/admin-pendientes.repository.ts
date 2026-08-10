@@ -1,10 +1,11 @@
 import "server-only";
 import {
-  computePendienteDisplayStatus,
-  formatFollowUpDateLabel,
-  isFollowUpOverdue,
-  PENDIENTES_SUMMARY_GROUPS,
-} from "@/lib/pendientes-display";
+  buildPendientesSummary,
+  mapPendientesListRow,
+  matchesPendientesDateRange,
+  matchesPendientesSearch,
+  type PendientesListRow,
+} from "@/lib/pendientes-list-utils";
 import {
   ADVISOR_PRESENCE_LABELS,
   advisorReceivesLeads,
@@ -14,30 +15,7 @@ import { getAuthRepository } from "@/repositories/auth.repository";
 import { reopenConversationToAdvisor } from "@/services/inbox-reopen.service";
 import { ensureSchema, getSql, withDbRetry } from "@/server/db/client";
 import { DEFAULT_COMPANY_ID } from "@/types/tenant";
-import type {
-  AdminPendienteRow,
-  AdminPendientesDateRange,
-  AdminPendientesFilters,
-  AdminPendientesResult,
-  AdminPendientesSummary,
-} from "@/types/admin-pendientes";
-
-type FollowUpListRow = {
-  id: string;
-  conversation_id: string;
-  gestion_id: string;
-  customer_name: string;
-  phone: string;
-  tipification_slug: string;
-  tipification_name: string | null;
-  badge_bg: string | null;
-  badge_text: string | null;
-  follow_up_date: string;
-  origin_advisor_id: string | null;
-  origin_advisor_name: string | null;
-  advisor_name: string;
-  note: string | null;
-};
+import type { AdminPendientesFilters, AdminPendientesResult } from "@/types/admin-pendientes";
 
 function requireSql() {
   const sql = getSql();
@@ -45,82 +23,11 @@ function requireSql() {
   return sql;
 }
 
-function mapRow(row: FollowUpListRow): AdminPendienteRow {
-  const followUpDate = row.follow_up_date.slice(0, 10);
-  return {
-    id: row.id,
-    conversationId: row.conversation_id,
-    gestionId: row.gestion_id,
-    customerName: row.customer_name,
-    phone: row.phone,
-    tipificationSlug: row.tipification_slug,
-    tipificationName: row.tipification_name ?? row.tipification_slug,
-    tipificationBadgeBg: row.badge_bg ?? "#eef2ff",
-    tipificationBadgeText: row.badge_text ?? "#3730a3",
-    followUpDate,
-    followUpDateLabel: formatFollowUpDateLabel(followUpDate),
-    originAdvisorId: row.origin_advisor_id,
-    originAdvisorName: row.origin_advisor_name ?? row.advisor_name ?? "",
-    note: row.note?.trim() ?? "",
-    isOverdue: isFollowUpOverdue(followUpDate),
-    displayStatus: computePendienteDisplayStatus(followUpDate),
-  };
-}
-
-function matchesSearch(row: FollowUpListRow, search: string): boolean {
-  const q = search.trim().toLowerCase();
-  if (!q) return true;
-  return (
-    row.customer_name.toLowerCase().includes(q) ||
-    row.phone.toLowerCase().includes(q) ||
-    (row.note ?? "").toLowerCase().includes(q)
-  );
-}
-
-function matchesDateRange(followUpDate: string, range: AdminPendientesDateRange): boolean {
-  if (range === "all") return true;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = new Date(`${followUpDate.slice(0, 10)}T00:00:00`);
-  const diffDays = Math.round((target.getTime() - today.getTime()) / 86_400_000);
-  if (range === "today") return diffDays === 0;
-  if (range === "next7") return diffDays >= 0 && diffDays <= 7;
-  if (range === "next30") return diffDays >= 0 && diffDays <= 30;
-  return true;
-}
-
-function buildSummary(rows: AdminPendienteRow[]): AdminPendientesSummary {
-  const bySlug = new Map<string, { slug: string; name: string; count: number }>();
-  for (const row of rows) {
-    const existing = bySlug.get(row.tipificationSlug);
-    if (existing) {
-      existing.count += 1;
-    } else {
-      bySlug.set(row.tipificationSlug, {
-        slug: row.tipificationSlug,
-        name: row.tipificationName,
-        count: 1,
-      });
-    }
-  }
-
-  const countGroup = (slugs: readonly string[]) =>
-    rows.filter((r) => slugs.includes(r.tipificationSlug)).length;
-
-  return {
-    totalPending: rows.length,
-    deuda: countGroup(PENDIENTES_SUMMARY_GROUPS.deuda),
-    permanencia: countGroup(PENDIENTES_SUMMARY_GROUPS.permanencia),
-    seguimiento: countGroup(PENDIENTES_SUMMARY_GROUPS.seguimiento),
-    byType: [...bySlug.values()].sort((a, b) => b.count - a.count),
-  };
-}
-
-async function fetchPendingRows(): Promise<FollowUpListRow[]> {
+async function fetchPendingRows(): Promise<PendientesListRow[]> {
   await ensureSchema();
   const sql = requireSql();
   return withDbRetry(() =>
-    sql<FollowUpListRow[]>`
+    sql<PendientesListRow[]>`
       SELECT
         f.id,
         f.conversation_id,
@@ -158,13 +65,13 @@ export async function listAdminPendientes(
       const advisorId = row.origin_advisor_id;
       if (advisorId !== filters.advisor) return false;
     }
-    if (!matchesDateRange(row.follow_up_date, filters.dateRange)) return false;
-    if (!matchesSearch(row, filters.search)) return false;
+    if (!matchesPendientesDateRange(row.follow_up_date, filters.dateRange)) return false;
+    if (!matchesPendientesSearch(row, filters.search)) return false;
     return true;
   });
 
-  const mappedAll = filtered.map(mapRow);
-  const summary = buildSummary(mappedAll);
+  const mappedAll = filtered.map(mapPendientesListRow);
+  const summary = buildPendientesSummary(mappedAll);
   const start = (filters.page - 1) * filters.pageSize;
   const pageRows = mappedAll.slice(start, start + filters.pageSize);
 
@@ -220,7 +127,7 @@ export async function transferPendienteToAdvisor(input: {
       SET status = 'transferred',
           module = 'recuperacion',
           owner_advisor_id = ${advisor.id},
-          completed_at = now()
+          completed_at = NULL
       WHERE id = ${input.pendienteId}
     `,
   );

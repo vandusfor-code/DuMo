@@ -4,7 +4,10 @@ import {
   resolveTipificationBehavior,
   shouldCloseInboxAfterSave,
 } from "@/lib/tipification-follow-up";
-import { upsertFollowUpFromGestion } from "@/repositories/follow-up.repository";
+import {
+  completeActiveRecuperacionFollowUp,
+  upsertFollowUpFromGestion,
+} from "@/repositories/follow-up.repository";
 import {
   getConversationInboxState,
   getGestionFollowUpDate,
@@ -64,6 +67,10 @@ export async function applyInboxLifecycleAfterSave(
     await setGestionFollowUpDate(input.gestionId, persistedFollowUpDate);
   } else {
     await setGestionFollowUpDate(input.gestionId, null);
+  }
+
+  if (input.saveAction === "close") {
+    await completeActiveRecuperacionFollowUp(input.conversationId);
   }
 
   let followUpCreated = false;

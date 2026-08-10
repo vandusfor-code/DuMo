@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { PRIMARY_NAV, SECONDARY_NAV, SIGN_OUT_ITEM, type NavItem } from "@/lib/nav";
 import { useUnreadMessageCount } from "@/hooks/use-unread-messages";
+import { useRecuperacionCount } from "@/hooks/use-advisor-recuperacion";
 import { APP_SIDEBAR_WIDTH_CLASS } from "@/components/layout/app-shell.constants";
 import { Logo } from "./logo";
 import { SidebarUser } from "./sidebar-user";
@@ -48,11 +49,16 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
 export function Sidebar() {
   const pathname = usePathname();
   const unread = useUnreadMessageCount("advisor");
+  const recuperacionCount = useRecuperacionCount();
 
   const navWithBadges = (items: NavItem[]) =>
     items.map((item) => {
       if (item.href === "/dashboard/leads" && unread > 0) {
         return { ...item, badge: unread > 99 ? 99 : unread };
+      }
+      if (item.href === "/dashboard/recuperacion" && (recuperacionCount.data ?? 0) > 0) {
+        const count = recuperacionCount.data ?? 0;
+        return { ...item, badge: count > 99 ? 99 : count };
       }
       if (item.href === "/dashboard/notificaciones" && unread > 0) {
         return { ...item, badge: unread > 99 ? 99 : unread };

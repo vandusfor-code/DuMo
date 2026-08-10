@@ -6,6 +6,7 @@ import { salesScriptKeys } from "@/hooks/use-sales-script";
 import { latestGestionKeys } from "@/hooks/use-latest-gestion";
 import { crmClientKeys } from "@/hooks/use-crm-clients";
 import { salesKeys } from "@/hooks/use-sales";
+import { recuperacionKeys } from "@/hooks/use-advisor-recuperacion";
 import { REALTIME_FALLBACK_POLL_MS } from "@/providers/realtime-provider";
 import type { ChatMessage, Conversation } from "@/types/conversation";
 import type { Plan, SaveLeadInput } from "@/types/lead";
@@ -97,6 +98,11 @@ export function useSaveLead(conversationId?: string) {
         queryClient.invalidateQueries({ queryKey: ["commissions"] });
       }
       queryClient.invalidateQueries({ queryKey: crmClientKeys.all });
+      queryClient.invalidateQueries({ queryKey: leadKeys.conversations });
+      queryClient.invalidateQueries({ queryKey: recuperacionKeys.all });
+      if (result.saveAction === "close") {
+        queryClient.invalidateQueries({ queryKey: ["admin", "pendientes"] });
+      }
     },
   });
 }

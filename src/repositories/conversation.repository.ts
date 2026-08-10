@@ -160,10 +160,16 @@ class PostgresConversationRepository implements ConversationRepository {
       withDbRetry(() =>
         advisorId
           ? sql`
-              SELECT * FROM lead_conversations
-              WHERE assigned_advisor_id = ${advisorId}
-                AND inbox_state = 'active'
-              ORDER BY last_message_at DESC
+              SELECT c.* FROM lead_conversations c
+              WHERE c.assigned_advisor_id = ${advisorId}
+                AND c.inbox_state = 'active'
+                AND NOT EXISTS (
+                  SELECT 1 FROM lead_follow_ups f
+                  WHERE f.conversation_id = c.id
+                    AND f.module = 'recuperacion'
+                    AND f.status <> 'completed'
+                )
+              ORDER BY c.last_message_at DESC
             `
           : sql`
               SELECT * FROM lead_conversations ORDER BY last_message_at DESC
