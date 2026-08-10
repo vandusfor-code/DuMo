@@ -5,6 +5,7 @@ type MigrationSql = postgres.Sql | postgres.TransactionSql;
 
 export const INBOX_LIFECYCLE_REQUIRED_COLUMNS = [
   "lead_conversations.inbox_state",
+  "lead_conversations.reopened_at",
   "lead_gestiones.follow_up_date",
 ] as const;
 
@@ -42,5 +43,10 @@ export async function runInboxStateMigrations(tx: MigrationSql): Promise<void> {
   await tx`
     ALTER TABLE lead_gestiones
     ADD COLUMN IF NOT EXISTS follow_up_date date
+  `;
+
+  await tx`
+    ALTER TABLE lead_conversations
+    ADD COLUMN IF NOT EXISTS reopened_at timestamptz
   `;
 }

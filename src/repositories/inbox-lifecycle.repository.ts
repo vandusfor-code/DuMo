@@ -60,6 +60,35 @@ export async function getConversationInboxState(conversationId: string): Promise
   return raw === "closed" ? "closed" : raw === "active" ? "active" : null;
 }
 
+export type LastGestionAdvisor = {
+  advisorId: string;
+  advisorName: string;
+};
+
+/** Última gestión con asesora registrada (tipificador original). */
+export async function getLastGestionAdvisor(
+  conversationId: string,
+): Promise<LastGestionAdvisor | null> {
+  await ensureSchema();
+  const sql = getSql();
+  if (!sql) return null;
+
+  const rows = await withDbRetry(() =>
+    sql<{ advisor_id: string; advisor_name: string }[]>`
+      SELECT advisor_id, advisor_name
+      FROM lead_gestiones
+      WHERE conversation_id = ${conversationId}
+        AND advisor_id IS NOT NULL
+      ORDER BY created_at DESC
+      LIMIT 1
+    `,
+  );
+
+  const row = rows[0];
+  if (!row?.advisor_id) return null;
+  return { advisorId: row.advisor_id, advisorName: row.advisor_name ?? "" };
+}
+
 export async function getGestionFollowUpDate(gestionId: string): Promise<string | null> {
   await ensureSchema();
   const sql = getSql();
