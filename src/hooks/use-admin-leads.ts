@@ -74,6 +74,12 @@ export function useSaveAdminLead(conversationId?: string) {
       if (result.script && conversationId) {
         qc.setQueryData(["leads", "script", conversationId], result.script);
       }
+      if (result.sale) {
+        qc.invalidateQueries({ queryKey: ["admin", "dashboard"] });
+        qc.invalidateQueries({ queryKey: ["admin", "sales"] });
+        qc.invalidateQueries({ queryKey: ["admin", "accounting"] });
+        qc.invalidateQueries({ queryKey: ["admin", "commissions"] });
+      }
     },
   });
 }

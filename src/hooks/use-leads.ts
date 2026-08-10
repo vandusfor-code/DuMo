@@ -90,6 +90,11 @@ export function useSaveLead(conversationId?: string) {
       if (result.sale) {
         queryClient.invalidateQueries({ queryKey: salesKeys.all });
         queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+        queryClient.invalidateQueries({ queryKey: ["admin", "dashboard"] });
+        queryClient.invalidateQueries({ queryKey: ["admin", "sales"] });
+        queryClient.invalidateQueries({ queryKey: ["admin", "accounting"] });
+        queryClient.invalidateQueries({ queryKey: ["admin", "commissions"] });
+        queryClient.invalidateQueries({ queryKey: ["commissions"] });
       }
       queryClient.invalidateQueries({ queryKey: crmClientKeys.all });
     },

@@ -25,7 +25,7 @@ import type { AdvisorScope } from "@/lib/advisor-scope";
 import { matchesAdvisor } from "@/lib/advisor-scope";
 import { getAuthRepository } from "@/repositories/auth.repository";
 import { getCommercialConfigurationRepository } from "@/repositories/commercial-configuration.repository";
-import { buildPlanValueIndex } from "@/lib/commercial-plan";
+import { buildPlanValueIndex, findCommercialPlanById } from "@/lib/commercial-plan";
 import { findPlanCommission } from "@/data/mock/commercial-config.mock";
 import {
   economicProgress,
@@ -326,29 +326,39 @@ export class PostgresSalesStore {
     const id = `VTA-${year}-${String(seq).padStart(5, "0")}`;
     const now = new Date();
     const today = businessDateISO(now);
-    const primaryType = input.lines[0]?.saleType ?? "portability";
+    const config = await getCommercialConfigurationRepository().getSnapshot();
+    const primaryLine = input.lines[0];
+    const primaryType = primaryLine?.saleType ?? "portability";
     const adminType = canonicalToAdminType(primaryType);
+    const primaryPlan = primaryLine?.planId
+      ? findCommercialPlanById(primaryLine.planId, config.plans)
+      : undefined;
+    const planName = primaryPlan?.name ?? "";
+    const operatorValue = primaryPlan?.womValue ?? 0;
+    const dumoValue = primaryPlan?.dumoValue ?? 0;
 
     await withDbRetry(async () => {
       await sql`
         INSERT INTO sales (
           id, customer_name, rut, phone, email, advisor_id, advisor_name,
-          status, sale_type, plan, operator_value, sale_date, notes, created_at
+          status, sale_type, plan, operator_value, dumo_value, sale_date, notes, created_at
         ) VALUES (
           ${id}, ${input.customerName}, ${input.rut}, ${input.phone},
           ${input.email ?? ""}, ${advisorId}, ${advisorName}, ${"registrada"},
-          ${adminType}, ${""}, ${0}, ${today}, ${input.notes ?? ""}, ${now.toISOString()}
+          ${adminType}, ${planName}, ${operatorValue}, ${dumoValue}, ${today},
+          ${input.notes ?? ""}, ${now.toISOString()}
         )
       `;
       for (let i = 0; i < input.lines.length; i++) {
         const l = input.lines[i];
         const lineAdminType = canonicalToAdminType(l.saleType);
+        const linePlanId = l.planId?.trim() ?? primaryLine?.planId?.trim() ?? "";
         await sql`
           INSERT INTO sale_lines (
             id, sale_id, phone_number, sale_type, device_name, plan_id, status
           ) VALUES (
             ${`${id}-L${i + 1}`}, ${id}, ${l.phoneNumber}, ${lineAdminType},
-            ${l.deviceName ?? ""}, ${""}, ${"registrada"}
+            ${l.deviceName ?? ""}, ${linePlanId}, ${"registrada"}
           )
         `;
       }

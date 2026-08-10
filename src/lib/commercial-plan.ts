@@ -115,7 +115,18 @@ export function buildPlanValueIndex(plans: CommercialPlan[]): Map<string, { wom:
   const index = new Map<string, { wom: number; dumo: number }>();
   for (const p of plans) {
     if (p.status !== "active") continue;
-    index.set(p.name.toLowerCase(), { wom: p.womValue, dumo: p.dumoValue });
+    const entry = { wom: p.womValue, dumo: p.dumoValue };
+    index.set(p.name.toLowerCase(), entry);
+    index.set(p.id.toLowerCase(), entry);
   }
   return index;
+}
+
+export function findCommercialPlanById(
+  planId: string,
+  plans: CommercialPlan[],
+): CommercialPlan | undefined {
+  const id = planId.trim();
+  if (!id) return undefined;
+  return plans.find((p) => p.id === id && p.status === "active");
 }

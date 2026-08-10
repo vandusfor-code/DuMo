@@ -84,6 +84,8 @@ export interface NewSaleInput {
   lines: {
     phoneNumber: string;
     saleType: SaleType;
+    /** ID del plan comercial (config comercial). */
+    planId?: string;
     deviceName?: string;
   }[];
 }

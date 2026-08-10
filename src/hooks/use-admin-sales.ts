@@ -44,6 +44,9 @@ export function useUpdateAdminSaleStatuses() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin", "sales"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["admin", "dashboard"] });
+      qc.invalidateQueries({ queryKey: ["admin", "accounting"] });
+      qc.invalidateQueries({ queryKey: ["admin", "commissions"] });
     },
   });
 }
@@ -56,6 +59,9 @@ export function useDeleteAdminSales() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin", "sales"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["admin", "dashboard"] });
+      qc.invalidateQueries({ queryKey: ["admin", "accounting"] });
+      qc.invalidateQueries({ queryKey: ["admin", "commissions"] });
     },
   });
 }

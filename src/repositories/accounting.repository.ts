@@ -29,9 +29,10 @@ function filterExpenses(filters: AccountingFilters, expenses: Expense[]): Expens
   return expenses.filter((e) => e.date.startsWith(key));
 }
 
-function buildChart(expenses: Expense[]): AccountingChartPoint[] {
+async function buildChart(expenses: Expense[]): Promise<AccountingChartPoint[]> {
   const now = new Date();
   const points: AccountingChartPoint[] = [];
+  const store = getPostgresSalesStore();
 
   for (let i = 5; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -39,11 +40,18 @@ function buildChart(expenses: Expense[]): AccountingChartPoint[] {
     const monthExpenses = expenses
       .filter((e) => e.date.startsWith(key))
       .reduce((s, e) => s + e.amount, 0);
+    let income = 0;
+    try {
+      const stats = await store.getMonthCommercialStats(key);
+      income = stats.dumoIncome;
+    } catch (err) {
+      console.error("[accounting] chart month stats", key, err);
+    }
     points.push({
       label: d.toLocaleDateString("es-CL", { month: "short" }),
-      income: 0,
+      income,
       expenses: monthExpenses,
-      profit: -monthExpenses,
+      profit: income - monthExpenses,
     });
   }
 
@@ -160,7 +168,7 @@ class PostgresAccountingRepository implements AccountingRepository {
       console.error("[accounting] month stats", err);
     }
     const summary = await buildSummary(filtered, monthlyBudget, stats);
-    const chart = buildChart(expenses);
+    const chart = await buildChart(expenses);
 
     return {
       summary,
@@ -217,7 +225,7 @@ class MockAccountingRepository implements AccountingRepository {
     const summary = await buildSummary(filtered, monthlyBudget);
     return {
       summary,
-      chart: buildChart(this.expenses),
+      chart: await buildChart(this.expenses),
       expenses: filtered.sort((a, b) => b.date.localeCompare(a.date)),
     };
   }

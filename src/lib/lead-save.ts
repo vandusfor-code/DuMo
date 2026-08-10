@@ -166,6 +166,7 @@ export function leadGestionToNewSaleInput(
     lines: input.lines.map((line) => ({
       phoneNumber: line.phone,
       saleType: mapLeadLineToSaleType(line.saleType, line.equipmentMode ?? "none"),
+      planId: line.planId?.trim() || undefined,
       deviceName:
         line.equipmentModel?.trim() ||
         line.equipment?.trim() ||
