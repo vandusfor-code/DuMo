@@ -152,7 +152,7 @@ export async function listAdminPendientes(
   filters: AdminPendientesFilters,
 ): Promise<AdminPendientesResult> {
   const allRows = await fetchPendingRows();
-  let filtered = allRows.filter((row) => {
+  const filtered = allRows.filter((row) => {
     if (filters.type !== "all" && row.tipification_slug !== filters.type) return false;
     if (filters.advisor !== "all") {
       const advisorId = row.origin_advisor_id;
