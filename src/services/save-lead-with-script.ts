@@ -182,7 +182,12 @@ export async function saveLeadWithScript(
     followUpCreated = lifecycle.followUpCreated;
   } catch (error) {
     console.error("[saveLeadWithScript] inbox lifecycle apply failed", error);
-    if (error instanceof Error && error.message.includes("seguimiento")) {
+    if (
+      error instanceof Error &&
+      (error.message.includes("seguimiento") ||
+        error.message.includes("lead_follow_ups") ||
+        error.message.includes("pendientes"))
+    ) {
       throw error;
     }
   }
