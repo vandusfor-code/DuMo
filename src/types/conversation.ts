@@ -16,6 +16,14 @@ export const CONVERSATION_STATUS_LABELS: Record<ConversationStatus, string> = {
 export type ConversationChannel = "whatsapp" | "messenger" | "web_qr";
 
 /** Resumen de una conversación en la bandeja. */
+export interface ConversationTipification {
+  slug: string;
+  name: string;
+  badgeBg: string;
+  badgeText: string;
+}
+
+/** Resumen de una conversación en la bandeja. */
 export interface Conversation {
   id: string;
   customerName: string;
@@ -33,6 +41,8 @@ export interface Conversation {
   online: boolean;
   /** P1.2 — visible en bandeja activa vs cerrada (filtro en P1.5). */
   inboxState?: InboxState;
+  /** Última tipificación guardada (lead_gestiones más reciente). */
+  latestTipification?: ConversationTipification | null;
 }
 
 /** Un mensaje dentro del chat — texto, imágenes y audios. */

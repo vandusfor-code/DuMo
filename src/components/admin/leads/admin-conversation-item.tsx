@@ -12,6 +12,7 @@ import { getInitials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { AdminAdvisor, AdminConversation } from "@/types/admin-lead";
 import { AdminLeadStatusBadge } from "./admin-conversation-filters";
+import { ConversationTipificationBadge } from "@/components/leads/conversation-tipification-badge";
 
 export function AdminConversationItem({
   conversation,
@@ -59,6 +60,9 @@ export function AdminConversationItem({
             )}
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {conversation.latestTipification ? (
+              <ConversationTipificationBadge tipification={conversation.latestTipification} />
+            ) : null}
             <AdminLeadStatusBadge status={conversation.status} />
             {conversation.assignedAdvisor && (
               <span className="text-[11px] text-muted">{conversation.assignedAdvisor.name}</span>

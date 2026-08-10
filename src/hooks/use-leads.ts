@@ -30,6 +30,35 @@ export function fetchConversationMessages(conversationId: string) {
   );
 }
 
+export function patchConversationUnread(
+  queryClient: ReturnType<typeof useQueryClient>,
+  conversationId: string,
+) {
+  queryClient.setQueryData<Conversation[]>(leadKeys.conversations, (prev) =>
+    prev?.map((c) => (c.id === conversationId ? { ...c, unread: 0 } : c)),
+  );
+}
+
+export function useMarkConversationRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (conversationId: string) =>
+      advisorApiPost<{ ok: boolean }>(
+        `/api/leads/conversations/${encodeURIComponent(conversationId)}/read`,
+        {},
+      ),
+    onMutate: (conversationId) => {
+      patchConversationUnread(queryClient, conversationId);
+    },
+    onSettled: (_data, _err, conversationId) => {
+      queryClient.invalidateQueries({ queryKey: leadKeys.conversations });
+      if (conversationId) {
+        queryClient.invalidateQueries({ queryKey: leadKeys.messages(conversationId) });
+      }
+    },
+  });
+}
+
 /** No conservar bandeja/mensajes tras 401/403 — evita mostrar datos de otra sesión. */
 function keepPlaceholderOnAuthError<T>(
   prev: T | undefined,

@@ -6,7 +6,7 @@ import { io, type Socket } from "socket.io-client";
 import { getClientToken } from "@/lib/auth/client-token";
 import { forceSessionLogout } from "@/lib/auth/force-logout";
 import { leadKeys } from "@/hooks/use-leads";
-import type { ChatMessage } from "@/types/conversation";
+import type { ChatMessage, Conversation } from "@/types/conversation";
 
 /** Polling de respaldo cuando WebSocket no está conectado o como red de seguridad. */
 export const REALTIME_FALLBACK_POLL_MS = 45_000;
@@ -97,6 +97,13 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
     socket.on("leads:conversation:updated", (payload: ConversationUpdatedEvent) => {
       if (!payload?.conversationId) return;
+      if (payload.reason === "read" || payload.unread === 0) {
+        queryClient.setQueryData<Conversation[]>(leadKeys.conversations, (prev) =>
+          prev?.map((c) =>
+            c.id === payload.conversationId ? { ...c, unread: 0 } : c,
+          ),
+        );
+      }
       invalidateForConversation(queryClient, payload.conversationId);
     });
 

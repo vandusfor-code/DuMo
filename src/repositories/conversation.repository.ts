@@ -8,6 +8,8 @@ import { parseInboxState } from "@/types/inbox-state";
 import { isMessengerConversation } from "@/lib/messenger/conversation-id";
 import { isWebQrConversation, webQrConversationId } from "@/lib/web-qr/conversation-id";
 import { formatWhatsAppDisplayPhone, isLikelyWhatsAppLid, normalizeWhatsAppPhoneDigits } from "@/lib/whatsapp/phone";
+import { mapConversationTipification } from "@/lib/conversation-tipification";
+import { DEFAULT_COMPANY_ID } from "@/types/tenant";
 import { ensureSchema, ensureSchemaForRead, getSql, hasDatabase, withDbRetry, withQueryTimeout } from "@/server/db/client";
 
 /** Un mensaje entrante/saliente a persistir. */
@@ -126,6 +128,10 @@ type ConvRow = {
   status: string;
   online: boolean;
   inbox_state?: string;
+  latest_tipification_slug?: string | null;
+  latest_tipification_name?: string | null;
+  badge_bg?: string | null;
+  badge_text?: string | null;
 };
 
 type MsgRow = {
@@ -152,6 +158,29 @@ function toStatus(value: string): ConversationStatus {
     : "new";
 }
 
+function mapConvRow(r: ConvRow): Conversation {
+  const formattedPhone = formatWhatsAppDisplayPhone(r.phone);
+  const displayName =
+    r.customer_name?.trim() ||
+    formattedPhone ||
+    (isWebQrConversation(r.id) && isLikelyWhatsAppLid(r.phone) ? "Contacto WhatsApp" : r.phone);
+  return {
+    id: r.id,
+    customerName: displayName,
+    phone: formattedPhone || r.phone,
+    rut: "",
+    channel: resolveConversationChannel(r.id),
+    lastMessage: r.last_message,
+    lastMessageTime: formatChatTime(r.last_message_at),
+    lastMessageDirection: r.last_message_direction === "out" ? "out" : "in",
+    unread: Number(r.unread) || 0,
+    status: toStatus(r.status),
+    online: Boolean(r.online),
+    inboxState: parseInboxState(r.inbox_state),
+    latestTipification: mapConversationTipification(r),
+  };
+}
+
 class PostgresConversationRepository implements ConversationRepository {
   async getConversations(advisorId?: string): Promise<Conversation[]> {
     await ensureSchemaForRead();
@@ -159,8 +188,23 @@ class PostgresConversationRepository implements ConversationRepository {
     const rows = await withQueryTimeout(
       withDbRetry(() =>
         advisorId
-          ? sql`
-              SELECT c.* FROM lead_conversations c
+          ? sql<ConvRow[]>`
+              SELECT
+                c.*,
+                lg.gestion_type AS latest_tipification_slug,
+                t.name AS latest_tipification_name,
+                t.badge_bg,
+                t.badge_text
+              FROM lead_conversations c
+              LEFT JOIN LATERAL (
+                SELECT gestion_type
+                FROM lead_gestiones
+                WHERE conversation_id = c.id
+                ORDER BY created_at DESC
+                LIMIT 1
+              ) lg ON true
+              LEFT JOIN tipifications t
+                ON t.slug = lg.gestion_type AND t.company_id = ${DEFAULT_COMPANY_ID}
               WHERE c.assigned_advisor_id = ${advisorId}
                 AND c.inbox_state = 'active'
                 AND NOT EXISTS (
@@ -171,33 +215,29 @@ class PostgresConversationRepository implements ConversationRepository {
                 )
               ORDER BY c.last_message_at DESC
             `
-          : sql`
-              SELECT * FROM lead_conversations ORDER BY last_message_at DESC
+          : sql<ConvRow[]>`
+              SELECT
+                c.*,
+                lg.gestion_type AS latest_tipification_slug,
+                t.name AS latest_tipification_name,
+                t.badge_bg,
+                t.badge_text
+              FROM lead_conversations c
+              LEFT JOIN LATERAL (
+                SELECT gestion_type
+                FROM lead_gestiones
+                WHERE conversation_id = c.id
+                ORDER BY created_at DESC
+                LIMIT 1
+              ) lg ON true
+              LEFT JOIN tipifications t
+                ON t.slug = lg.gestion_type AND t.company_id = ${DEFAULT_COMPANY_ID}
+              ORDER BY c.last_message_at DESC
             `,
       ),
       8000,
     );
-    return (rows as unknown as ConvRow[]).map((r) => {
-      const formattedPhone = formatWhatsAppDisplayPhone(r.phone);
-      const displayName =
-        r.customer_name?.trim() ||
-        formattedPhone ||
-        (isWebQrConversation(r.id) && isLikelyWhatsAppLid(r.phone) ? "Contacto WhatsApp" : r.phone);
-      return {
-        id: r.id,
-        customerName: displayName,
-        phone: formattedPhone || r.phone,
-        rut: "",
-        channel: resolveConversationChannel(r.id),
-        lastMessage: r.last_message,
-        lastMessageTime: formatChatTime(r.last_message_at),
-        lastMessageDirection: r.last_message_direction === "out" ? "out" : "in",
-        unread: Number(r.unread) || 0,
-        status: toStatus(r.status),
-        online: Boolean(r.online),
-        inboxState: parseInboxState(r.inbox_state),
-      };
-    });
+    return rows.map(mapConvRow);
   }
 
   async getMessages(conversationId: string): Promise<ChatMessage[]> {
@@ -343,6 +383,13 @@ class PostgresConversationRepository implements ConversationRepository {
   async markRead(conversationId: string): Promise<void> {
     await ensureSchema();
     const sql = getSql()!;
+    await sql`
+      UPDATE lead_messages
+      SET read = true
+      WHERE conversation_id = ${conversationId}
+        AND direction = 'in'
+        AND read = false
+    `;
     await sql`UPDATE lead_conversations SET unread = 0 WHERE id = ${conversationId}`;
     const convRows = (await sql`
       SELECT assigned_advisor_id FROM lead_conversations WHERE id = ${conversationId}

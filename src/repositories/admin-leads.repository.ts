@@ -25,6 +25,8 @@ import {
   type AdvisorPresenceStatus,
 } from "@/lib/advisor-presence";
 import { withLatency } from "@/lib/mock";
+import { mapConversationTipification } from "@/lib/conversation-tipification";
+import { DEFAULT_COMPANY_ID } from "@/types/tenant";
 import { getConfig, setConfig } from "@/server/db/app-config";
 import { ensureSchema, ensureSchemaForRead, getSql, hasDatabase, withDbRetry, withQueryTimeout } from "@/server/db/client";
 
@@ -70,6 +72,10 @@ type ConvRow = {
   assigned_advisor_id: string | null;
   assigned_advisor_name: string | null;
   admin_status: string;
+  latest_tipification_slug?: string | null;
+  latest_tipification_name?: string | null;
+  badge_bg?: string | null;
+  badge_text?: string | null;
 };
 
 function toAdminStatus(value: string): AdminLeadStatus {
@@ -109,6 +115,7 @@ function mapConversation(r: ConvRow): AdminConversation {
           name: r.assigned_advisor_name ?? "",
         }
       : null,
+    latestTipification: mapConversationTipification(r),
   };
 }
 
@@ -125,18 +132,46 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
     return withQueryTimeout(
       withDbRetry(() =>
         advisorId
-          ? sql`
-              SELECT id, phone, customer_name, last_message, last_message_at, last_message_direction,
-                     unread, online, assigned_advisor_id, assigned_advisor_name, admin_status
-              FROM lead_conversations
-              WHERE assigned_advisor_id = ${advisorId}
-              ORDER BY last_message_at DESC
+          ? sql<ConvRow[]>`
+              SELECT
+                c.id, c.phone, c.customer_name, c.last_message, c.last_message_at, c.last_message_direction,
+                c.unread, c.online, c.assigned_advisor_id, c.assigned_advisor_name, c.admin_status,
+                lg.gestion_type AS latest_tipification_slug,
+                t.name AS latest_tipification_name,
+                t.badge_bg,
+                t.badge_text
+              FROM lead_conversations c
+              LEFT JOIN LATERAL (
+                SELECT gestion_type
+                FROM lead_gestiones
+                WHERE conversation_id = c.id
+                ORDER BY created_at DESC
+                LIMIT 1
+              ) lg ON true
+              LEFT JOIN tipifications t
+                ON t.slug = lg.gestion_type AND t.company_id = ${DEFAULT_COMPANY_ID}
+              WHERE c.assigned_advisor_id = ${advisorId}
+              ORDER BY c.last_message_at DESC
             `
-          : sql`
-              SELECT id, phone, customer_name, last_message, last_message_at, last_message_direction,
-                     unread, online, assigned_advisor_id, assigned_advisor_name, admin_status
-              FROM lead_conversations
-              ORDER BY last_message_at DESC
+          : sql<ConvRow[]>`
+              SELECT
+                c.id, c.phone, c.customer_name, c.last_message, c.last_message_at, c.last_message_direction,
+                c.unread, c.online, c.assigned_advisor_id, c.assigned_advisor_name, c.admin_status,
+                lg.gestion_type AS latest_tipification_slug,
+                t.name AS latest_tipification_name,
+                t.badge_bg,
+                t.badge_text
+              FROM lead_conversations c
+              LEFT JOIN LATERAL (
+                SELECT gestion_type
+                FROM lead_gestiones
+                WHERE conversation_id = c.id
+                ORDER BY created_at DESC
+                LIMIT 1
+              ) lg ON true
+              LEFT JOIN tipifications t
+                ON t.slug = lg.gestion_type AND t.company_id = ${DEFAULT_COMPANY_ID}
+              ORDER BY c.last_message_at DESC
             `,
       ),
       8000,

@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/shared/error-state";
 import { useAdvisorRecuperacion } from "@/hooks/use-advisor-recuperacion";
-import { useConversationMessages } from "@/hooks/use-leads";
+import { useConversationMessages, useMarkConversationRead } from "@/hooks/use-leads";
 import { resolveConversationChannel } from "@/lib/conversation-channel";
 import type { AdvisorRecuperacionFilters, AdvisorRecuperacionRow } from "@/types/advisor-recuperacion";
 import type { Conversation } from "@/types/conversation";
@@ -81,6 +81,12 @@ function RecuperacionPageContent() {
   );
 
   const messages = useConversationMessages(selectedConversation?.id ?? null);
+  const markRead = useMarkConversationRead();
+
+  const openChat = (row: AdvisorRecuperacionRow) => {
+    setSelectedRow(row);
+    markRead.mutate(row.conversationId);
+  };
 
   const apply = (f: RecuperacionAppliedFilters) => {
     setApplied(f);
@@ -141,7 +147,7 @@ function RecuperacionPageContent() {
                 page={page}
                 pageSize={10}
                 selectedConversationId={selectedRow?.conversationId ?? null}
-                onOpenChat={setSelectedRow}
+                onOpenChat={openChat}
                 onPageChange={setPage}
               />
             </>

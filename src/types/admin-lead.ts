@@ -39,6 +39,8 @@ export interface AdminConversation {
   status: AdminLeadStatus;
   online: boolean;
   assignedAdvisor: AdminAdvisor | null;
+  /** Última tipificación guardada (lead_gestiones más reciente). */
+  latestTipification?: import("./conversation").ConversationTipification | null;
 }
 
 export interface LeadNote {
