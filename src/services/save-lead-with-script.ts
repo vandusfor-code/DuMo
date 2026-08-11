@@ -83,10 +83,22 @@ export async function saveLeadWithScript(
     saveAction !== "close" &&
     isSaleFlow &&
     input.lines.length > 0;
-  const shouldRegisterSale =
-    (saveAction === "sale" || saveAction === "script") &&
-    isSaleFlow &&
-    input.lines.length > 0;
+  /**
+   * P0 — CAUSA RAÍZ del hueco Ventas↔Metas↔Comisiones↔Contabilidad↔Dashboard:
+   * esto antes exigía saveAction === "sale" | "script", así que guardar una
+   * gestión "venta" completa con el botón genérico "Guardar y cerrar" (o con
+   * Enter dentro de un campo, que dispara el submit nativo del formulario sin
+   * pasar por el onClick del botón y deja saveModeRef en su default "close")
+   * NUNCA registraba la venta — sin ningún error visible (sale:null,
+   * saleError:null). Confirmado en producción: 24 de 28 gestiones "venta"
+   * reales se perdieron así.
+   *
+   * Si la tipificación es de flujo de venta y hay al menos una línea
+   * completa, la venta se registra siempre — independiente del botón que
+   * disparó el guardado. saveAction solo decide si ADEMÁS se genera el
+   * script de la llamada, nunca si la venta existe.
+   */
+  const shouldRegisterSale = isSaleFlow && input.lines.length > 0;
 
   if (shouldGenerateScript) {
     const main = input.lines[0];
