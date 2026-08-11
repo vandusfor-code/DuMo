@@ -30,6 +30,7 @@ import {
   makeCacheableSignalKeyStore,
 } from "@whiskeysockets/baileys";
 import { processInboundAudioMessage } from "./inbound-audio.js";
+import { processInboundImageMessage } from "./inbound-image.js";
 import { prepareWhatsAppAudio } from "./audio-transcode.js";
 import {
   assertAllowedInboundAudioMime,
@@ -38,7 +39,7 @@ import {
   MAX_INBOUND_AUDIO_BYTES,
   newMediaAssetId,
 } from "./media-config.js";
-import { getSupabaseStorageStatus, uploadInboundAudioToSupabase } from "./supabase-upload.js";
+import { getSupabaseStorageStatus } from "./supabase-upload.js";
 
 const log = pino({ level: process.env.LOG_LEVEL ?? "info" });
 const msgRetryCounterCache = new NodeCache();
@@ -315,6 +316,41 @@ async function forwardInboundToDuMo(session, msg, upsertType) {
           err instanceof Error && err.message.includes("no compatible")
             ? `⚠️ ${err.message}`
             : "⚠️ No se pudo recibir el audio. Pide al cliente que lo reenvíe.";
+      }
+    }
+  }
+
+  if (isImage) {
+    if (!isSupabaseStorageConfigured()) {
+      log.error({ channelId: session.channelId, messageId: msg.key.id }, "image QR: Supabase no configurado");
+      payload.type = "text";
+      payload.text =
+        "⚠️ No se pudo recibir la imagen (almacenamiento no configurado). Pide al cliente que la reenvíe.";
+    } else if (!session.sock) {
+      log.error({ channelId: session.channelId, messageId: msg.key.id }, "image QR: socket no conectado");
+      payload.type = "text";
+      payload.text = "⚠️ No se pudo recibir la imagen. Pide al cliente que la reenvíe.";
+    } else {
+      try {
+        const image = await processInboundImageMessage({
+          sock: session.sock,
+          msg,
+          imageMessage: content.imageMessage,
+          phone: resolvedPhone,
+        });
+        payload.mediaUrl = image.publicUrl;
+        payload.mimeType = image.mimeType;
+        if (image.caption) payload.caption = image.caption;
+        if (!payload.text) {
+          payload.text = image.caption || "📷 Imagen";
+        }
+      } catch (err) {
+        log.error(
+          { err, channelId: session.channelId, messageId: msg.key.id },
+          "image QR: descarga o upload falló",
+        );
+        payload.type = "text";
+        payload.text = "⚠️ No se pudo recibir la imagen. Pide al cliente que la reenvíe.";
       }
     }
   }
@@ -1123,6 +1159,7 @@ app.get("/health", (_req, res) => {
     ),
     supabaseStorage: getSupabaseStorageStatus(),
     inboundAudioEnabled: isSupabaseStorageConfigured(),
+    inboundImageEnabled: isSupabaseStorageConfigured(),
     active: [...sessions.values()].map((s) => ({
       channelId: s.channelId,
       status: s.status,

@@ -78,17 +78,17 @@ export async function persistWebQrInbound(payload: BridgeInboundPayload): Promis
     return;
   }
 
-  let body = payload.text?.trim() ?? "";
-
   if (payload.type === "image" && payload.mediaUrl) {
-    body = payload.caption?.trim() || "📷 Imagen";
-    await leadsService.receiveMessage({
+    await leadsService.receiveInboundImageFromUrl({
       ...baseMessage,
-      body,
-      messageType: "image",
+      mediaUrl: payload.mediaUrl,
+      mimeType: payload.mimeType,
+      caption: payload.caption ?? payload.text?.trim(),
     });
     return;
   }
+
+  let body = payload.text?.trim() ?? "";
 
   if (!body && payload.type !== "text") {
     body = `⚠️ DuMo recibió ${payload.type} por WhatsApp Web. Pide al cliente que envíe texto o imagen.`;

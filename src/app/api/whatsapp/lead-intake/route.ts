@@ -77,14 +77,21 @@ export async function POST(request: NextRequest) {
     SELECT id, assigned_advisor_id FROM lead_conversations WHERE dulabs_session_id = ${payload.dulabs_session_id}
   `) as unknown as { id: string; assigned_advisor_id: string | null }[];
   if (existente[0]) {
-    // Backfill seguro para leads ya procesados antes de que dumo_phone_id se
-    // empezara a mandar -- no toca nada más, no reactiva auto-assign.
+    // Backfill seguro para leads ya procesados antes de estas correcciones
+    // -- no toca nada más, no reactiva auto-assign.
     if (payload.phone_number_id) {
       await sql`
         UPDATE lead_conversations SET dumo_phone_id = ${payload.phone_number_id}
         WHERE id = ${existente[0].id} AND dumo_phone_id IS NULL
       `;
     }
+    // Corrige leads creados antes del fix de phone (ver comentario abajo):
+    // el campo debe ser siempre el wa_id real, nunca el phone_provided del
+    // formulario.
+    await sql`
+      UPDATE lead_conversations SET phone = id
+      WHERE id = ${existente[0].id} AND phone IS DISTINCT FROM id
+    `;
     return NextResponse.json({
       ok: true,
       conversation_id: existente[0].id,
@@ -102,7 +109,14 @@ export async function POST(request: NextRequest) {
   await getConversationRepository().saveMessage({
     waMessageId: `dulabs-lead-${payload.dulabs_session_id}`,
     conversationId,
-    phone: payload.phone_provided || conversationId,
+    // SIEMPRE el wa_id real (mismo criterio que un inbound real de
+    // WhatsApp, ver inbound-persist.ts: phone = msg.from = conversationId).
+    // NO usar phone_provided -- ese es un dato del formulario del lead (el
+    // cliente puede escribir un número distinto al que está chateando), y
+    // la UI usa este campo `phone` como destino real al enviar
+    // (chat-window.tsx: <ChatInput to={conversation.phone} />). Ponerlo mal
+    // manda la respuesta de la asesora a un número equivocado.
+    phone: conversationId,
     customerName: payload.customer_name ?? "",
     body: resumenLead(payload),
     direction: "in",

@@ -76,21 +76,22 @@ export async function sendWebQrMedia(input: {
 
   const preview = input.caption?.trim() || "Imagen";
 
-  await repo.saveMessage({
-    waMessageId: sent.id,
-    conversationId: input.conversationId,
-    phone,
-    customerName: "",
-    body: preview,
-    direction: "out",
-    createdAt: new Date().toISOString(),
-    dumoPhoneId: input.channelId,
-    messageType: "image",
-    mediaAssetId: input.mediaAssetId,
-    caption: input.caption,
-    companyId: input.companyId,
-    waChatJid: sent.jid ?? jid,
-  });
+    await repo.saveMessage({
+      waMessageId: sent.id,
+      conversationId: input.conversationId,
+      phone,
+      customerName: "",
+      body: preview,
+      direction: "out",
+      createdAt: new Date().toISOString(),
+      dumoPhoneId: input.channelId,
+      messageType: "image",
+      mediaAssetId: input.mediaAssetId,
+      mediaUrl: input.mediaUrl,
+      caption: input.caption,
+      companyId: input.companyId,
+      waChatJid: sent.jid ?? jid,
+    });
 
   return sent;
 }

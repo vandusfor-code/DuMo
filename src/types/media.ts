@@ -43,7 +43,8 @@ export function isSupportedAudioMime(mimeType: string): boolean {
     base === "audio/opus" ||
     base === "audio/mpeg" ||
     base === "audio/mp3" ||
-    base === "audio/webm"
+    base === "audio/webm" ||
+    base === "audio/mp4"
   );
 }
 

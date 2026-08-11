@@ -5,6 +5,16 @@ export const DEFAULT_COMPANY_ID = process.env.DUMO_COMPANY_ID?.trim() || "compan
 /** Máximo audio entrante (16 MB). */
 export const MAX_INBOUND_AUDIO_BYTES = 16 * 1024 * 1024;
 
+/** Máximo imagen entrante (5 MB — límite WhatsApp). */
+export const MAX_INBOUND_IMAGE_BYTES = 5 * 1024 * 1024;
+
+export const ALLOWED_INBOUND_IMAGE_MIMES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+]);
+
 export const ALLOWED_INBOUND_AUDIO_MIMES = new Set([
   "audio/ogg",
   "audio/ogg; codecs=opus",
@@ -81,6 +91,32 @@ export function extensionFromAudioMime(mimeType) {
   if (m.includes("ogg") || m.includes("opus")) return "ogg";
   if (m.includes("webm")) return "webm";
   return "bin";
+}
+
+export function normalizeInboundImageMime(rawMime) {
+  const raw = String(rawMime ?? "").trim().toLowerCase();
+  const base = raw.split(";")[0].trim();
+  if (ALLOWED_INBOUND_IMAGE_MIMES.has(base)) return base;
+  if (base === "image/jpg") return "image/jpeg";
+  return "";
+}
+
+export function extensionFromImageMime(mimeType) {
+  const m = String(mimeType ?? "").toLowerCase();
+  if (m.includes("png")) return "png";
+  if (m.includes("webp")) return "webp";
+  if (m.includes("gif")) return "gif";
+  return "jpg";
+}
+
+export function assertAllowedInboundImageMime(rawMime) {
+  const candidate = normalizeInboundImageMime(rawMime);
+  if (!candidate) {
+    throw new Error(
+      `Formato de imagen no compatible (${rawMime || "desconocido"}). Usa JPG, PNG o WEBP.`,
+    );
+  }
+  return candidate;
 }
 
 export function assertAllowedInboundAudioMime(rawMime, ptt) {

@@ -27,7 +27,7 @@ import {
 } from "@/lib/messenger/conversation-id";
 import { isWebQrConversation } from "@/lib/web-qr/conversation-id";
 import { sendWebQrAudio, sendWebQrMedia, sendWebQrText, resolveWebQrChannelId } from "@/server/web-qr/send";
-import { sendMessengerText } from "@/server/messenger/send";
+import { sendMessengerAttachment, sendMessengerText } from "@/server/messenger/send";
 import { getMessengerIntegrationConfig } from "@/server/messenger/config";
 
 const GRAPH = "https://graph.facebook.com";
@@ -185,7 +185,110 @@ export const leadsService = {
       dumoPhoneId: input.dumoPhoneId,
       messageType: "image",
       mediaAssetId: asset.id,
+      mediaUrl: asset.publicUrl,
       caption: input.caption,
+      companyId,
+    });
+  },
+
+  /** Imagen ya subida por el bridge QR — registra media_asset y persiste mensaje entrante. */
+  async receiveInboundImageFromUrl(input: {
+    waMessageId: string;
+    conversationId: string;
+    phone: string;
+    customerName: string;
+    createdAt: string;
+    dumoPhoneId?: string;
+    mediaUrl: string;
+    mimeType?: string;
+    caption?: string;
+    companyId?: string;
+  }): Promise<void> {
+    const companyId = input.companyId ?? DEFAULT_COMPANY_ID;
+    const mimeType = input.mimeType?.trim() || "image/jpeg";
+    assertSupportedImageMime(mimeType);
+
+    const fileName = input.mediaUrl.split("/").pop()?.split("?")[0] || "image.jpg";
+    const asset = await mediaService.registerExistingChatMedia({
+      companyId,
+      publicUrl: input.mediaUrl,
+      fileName: decodeURIComponent(fileName),
+      mimeType,
+      source: "whatsapp_inbound",
+    });
+
+    const preview = input.caption?.trim() || "📷 Imagen";
+
+    await this.receiveMessage({
+      waMessageId: input.waMessageId,
+      conversationId: input.conversationId,
+      phone: input.phone,
+      customerName: input.customerName,
+      body: preview,
+      direction: "in",
+      createdAt: input.createdAt,
+      dumoPhoneId: input.dumoPhoneId,
+      messageType: "image",
+      mediaAssetId: asset.id,
+      mediaUrl: asset.publicUrl,
+      caption: input.caption,
+      companyId,
+    });
+  },
+
+  /** Descarga audio de Meta, lo guarda en Supabase y persiste el mensaje entrante. */
+  async receiveInboundAudio(input: {
+    waMessageId: string;
+    conversationId: string;
+    phone: string;
+    customerName: string;
+    createdAt: string;
+    dumoPhoneId?: string;
+    waMediaId: string;
+    mimeType?: string;
+    companyId?: string;
+    voice?: boolean;
+  }): Promise<void> {
+    const repo = getConversationRepository();
+    const companyId = input.companyId ?? DEFAULT_COMPANY_ID;
+    const phoneId = input.dumoPhoneId?.trim() || defaultPhoneNumberId() || "";
+    const perNumberToken = phoneId ? await repo.getAccessTokenForPhoneId(phoneId) : null;
+    const creds = resolveSendCredentials(phoneId, perNumberToken);
+    if ("error" in creds) {
+      throw new Error(creds.error);
+    }
+
+    const downloaded = await downloadWhatsAppMedia({
+      mediaId: input.waMediaId,
+      token: creds.token,
+    });
+    const mimeType = input.mimeType ?? downloaded.mimeType;
+    assertSupportedAudioMime(mimeType);
+
+    const asset = await mediaService.uploadChatMedia({
+      companyId,
+      conversationId: input.conversationId,
+      direction: "inbound",
+      fileName: downloaded.fileName ?? `wa-${input.waMediaId}.ogg`,
+      mimeType,
+      data: downloaded.data,
+      waMediaId: input.waMediaId,
+    });
+
+    const preview = input.voice ? "🎤 Nota de voz" : "🔊 Audio";
+
+    await this.receiveMessage({
+      waMessageId: input.waMessageId,
+      conversationId: input.conversationId,
+      phone: input.phone,
+      customerName: input.customerName,
+      body: preview,
+      direction: "in",
+      createdAt: input.createdAt,
+      dumoPhoneId: input.dumoPhoneId,
+      messageType: "audio",
+      mediaAssetId: asset.id,
+      mediaUrl: asset.publicUrl,
       companyId,
     });
   },
@@ -402,7 +505,29 @@ export const leadsService = {
   /** Envía imagen por URL pública (Supabase) y persiste el mensaje. */
   async sendMediaMessage(input: SendMediaMessageInput): Promise<{ id: string }> {
     if (isMessengerConversation(input.conversationId)) {
-      throw new Error("El envío de imágenes por Messenger aún no está disponible. Usa texto.");
+      const psid = parseMessengerPsid(input.conversationId);
+      if (!psid) throw new Error("Conversación Messenger inválida.");
+      assertSupportedImageMime(input.mimeType);
+      const sent = await sendMessengerAttachment({
+        psid,
+        type: "image",
+        url: input.mediaUrl,
+      });
+      const preview = input.caption?.trim() || "Imagen";
+      await getConversationRepository().saveMessage({
+        waMessageId: sent.id,
+        conversationId: input.conversationId,
+        phone: psid,
+        customerName: "",
+        body: preview,
+        direction: "out",
+        createdAt: new Date().toISOString(),
+        messageType: "image",
+        mediaAssetId: input.mediaAssetId,
+        caption: input.caption,
+        companyId: input.companyId,
+      });
+      return sent;
     }
     if (isWebQrConversation(input.conversationId)) {
       const channelId = await resolveWebQrChannelId(input.conversationId);
@@ -461,6 +586,7 @@ export const leadsService = {
       dumoPhoneId: creds.phoneNumberId,
       messageType: "image",
       mediaAssetId: input.mediaAssetId,
+      mediaUrl: input.mediaUrl,
       caption: input.caption,
       companyId: input.companyId,
     });
@@ -469,10 +595,32 @@ export const leadsService = {
 
   /** Envía audio por URL pública y persiste el mensaje. */
   async sendAudioMessage(input: SendAudioMessageInput): Promise<{ id: string }> {
-    if (isMessengerConversation(input.conversationId)) {
-      throw new Error("El envío de audio por Messenger aún no está disponible.");
-    }
     assertSupportedAudioMime(input.mimeType);
+
+    if (isMessengerConversation(input.conversationId)) {
+      const psid = parseMessengerPsid(input.conversationId);
+      if (!psid) throw new Error("Conversación Messenger inválida.");
+      const sent = await sendMessengerAttachment({
+        psid,
+        type: "audio",
+        url: input.mediaUrl,
+      });
+      const preview = input.ptt === false ? "🔊 Audio" : "🎤 Nota de voz";
+      await getConversationRepository().saveMessage({
+        waMessageId: sent.id,
+        conversationId: input.conversationId,
+        phone: psid,
+        customerName: "",
+        body: preview,
+        direction: "out",
+        createdAt: new Date().toISOString(),
+        messageType: "audio",
+        mediaAssetId: input.mediaAssetId,
+        mediaUrl: input.mediaUrl,
+        companyId: input.companyId,
+      });
+      return sent;
+    }
 
     if (isWebQrConversation(input.conversationId)) {
       const channelId = await resolveWebQrChannelId(input.conversationId);
@@ -488,7 +636,49 @@ export const leadsService = {
       });
     }
 
-    throw new Error("El envío de audio solo está disponible en conversaciones WhatsApp Web (QR).");
+    const version = graphVersion();
+    const repo = getConversationRepository();
+    const creds = await resolveSendCreds(input.conversationId);
+    const to = waTo({ to: input.to, conversationId: input.conversationId });
+
+    const res = await fetch(`${GRAPH}/${version}/${creds.phoneNumberId}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${creds.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to,
+        type: "audio",
+        audio: { link: input.mediaUrl },
+      }),
+    });
+    const json = (await res.json()) as {
+      messages?: { id?: string }[];
+      error?: { message?: string };
+    };
+    if (!res.ok) {
+      throw new Error(json.error?.message ?? "Error enviando el audio.");
+    }
+    const id = json.messages?.[0]?.id ?? `out-${Date.now()}`;
+    const preview = input.ptt === false ? "🔊 Audio" : "🎤 Nota de voz";
+
+    await repo.saveMessage({
+      waMessageId: id,
+      conversationId: input.conversationId,
+      phone: input.to,
+      customerName: "",
+      body: preview,
+      direction: "out",
+      createdAt: new Date().toISOString(),
+      dumoPhoneId: creds.phoneNumberId,
+      messageType: "audio",
+      mediaAssetId: input.mediaAssetId,
+      mediaUrl: input.mediaUrl,
+      companyId: input.companyId,
+    });
+    return { id };
   },
 
   /** Envía un mensaje por la Cloud API y lo persiste como saliente. */

@@ -1,13 +1,22 @@
 import "server-only";
 import { messengerConversationId } from "@/lib/messenger/conversation-id";
+import { assertSupportedAudioMime, assertSupportedImageMime } from "@/types/media";
 import { leadsService } from "@/services/leads.service";
+import { mediaService } from "@/services/media.service";
+import { DEFAULT_COMPANY_ID } from "@/types/tenant";
 import { fetchMessengerProfile } from "@/server/messenger/send";
+import { downloadMessengerAttachment } from "@/server/messenger/media";
 
 type MessengerReferral = {
   ref?: string;
   source?: string;
   type?: string;
   ad_id?: string;
+};
+
+type MessengerAttachment = {
+  type?: string;
+  payload?: { url?: string };
 };
 
 type MessengerEvent = {
@@ -18,7 +27,7 @@ type MessengerEvent = {
     mid?: string;
     text?: string;
     is_echo?: boolean;
-    attachments?: Array<{ type?: string }>;
+    attachments?: MessengerAttachment[];
     sticker_id?: number;
     referral?: MessengerReferral;
   };
@@ -39,32 +48,6 @@ function referralSuffix(referral?: MessengerReferral): string {
   return `\n📣 ${parts.join(" · ")}`;
 }
 
-function messageBody(event: MessengerEvent): string | null {
-  const text = event.message?.text?.trim();
-  if (text) return text + referralSuffix(event.message?.referral ?? event.referral);
-
-  const attachments = event.message?.attachments ?? [];
-  if (attachments.some((item) => item.type === "image")) {
-    return "⚠️ DuMo no admite imágenes por Messenger aún. Pide al cliente que envíe texto.";
-  }
-  if (attachments.some((item) => item.type === "video")) {
-    return "⚠️ DuMo no admite videos por Messenger. Pide al cliente que envíe texto.";
-  }
-  if (attachments.some((item) => item.type === "audio")) {
-    return "⚠️ DuMo no admite audios por Messenger. Pide al cliente que envíe texto.";
-  }
-  if (attachments.some((item) => item.type === "file")) {
-    return "⚠️ DuMo no admite archivos por Messenger. Pide al cliente que envíe texto.";
-  }
-  if (attachments.length > 0) {
-    return "⚠️ DuMo no admite este tipo de contenido por Messenger. Pide al cliente que envíe texto.";
-  }
-  if (event.message?.sticker_id) {
-    return "⚠️ DuMo no admite stickers por Messenger. Pide al cliente que envíe texto.";
-  }
-  return null;
-}
-
 function postbackBody(event: MessengerEvent): string | null {
   const pb = event.postback;
   if (!pb) return null;
@@ -83,6 +66,85 @@ function referralBody(referral: MessengerReferral): string {
   return suffix ? `Lead desde Messenger${suffix}` : "Lead desde Messenger";
 }
 
+async function persistMessengerMediaInbound(
+  event: MessengerEvent,
+  pageId: string,
+  attachment: MessengerAttachment,
+): Promise<boolean> {
+  const psid = event.sender?.id?.trim();
+  const url = attachment.payload?.url?.trim();
+  const rawType = attachment.type?.trim().toLowerCase();
+  if (!psid || !url || (pageId && psid === pageId)) return false;
+  if (rawType !== "image" && rawType !== "audio") return false;
+
+  const ts = event.timestamp ?? Date.now();
+  const mid = event.message?.mid ?? `messenger-media-${psid}-${ts}`;
+  const conversationId = messengerConversationId(psid);
+  const customerName =
+    (await fetchMessengerProfile(psid)) || `Messenger ${psid.slice(-6)}`;
+  const createdAt = event.timestamp
+    ? new Date(event.timestamp).toISOString()
+    : new Date().toISOString();
+
+  try {
+    const downloaded = await downloadMessengerAttachment(url);
+    const mimeType = downloaded.mimeType;
+    if (rawType === "image") {
+      assertSupportedImageMime(mimeType);
+    } else {
+      assertSupportedAudioMime(mimeType);
+    }
+
+    const ext = rawType === "image" ? "jpg" : "ogg";
+    const asset = await mediaService.uploadChatMedia({
+      companyId: DEFAULT_COMPANY_ID,
+      conversationId,
+      direction: "inbound",
+      fileName: `messenger-${mid}.${ext}`,
+      mimeType,
+      data: downloaded.data,
+    });
+
+    const preview =
+      rawType === "image"
+        ? event.message?.text?.trim() || "📷 Imagen"
+        : "🎤 Nota de voz";
+
+    await leadsService.receiveMessage({
+      waMessageId: `messenger-${mid}`,
+      conversationId,
+      phone: psid,
+      customerName,
+      body: preview,
+      direction: "in",
+      createdAt,
+      dumoPhoneId: pageId,
+      messageType: rawType === "image" ? "image" : "audio",
+      mediaAssetId: asset.id,
+      mediaUrl: asset.publicUrl,
+      caption: rawType === "image" ? event.message?.text?.trim() : undefined,
+    });
+    return true;
+  } catch (error) {
+    console.error("[messenger-inbound] media failed", { mid, rawType, error });
+    await leadsService.receiveMessage({
+      waMessageId: `messenger-${mid}`,
+      conversationId,
+      phone: psid,
+      customerName,
+      body:
+        rawType === "image"
+          ? "⚠️ No se pudo recibir la imagen por Messenger."
+          : "⚠️ No se pudo recibir el audio por Messenger.",
+      direction: "in",
+      createdAt,
+      dumoPhoneId: pageId,
+      messageType: "text",
+    });
+    return true;
+  }
+}
+
 /** Normaliza message / postback / referral (anuncios) a un inbound persistible. */
 export function parseMessengerInboundEvent(
   event: MessengerEvent,
@@ -94,12 +156,12 @@ export function parseMessengerInboundEvent(
 
   const ts = event.timestamp ?? Date.now();
 
-  const fromMessage = messageBody(event);
-  if (fromMessage) {
+  const text = event.message?.text?.trim();
+  if (text) {
     return {
       psid,
       mid: event.message!.mid ?? `messenger-msg-${psid}-${ts}`,
-      body: fromMessage,
+      body: text + referralSuffix(event.message?.referral ?? event.referral),
     };
   }
 
@@ -124,6 +186,12 @@ export function parseMessengerInboundEvent(
 }
 
 export async function persistMessengerInbound(event: MessengerEvent, pageId: string): Promise<boolean> {
+  const attachment = event.message?.attachments?.[0];
+  if (attachment?.payload?.url && !event.message?.is_echo) {
+    const handled = await persistMessengerMediaInbound(event, pageId, attachment);
+    if (handled) return true;
+  }
+
   const parsed = parseMessengerInboundEvent(event, pageId);
   if (!parsed) return false;
 

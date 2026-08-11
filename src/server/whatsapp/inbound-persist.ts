@@ -36,6 +36,11 @@ export type WhatsAppInboundMessage = {
     mime_type?: string;
     caption?: string;
   };
+  audio?: {
+    id?: string;
+    mime_type?: string;
+    voice?: boolean;
+  };
 };
 
 export async function persistWhatsAppInboundMessage(input: {
@@ -86,6 +91,27 @@ export async function persistWhatsAppInboundMessage(input: {
       await leadsService.receiveMessage({
         ...base,
         body: imageDownloadFailedBody(),
+        messageType: "text",
+      });
+      return;
+    }
+  }
+
+  if (type === "audio" && msg.audio?.id) {
+    try {
+      await leadsService.receiveInboundAudio({
+        ...base,
+        waMediaId: msg.audio.id,
+        mimeType: msg.audio.mime_type,
+        voice: msg.audio.voice,
+      });
+      return;
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      console.error("[whatsapp-inbound] audio failed", { messageId: msg.id, detail, error });
+      await leadsService.receiveMessage({
+        ...base,
+        body: "⚠️ No se pudo recibir el audio. Pide al cliente que lo reenvíe.",
         messageType: "text",
       });
       return;

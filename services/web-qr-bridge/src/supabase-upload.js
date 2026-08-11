@@ -8,10 +8,10 @@ import {
 } from "./media-config.js";
 
 /**
- * Sube audio entrante QR a Supabase Storage vía REST (sin supabase-js — compatible Node 20).
+ * Sube media entrante QR a Supabase Storage vía REST (sin supabase-js — compatible Node 20).
  * @returns {Promise<{ publicUrl: string, storagePath: string }>}
  */
-export async function uploadInboundAudioToSupabase(input) {
+export async function uploadInboundChatMediaToSupabase(input) {
   if (!isSupabaseStorageConfigured()) {
     throw new Error("Supabase Storage no configurado.");
   }
@@ -57,6 +57,9 @@ export async function uploadInboundAudioToSupabase(input) {
 
   return { publicUrl, storagePath };
 }
+
+/** @deprecated alias — usar uploadInboundChatMediaToSupabase */
+export const uploadInboundAudioToSupabase = uploadInboundChatMediaToSupabase;
 
 export function getSupabaseStorageStatus() {
   return {
