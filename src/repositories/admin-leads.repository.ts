@@ -64,6 +64,7 @@ type ConvRow = {
   id: string;
   phone: string;
   customer_name: string;
+  rut?: string | null;
   last_message: string;
   last_message_at: string;
   last_message_direction?: string;
@@ -101,7 +102,7 @@ function mapConversation(r: ConvRow): AdminConversation {
     id: r.id,
     customerName: displayName,
     phone: formattedPhone || r.phone,
-    rut: "",
+    rut: r.rut ?? "",
     channel: resolveConversationChannel(r.id),
     lastMessage: r.last_message,
     lastMessageTime: formatChatTime(r.last_message_at),
@@ -134,7 +135,7 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
         advisorId
           ? sql<ConvRow[]>`
               SELECT
-                c.id, c.phone, c.customer_name, c.last_message, c.last_message_at, c.last_message_direction,
+                c.id, c.phone, c.customer_name, c.rut, c.last_message, c.last_message_at, c.last_message_direction,
                 c.unread, c.online, c.assigned_advisor_id, c.assigned_advisor_name, c.admin_status,
                 lg.gestion_type AS latest_tipification_slug,
                 t.name AS latest_tipification_name,
@@ -155,7 +156,7 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
             `
           : sql<ConvRow[]>`
               SELECT
-                c.id, c.phone, c.customer_name, c.last_message, c.last_message_at, c.last_message_direction,
+                c.id, c.phone, c.customer_name, c.rut, c.last_message, c.last_message_at, c.last_message_direction,
                 c.unread, c.online, c.assigned_advisor_id, c.assigned_advisor_name, c.admin_status,
                 lg.gestion_type AS latest_tipification_slug,
                 t.name AS latest_tipification_name,

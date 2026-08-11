@@ -121,6 +121,7 @@ type ConvRow = {
   id: string;
   phone: string;
   customer_name: string;
+  rut?: string | null;
   last_message: string;
   last_message_at: string;
   last_message_direction?: string;
@@ -168,7 +169,7 @@ function mapConvRow(r: ConvRow): Conversation {
     id: r.id,
     customerName: displayName,
     phone: formattedPhone || r.phone,
-    rut: "",
+    rut: r.rut ?? "",
     channel: resolveConversationChannel(r.id),
     lastMessage: r.last_message,
     lastMessageTime: formatChatTime(r.last_message_at),
