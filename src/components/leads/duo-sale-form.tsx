@@ -206,10 +206,11 @@ export function DuoSaleForm() {
             />
           </FormField>
 
-          <FormField label="Nombre registrado en DuMo">
+          <FormField label="Número registrado en DuMo">
             <Input
+              type="tel"
               className="h-11 text-[14px]"
-              placeholder="Como debe quedar registrado"
+              placeholder="Número con el que quedará registrado en DuMo"
               {...register("duo.dumoRegisteredName")}
             />
           </FormField>

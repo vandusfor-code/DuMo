@@ -87,7 +87,7 @@ export function DuoCaseDetailPanel({ sale }: { sale: DuoSale }) {
           <Field label="Región" value={sale.region} />
           <Field label="Comuna" value={sale.comuna} />
           <Field label="Dirección" value={`${sale.street} ${sale.houseNumber}`.trim()} />
-          <Field label="Nombre registrado en DuMo" value={sale.dumoRegisteredName} />
+          <Field label="Número registrado en DuMo" value={sale.dumoRegisteredName} />
           <Field label="Horario preferido de llamada" value={sale.callTime} />
           <div className="col-span-2">
             <Field label="Comentarios" value={sale.comments} />

@@ -33,6 +33,7 @@ export interface DuoSaleFormInput {
   equipment: string;
   saleType: string;
   dispatch: string;
+  /** Número (no nombre) con el que queda registrado el cliente en DuMo. */
   dumoRegisteredName: string;
   callTime: string;
   comments: string;

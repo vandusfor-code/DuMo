@@ -65,6 +65,28 @@ export const leadLineSchema = z.object({
   isUpselling: z.boolean().optional().default(false),
 });
 
+/**
+ * DUO-1 — campos del formulario de Operación Duo. Sin esto en el schema,
+ * Zod descarta `duoSale` en silencio (los objetos de Zod ignoran claves no
+ * declaradas por defecto) y la gestión se guarda normal sin crear nunca el
+ * caso en duo_sales — exactamente el bug reportado: "no me registra nada".
+ */
+export const duoSaleFormSchema = z.object({
+  currentCompany: z.string().trim().optional().default(""),
+  email: z.string().trim().optional().default(""),
+  region: z.string().trim().optional().default(""),
+  comuna: z.string().trim().optional().default(""),
+  street: z.string().trim().optional().default(""),
+  houseNumber: z.string().trim().optional().default(""),
+  plan: z.string().trim().optional().default(""),
+  equipment: z.string().trim().optional().default(""),
+  saleType: z.string().trim().optional().default(""),
+  dispatch: z.string().trim().optional().default(""),
+  dumoRegisteredName: z.string().trim().optional().default(""),
+  callTime: z.string().trim().optional().default(""),
+  comments: z.string().trim().optional().default(""),
+});
+
 export const saveLeadSchema = z.object({
   conversationId: z.string().trim().min(1),
   phone: z.string().trim().min(1),
@@ -77,6 +99,7 @@ export const saveLeadSchema = z.object({
   registerSale: z.boolean().optional().default(false),
   saveAction: z.enum(["tipify", "script", "sale", "close"]).optional().default("script"),
   followUpDate: z.string().trim().optional().nullable(),
+  duoSale: duoSaleFormSchema.optional(),
 });
 
 export type SaveLeadValues = z.infer<typeof saveLeadSchema>;
