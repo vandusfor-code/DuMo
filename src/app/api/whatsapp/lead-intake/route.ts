@@ -77,6 +77,14 @@ export async function POST(request: NextRequest) {
     SELECT id, assigned_advisor_id FROM lead_conversations WHERE dulabs_session_id = ${payload.dulabs_session_id}
   `) as unknown as { id: string; assigned_advisor_id: string | null }[];
   if (existente[0]) {
+    // Backfill seguro para leads ya procesados antes de que dumo_phone_id se
+    // empezara a mandar -- no toca nada más, no reactiva auto-assign.
+    if (payload.phone_number_id) {
+      await sql`
+        UPDATE lead_conversations SET dumo_phone_id = ${payload.phone_number_id}
+        WHERE id = ${existente[0].id} AND dumo_phone_id IS NULL
+      `;
+    }
     return NextResponse.json({
       ok: true,
       conversation_id: existente[0].id,
@@ -100,6 +108,10 @@ export async function POST(request: NextRequest) {
     direction: "in",
     createdAt: payload.captured_at ?? nowIso,
     messageType: "text",
+    // Sin esto la asesora no puede responder ("Falta phone_number_id para
+    // enviar"): DuMo necesita saber por cuál número de WhatsApp conectado
+    // debe salir la respuesta -- el mismo que usó la campaña.
+    dumoPhoneId: payload.phone_number_id,
   });
 
   await sql`
