@@ -50,9 +50,15 @@ export async function armTimerAfterInboundMessage(input: {
 /** Se llama cuando se persiste cualquier mensaje saliente (cualquier canal). */
 export async function resolveTimerAfterOutboundMessage(conversationId: string): Promise<void> {
   const repo = getResponseSlaRepository();
-  const { hadActiveTimer } = await repo.resolve(conversationId);
+  const { hadActiveTimer, advisorId } = await repo.resolve(conversationId);
   if (hadActiveTimer) {
     await cancelSlaCheck(conversationId);
+    const { emitLeadsConversationUpdated } = await import("@/server/realtime/emit");
+    emitLeadsConversationUpdated({
+      conversationId,
+      assignedAdvisorId: advisorId,
+      reason: "sla-resolved",
+    });
   }
 }
 
@@ -66,6 +72,28 @@ export async function reconcileConversationTimer(conversationId: string): Promis
   const repo = getResponseSlaRepository();
   const result = await repo.reconcileOne(conversationId);
   if (!result.transitioned || !result.timer || !result.newStatus) return;
+
+  // RESP-2 — aviso a nivel de sesión (no solo el chat abierto): banner
+  // flotante + indicador en la lista, sin importar qué esté viendo la
+  // asesora en ese momento.
+  if (result.newStatus === "warning_sent" || result.newStatus === "final_warning_sent") {
+    const [{ emitLeadsSlaWarning }, customerName] = await Promise.all([
+      import("@/server/realtime/emit"),
+      repo.getCustomerName(conversationId),
+    ]);
+    const elapsedMinutes = Math.max(
+      0,
+      Math.round((Date.now() - new Date(result.timer.armedAt).getTime()) / 60_000),
+    );
+    emitLeadsSlaWarning({
+      conversationId,
+      advisorId: result.timer.advisorId,
+      customerName,
+      scenario: result.timer.scenario,
+      status: result.newStatus,
+      minutesUnanswered: elapsedMinutes,
+    });
+  }
 
   const nextMinutes = nextThresholdMinutes(result.timer.scenario, result.newStatus);
   if (nextMinutes === null) return; // threshold_reached — RESP-3 continúa desde aquí.

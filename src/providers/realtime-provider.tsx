@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { io, type Socket } from "socket.io-client";
 import { getClientToken } from "@/lib/auth/client-token";
 import { forceSessionLogout } from "@/lib/auth/force-logout";
 import { leadKeys } from "@/hooks/use-leads";
 import type { ChatMessage, Conversation } from "@/types/conversation";
+import { SlaWarningBanners, type SlaWarningEvent } from "@/components/leads/sla-warning-banner";
 
 /** Polling de respaldo cuando WebSocket no está conectado o como red de seguridad. */
 export const REALTIME_FALLBACK_POLL_MS = 45_000;
@@ -28,6 +29,16 @@ type ConversationUpdatedEvent = {
   unread?: number;
   reason?: string;
 };
+
+function patchSlaWarningInList(
+  queryClient: ReturnType<typeof useQueryClient>,
+  conversationId: string,
+  warning: Conversation["activeSlaWarning"],
+) {
+  const patch = (prev: Conversation[] | undefined) =>
+    prev?.map((c) => (c.id === conversationId ? { ...c, activeSlaWarning: warning } : c));
+  queryClient.setQueryData<Conversation[]>(leadKeys.conversations, patch);
+}
 
 function appendMessageToCache(
   queryClient: ReturnType<typeof useQueryClient>,
@@ -70,9 +81,17 @@ function invalidateForConversation(
   queryClient.invalidateQueries({ queryKey: ["admin", "leads", "detail", conversationId] });
 }
 
+/** RESP-2 — banners visibles ~12s antes de desaparecer solos si no se cierran a mano. */
+const SLA_BANNER_AUTO_DISMISS_MS = 12_000;
+
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const socketRef = useRef<Socket | null>(null);
+  const [slaBanners, setSlaBanners] = useState<SlaWarningEvent[]>([]);
+
+  const dismissSlaBanner = (id: string) => {
+    setSlaBanners((prev) => prev.filter((e) => e.id !== id));
+  };
 
   useEffect(() => {
     const realtimeUrl = process.env.NEXT_PUBLIC_REALTIME_URL?.replace(/\/$/, "") || undefined;
@@ -104,7 +123,23 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           ),
         );
       }
+      if (payload.reason === "sla-resolved") {
+        patchSlaWarningInList(queryClient, payload.conversationId, null);
+        setSlaBanners((prev) => prev.filter((e) => e.conversationId !== payload.conversationId));
+      }
       invalidateForConversation(queryClient, payload.conversationId);
+    });
+
+    socket.on("leads:sla-warning", (payload: Omit<SlaWarningEvent, "id"> & { conversationId?: string }) => {
+      if (!payload?.conversationId) return;
+      patchSlaWarningInList(queryClient, payload.conversationId, {
+        scenario: payload.scenario,
+        status: payload.status,
+        minutesUnanswered: payload.minutesUnanswered,
+      });
+      const id = `${payload.conversationId}-${payload.status}-${Date.now()}`;
+      setSlaBanners((prev) => [...prev.filter((e) => e.conversationId !== payload.conversationId), { ...payload, id }]);
+      setTimeout(() => dismissSlaBanner(id), SLA_BANNER_AUTO_DISMISS_MS);
     });
 
     socket.on("session:revoked", () => {
@@ -121,5 +156,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     };
   }, [queryClient]);
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <SlaWarningBanners events={slaBanners} onDismiss={dismissSlaBanner} />
+    </>
+  );
 }

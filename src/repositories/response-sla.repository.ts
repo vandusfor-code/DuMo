@@ -25,9 +25,13 @@ export interface ReconcileResult {
 export interface ResponseSlaRepository {
   /** true si ya existe algún mensaje saliente en esta conversación (define first_contact vs follow_up). */
   hasPriorOutboundMessage(conversationId: string): Promise<boolean>;
+  /** RESP-2 — para el payload del aviso en tiempo real. */
+  getCustomerName(conversationId: string): Promise<string>;
   armOrReset(input: ArmTimerInput): Promise<void>;
   /** Marca el timer resuelto (la asesora respondió). Devuelve el jobId activo (si había) para cancelarlo. */
-  resolve(conversationId: string): Promise<{ hadActiveTimer: boolean; bullmqJobId: string | null }>;
+  resolve(
+    conversationId: string,
+  ): Promise<{ hadActiveTimer: boolean; bullmqJobId: string | null; advisorId: string | null }>;
   getTimer(conversationId: string): Promise<ResponseSlaTimer | null>;
   listActiveConversationIds(): Promise<string[]>;
   /**
@@ -99,9 +103,12 @@ class MockResponseSlaRepository implements ResponseSlaRepository {
   async hasPriorOutboundMessage(): Promise<boolean> {
     return false;
   }
+  async getCustomerName(): Promise<string> {
+    return "";
+  }
   async armOrReset(): Promise<void> {}
-  async resolve(): Promise<{ hadActiveTimer: boolean; bullmqJobId: string | null }> {
-    return { hadActiveTimer: false, bullmqJobId: null };
+  async resolve(): Promise<{ hadActiveTimer: boolean; bullmqJobId: string | null; advisorId: string | null }> {
+    return { hadActiveTimer: false, bullmqJobId: null, advisorId: null };
   }
   async getTimer(): Promise<ResponseSlaTimer | null> {
     return null;
@@ -126,6 +133,17 @@ class PostgresResponseSlaRepository implements ResponseSlaRepository {
       `,
     );
     return rows.length > 0;
+  }
+
+  async getCustomerName(conversationId: string): Promise<string> {
+    await ensureSchema();
+    const sql = requireSql();
+    const rows = await withDbRetry(() =>
+      sql<{ customer_name: string }[]>`
+        SELECT customer_name FROM lead_conversations WHERE id = ${conversationId} LIMIT 1
+      `,
+    );
+    return rows[0]?.customer_name ?? "";
   }
 
   async armOrReset(input: ArmTimerInput): Promise<void> {
@@ -155,20 +173,26 @@ class PostgresResponseSlaRepository implements ResponseSlaRepository {
     );
   }
 
-  async resolve(conversationId: string): Promise<{ hadActiveTimer: boolean; bullmqJobId: string | null }> {
+  async resolve(
+    conversationId: string,
+  ): Promise<{ hadActiveTimer: boolean; bullmqJobId: string | null; advisorId: string | null }> {
     await ensureSchema();
     const sql = requireSql();
     const rows = await withDbRetry(() =>
-      sql<{ status: string; bullmq_job_id: string | null }[]>`
+      sql<{ status: string; bullmq_job_id: string | null; advisor_id: string }[]>`
         UPDATE response_sla_timers
         SET status = 'resolved', bullmq_job_id = NULL, updated_at = now()
         WHERE conversation_id = ${conversationId}
           AND status NOT IN ('resolved', 'reassigned')
-        RETURNING status, bullmq_job_id
+        RETURNING status, bullmq_job_id, advisor_id
       `,
     );
     const row = rows[0];
-    return { hadActiveTimer: Boolean(row), bullmqJobId: row?.bullmq_job_id ?? null };
+    return {
+      hadActiveTimer: Boolean(row),
+      bullmqJobId: row?.bullmq_job_id ?? null,
+      advisorId: row?.advisor_id ?? null,
+    };
   }
 
   async getTimer(conversationId: string): Promise<ResponseSlaTimer | null> {

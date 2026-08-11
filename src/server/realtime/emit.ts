@@ -36,7 +36,7 @@ export type LeadsConversationUpdatedPayload = {
   conversationId: string;
   assignedAdvisorId?: string | null;
   unread?: number;
-  reason?: "message" | "read" | "assign" | "auto-assign" | "reopen";
+  reason?: "message" | "read" | "assign" | "auto-assign" | "reopen" | "sla-resolved";
 };
 
 type IoLike = {
@@ -70,6 +70,22 @@ export function emitLeadsMessageNew(payload: LeadsMessageNewPayload) {
 
 export function emitLeadsConversationUpdated(payload: LeadsConversationUpdatedPayload) {
   emitToLeadsRooms(payload, "leads:conversation:updated", payload);
+}
+
+export type LeadsSlaWarningPayload = {
+  conversationId: string;
+  advisorId: string;
+  customerName: string;
+  scenario: "first_contact" | "follow_up";
+  status: "warning_sent" | "final_warning_sent";
+  minutesUnanswered: number;
+};
+
+/** RESP-2 — aviso de tiempo de respuesta, a nivel de sesión (no solo el chat abierto). */
+export function emitLeadsSlaWarning(payload: LeadsSlaWarningPayload) {
+  const io = getIo();
+  if (!io) return;
+  io.to(`advisor:${payload.advisorId}`).emit("leads:sla-warning", payload);
 }
 
 export type SessionRevokedPayload = {

@@ -133,6 +133,9 @@ type ConvRow = {
   latest_tipification_name?: string | null;
   badge_bg?: string | null;
   badge_text?: string | null;
+  sla_scenario?: string | null;
+  sla_status?: string | null;
+  sla_armed_at?: string | Date | null;
 };
 
 type MsgRow = {
@@ -159,6 +162,15 @@ function toStatus(value: string): ConversationStatus {
     : "new";
 }
 
+function mapSlaWarning(r: ConvRow): Conversation["activeSlaWarning"] {
+  if (r.sla_status !== "warning_sent" && r.sla_status !== "final_warning_sent") return null;
+  if (r.sla_scenario !== "first_contact" && r.sla_scenario !== "follow_up") return null;
+  if (!r.sla_armed_at) return null;
+  const armedMs = new Date(r.sla_armed_at).getTime();
+  const minutesUnanswered = Math.max(0, Math.round((Date.now() - armedMs) / 60_000));
+  return { scenario: r.sla_scenario, status: r.sla_status, minutesUnanswered };
+}
+
 function mapConvRow(r: ConvRow): Conversation {
   const formattedPhone = formatWhatsAppDisplayPhone(r.phone);
   const displayName =
@@ -179,6 +191,7 @@ function mapConvRow(r: ConvRow): Conversation {
     online: Boolean(r.online),
     inboxState: parseInboxState(r.inbox_state),
     latestTipification: mapConversationTipification(r),
+    activeSlaWarning: mapSlaWarning(r),
   };
 }
 
@@ -195,7 +208,10 @@ class PostgresConversationRepository implements ConversationRepository {
                 lg.gestion_type AS latest_tipification_slug,
                 t.name AS latest_tipification_name,
                 t.badge_bg,
-                t.badge_text
+                t.badge_text,
+                s.scenario AS sla_scenario,
+                s.status AS sla_status,
+                s.armed_at AS sla_armed_at
               FROM lead_conversations c
               LEFT JOIN LATERAL (
                 SELECT gestion_type
@@ -206,6 +222,8 @@ class PostgresConversationRepository implements ConversationRepository {
               ) lg ON true
               LEFT JOIN tipifications t
                 ON t.slug = lg.gestion_type AND t.company_id = ${DEFAULT_COMPANY_ID}
+              LEFT JOIN response_sla_timers s
+                ON s.conversation_id = c.id AND s.status IN ('warning_sent', 'final_warning_sent')
               WHERE c.assigned_advisor_id = ${advisorId}
                 AND c.inbox_state = 'active'
                 AND NOT EXISTS (
@@ -222,7 +240,10 @@ class PostgresConversationRepository implements ConversationRepository {
                 lg.gestion_type AS latest_tipification_slug,
                 t.name AS latest_tipification_name,
                 t.badge_bg,
-                t.badge_text
+                t.badge_text,
+                s.scenario AS sla_scenario,
+                s.status AS sla_status,
+                s.armed_at AS sla_armed_at
               FROM lead_conversations c
               LEFT JOIN LATERAL (
                 SELECT gestion_type
@@ -233,6 +254,8 @@ class PostgresConversationRepository implements ConversationRepository {
               ) lg ON true
               LEFT JOIN tipifications t
                 ON t.slug = lg.gestion_type AND t.company_id = ${DEFAULT_COMPANY_ID}
+              LEFT JOIN response_sla_timers s
+                ON s.conversation_id = c.id AND s.status IN ('warning_sent', 'final_warning_sent')
               ORDER BY c.last_message_at DESC
             `,
       ),

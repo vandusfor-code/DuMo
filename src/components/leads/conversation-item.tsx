@@ -1,5 +1,6 @@
 "use client";
 
+import { AlertTriangle } from "lucide-react";
 import { InitialsAvatar } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -31,9 +32,13 @@ export function ConversationItem({
       className={cn(
         "flex w-full items-center gap-3 rounded-[14px] border px-3 py-2.5 text-left",
         "transition-colors duration-200",
-        active
-          ? "border-border-strong bg-active-surface"
-          : "border-transparent bg-card hover:bg-hover",
+        conversation.activeSlaWarning
+          ? conversation.activeSlaWarning.status === "final_warning_sent"
+            ? "border-danger/40 bg-danger-soft"
+            : "border-warning/40 bg-warning-soft"
+          : active
+            ? "border-border-strong bg-active-surface"
+            : "border-transparent bg-card hover:bg-hover",
       )}
     >
       <div className="relative shrink-0">
@@ -43,6 +48,19 @@ export function ConversationItem({
         />
         {conversation.online && (
           <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-white bg-online" />
+        )}
+        {conversation.activeSlaWarning && (
+          <span
+            title="Aviso de tiempo de respuesta activo"
+            className={cn(
+              "absolute -top-1 -right-1 grid size-4 place-items-center rounded-full border-2 border-white",
+              conversation.activeSlaWarning.status === "final_warning_sent"
+                ? "bg-danger"
+                : "bg-warning",
+            )}
+          >
+            <AlertTriangle className="size-2.5 text-white" />
+          </span>
         )}
       </div>
 
