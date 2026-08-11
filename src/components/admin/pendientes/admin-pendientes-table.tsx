@@ -23,6 +23,10 @@ import { TransferPendienteDialog } from "./transfer-pendiente-dialog";
 import { useTransferPendiente } from "@/hooks/use-admin-pendientes";
 import { PENDIENTE_STATUS_LABELS } from "@/lib/pendientes-display";
 import { cn } from "@/lib/utils";
+import {
+  adminTableHeaderCellClass,
+  adminTableHeaderRowClass,
+} from "@/lib/admin-table-header-styles";
 import type { AdminPendienteRow } from "@/types/admin-pendientes";
 
 function TipificationBadge({ row }: { row: AdminPendienteRow }) {
@@ -80,14 +84,16 @@ export function AdminPendientesTable({
       <Card className="overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>Cliente</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Fecha programada</TableHead>
-              <TableHead>Asesora</TableHead>
-              <TableHead>Nota</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="w-12 text-right">Acciones</TableHead>
+            <TableRow className={adminTableHeaderRowClass}>
+              <TableHead className={adminTableHeaderCellClass}>Cliente</TableHead>
+              <TableHead className={adminTableHeaderCellClass}>Tipo</TableHead>
+              <TableHead className={adminTableHeaderCellClass}>Fecha programada</TableHead>
+              <TableHead className={adminTableHeaderCellClass}>Asesora</TableHead>
+              <TableHead className={adminTableHeaderCellClass}>Nota</TableHead>
+              <TableHead className={adminTableHeaderCellClass}>Estado</TableHead>
+              <TableHead className={cn(adminTableHeaderCellClass, "w-12 text-right")}>
+                Acciones
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

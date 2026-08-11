@@ -27,6 +27,11 @@ import {
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { DynamicTipificationBadge } from "@/components/shared/dynamic-tipification-badge";
 import { formatLongDate, getInitials } from "@/lib/format";
+import {
+  adminTableHeaderCellClass,
+  adminTableHeaderRowClass,
+} from "@/lib/admin-table-header-styles";
+import { cn } from "@/lib/utils";
 import type { CrmClient } from "@/types/crm-client";
 
 type DateRange = "today" | "week" | "month" | "all";
@@ -190,9 +195,15 @@ export function ClientsPortfolio({
             <Table>
               <TableHeader>
                 {table.getHeaderGroups().map((hg) => (
-                  <TableRow key={hg.id}>
+                  <TableRow key={hg.id} className={adminTableHeaderRowClass}>
                     {hg.headers.map((header) => (
-                      <TableHead key={header.id}>
+                      <TableHead
+                        key={header.id}
+                        className={cn(
+                          adminTableHeaderCellClass,
+                          header.id === "actions" ? "text-right" : "",
+                        )}
+                      >
                         {flexRender(header.column.columnDef.header, header.getContext())}
                       </TableHead>
                     ))}

@@ -37,6 +37,11 @@ import {
   deriveMaxLines,
 } from "@/lib/commercial-plan-offer";
 import { cn } from "@/lib/utils";
+import {
+  adminTableHeaderActionsClass,
+  adminTableHeaderCellClass,
+  adminTableHeaderRowClass,
+} from "@/lib/admin-table-header-styles";
 
 const money = new Intl.NumberFormat("es-CL", {
   style: "currency",
@@ -68,16 +73,16 @@ export function CommercialPlansTable({
       </div>
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead>Nombre plan</TableHead>
-            <TableHead>Operador</TableHead>
-            <TableHead>Tipo venta</TableHead>
-            <TableHead>Datos</TableHead>
-            <TableHead>Valor Wom</TableHead>
-            <TableHead>Valor DuMo</TableHead>
-            <TableHead>Comisión asesora</TableHead>
-            <TableHead>Estado</TableHead>
-            <TableHead className="w-12" />
+          <TableRow className={adminTableHeaderRowClass}>
+            <TableHead className={adminTableHeaderCellClass}>Nombre plan</TableHead>
+            <TableHead className={adminTableHeaderCellClass}>Operador</TableHead>
+            <TableHead className={adminTableHeaderCellClass}>Tipo venta</TableHead>
+            <TableHead className={adminTableHeaderCellClass}>Datos</TableHead>
+            <TableHead className={adminTableHeaderCellClass}>Valor Wom</TableHead>
+            <TableHead className={adminTableHeaderCellClass}>Valor DuMo</TableHead>
+            <TableHead className={adminTableHeaderCellClass}>Comisión asesora</TableHead>
+            <TableHead className={adminTableHeaderCellClass}>Estado</TableHead>
+            <TableHead className={adminTableHeaderActionsClass} />
           </TableRow>
         </TableHeader>
         <TableBody>

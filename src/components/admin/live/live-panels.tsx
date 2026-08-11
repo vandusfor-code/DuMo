@@ -35,6 +35,10 @@ import {
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { getInitials } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import {
+  adminTableHeaderCellClass,
+  adminTableHeaderRowClass,
+} from "@/lib/admin-table-header-styles";
 import { useSetAdvisorPresence } from "@/hooks/use-admin-live";
 import type { LiveAdvisorRow, LiveSnapshot } from "@/types/admin-live";
 
@@ -228,13 +232,13 @@ export function LiveAdvisorsTable({ advisors }: { advisors: LiveAdvisorRow[] }) 
 
       <Table>
         <TableHeader>
-          <TableRow className="hover:bg-transparent">
-            <TableHead className="pl-5">Asesora</TableHead>
-            <TableHead>Leads asignados hoy</TableHead>
-            <TableHead>Leads gestionados hoy</TableHead>
-            <TableHead>Tiempo de conexión</TableHead>
-            <TableHead>Estado</TableHead>
-            <TableHead className="pr-5 text-right">Acciones</TableHead>
+          <TableRow className={adminTableHeaderRowClass}>
+            <TableHead className={adminTableHeaderCellClass}>Asesora</TableHead>
+            <TableHead className={adminTableHeaderCellClass}>Leads asignados hoy</TableHead>
+            <TableHead className={adminTableHeaderCellClass}>Leads gestionados hoy</TableHead>
+            <TableHead className={adminTableHeaderCellClass}>Tiempo de conexión</TableHead>
+            <TableHead className={adminTableHeaderCellClass}>Estado</TableHead>
+            <TableHead className={cn(adminTableHeaderCellClass, "text-right")}>Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

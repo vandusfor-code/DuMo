@@ -28,6 +28,11 @@ import {
 import { DuoSaleStatusBadge } from "./duo-sale-status-badge";
 import { getInitials } from "@/lib/format";
 import { LEAD_SALE_TYPE_LABELS, type LeadSaleType } from "@/types/lead";
+import {
+  adminTableHeaderCellClass,
+  adminTableHeaderRowClass,
+} from "@/lib/admin-table-header-styles";
+import { cn } from "@/lib/utils";
 import type { DuoSale } from "@/types/duo-sale";
 
 function formatShortDate(iso: string): { date: string; time: string } {
@@ -76,15 +81,15 @@ export function VentasPorCerrarTable({
     <Card className="p-0 overflow-hidden">
       <Table>
         <TableHeader>
-          <TableRow className="hover:bg-transparent">
-            <TableHead className="pl-6">Cliente</TableHead>
-            <TableHead>Número folio</TableHead>
-            <TableHead>Asesora que concretó</TableHead>
-            <TableHead>Fecha</TableHead>
-            <TableHead>Plan / Producto</TableHead>
-            <TableHead>Asesora de cierre</TableHead>
-            <TableHead>Estado</TableHead>
-            <TableHead className="pr-6 text-right">Acciones</TableHead>
+          <TableRow className={adminTableHeaderRowClass}>
+            <TableHead className={adminTableHeaderCellClass}>Cliente</TableHead>
+            <TableHead className={adminTableHeaderCellClass}>Número folio</TableHead>
+            <TableHead className={adminTableHeaderCellClass}>Asesora que concretó</TableHead>
+            <TableHead className={adminTableHeaderCellClass}>Fecha</TableHead>
+            <TableHead className={adminTableHeaderCellClass}>Plan / Producto</TableHead>
+            <TableHead className={adminTableHeaderCellClass}>Asesora de cierre</TableHead>
+            <TableHead className={adminTableHeaderCellClass}>Estado</TableHead>
+            <TableHead className={cn(adminTableHeaderCellClass, "text-right")}>Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
