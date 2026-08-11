@@ -1,5 +1,7 @@
 FROM node:20-bookworm-slim
 
+# inbound-image-v0.1.1 — rebuild trigger for QR image upload
+
 WORKDIR /app
 
 RUN apt-get update \

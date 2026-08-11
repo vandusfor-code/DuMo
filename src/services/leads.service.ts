@@ -524,6 +524,7 @@ export const leadsService = {
         createdAt: new Date().toISOString(),
         messageType: "image",
         mediaAssetId: input.mediaAssetId,
+        mediaUrl: input.mediaUrl,
         caption: input.caption,
         companyId: input.companyId,
       });

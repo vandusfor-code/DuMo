@@ -19,7 +19,6 @@ import { PinnedQuickReplies } from "@/components/leads/premium/pinned-quick-repl
 import type { ChatUiTheme } from "@/components/leads/premium/chat-theme";
 import { cn } from "@/lib/utils";
 import { isMessengerConversation } from "@/lib/messenger/conversation-id";
-import { isWebQrConversation } from "@/lib/web-qr/conversation-id";
 
 /**
  * Composer del chat. Envía texto, imágenes y audios; el mensaje
@@ -40,7 +39,7 @@ export function ChatInput({
 }) {
   const premium = uiTheme === "premium";
   const isMessenger = isMessengerConversation(conversationId);
-  const canRecord = isWebQrConversation(conversationId) && !isMessenger;
+  const canRecord = true;
   const [value, setValue] = useState("");
   const [dragActive, setDragActive] = useState(false);
   const advisorSend = useSendMessage(conversationId);
