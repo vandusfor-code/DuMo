@@ -17,6 +17,10 @@ import {
   runInboxStateMigrations,
 } from "@/server/db/migrations/inbox-lifecycle-schema";
 import { runLeadFollowUpsMigrations } from "@/server/db/migrations/lead-follow-ups-schema";
+import {
+  DULABS_CAMPAIGN_LEADS_REQUIRED_COLUMNS,
+  runDulabsCampaignLeadsMigrations,
+} from "@/server/db/migrations/dulabs-campaign-leads-schema";
 
 let sqlSingleton: Sql | null = null;
 let schemaPromise: Promise<void> | null = null;
@@ -205,6 +209,7 @@ const REQUIRED_COLUMNS = [
   "crm_clients.conversation_id",
   ...QUICK_REPLY_REQUIRED_COLUMNS,
   ...TIPIFICATION_REQUIRED_COLUMNS,
+  ...DULABS_CAMPAIGN_LEADS_REQUIRED_COLUMNS,
 ];
 
 /** ¿Está el esquema completo? Una sola consulta al catálogo. */
@@ -309,6 +314,7 @@ async function ensureIncrementalMigrations(sql: Sql): Promise<void> {
     await runInboxStateMigrations(sql);
 
     await runLeadFollowUpsMigrations(sql);
+    await runDulabsCampaignLeadsMigrations(sql);
   } catch (err) {
     console.error("[ensureIncrementalMigrations]", err);
   }
@@ -524,6 +530,7 @@ async function runMigrations(sql: Sql) {
     await runLeadAssignmentMigrations(tx);
     await runTeleprompterScriptMigrations(tx);
     await runWebQrMigrations(tx);
+    await runDulabsCampaignLeadsMigrations(tx);
 
     await tx`
       INSERT INTO users (id, username, email, password_hash, name, role, active, avatar_url, company_id)
