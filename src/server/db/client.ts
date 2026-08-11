@@ -14,6 +14,7 @@ import {
   runTipificationDuoMigrations,
   TIPIFICATION_DUO_REQUIRED_COLUMNS,
 } from "@/server/db/migrations/tipification-duo-schema";
+import { runTipificationNewLeadMigrations } from "@/server/db/migrations/tipification-new-lead-schema";
 import {
   runDuoSalesMigrations,
   DUO_SALES_REQUIRED_COLUMNS,
@@ -337,6 +338,7 @@ async function ensureIncrementalMigrations(sql: Sql): Promise<void> {
     await runTipificationBehaviorMigrations(sql);
     await runTipificationP16Migrations(sql);
     await runTipificationDuoMigrations(sql);
+    await runTipificationNewLeadMigrations(sql);
     await runDuoSalesMigrations(sql);
     await runDuoSalesCloseMigrations(sql);
     await runSalesReconciliationMigrations(sql);
@@ -557,6 +559,7 @@ async function runMigrations(sql: Sql) {
     await runTipificationMigrations(tx);
     await runTipificationP16Migrations(tx);
     await runTipificationDuoMigrations(tx);
+    await runTipificationNewLeadMigrations(tx);
     await runDuoSalesMigrations(tx);
     await runDuoSalesCloseMigrations(tx);
     await runSalesReconciliationMigrations(tx);

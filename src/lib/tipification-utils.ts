@@ -1,6 +1,7 @@
 import {
   DEFAULT_TIPIFICATION_SEEDS,
   DUO_TIPIFICATION_PLAN,
+  NEW_LEAD_TIPIFICATION_PLAN,
   P16_TIPIFICATION_PLAN,
 } from "@/lib/tipification-seeds";
 import { LEAD_TYPE_LABELS, type LeadType } from "@/types/lead";
@@ -41,7 +42,18 @@ export function buildFallbackTipificationCatalog(companyId = "company-default"):
     updatedAt: now,
     createdBy: "system",
   }));
-  return [...legacy, ...p16Inserts, ...duoInserts].sort((a, b) => a.sortOrder - b.sortOrder);
+  const newLeadInserts = NEW_LEAD_TIPIFICATION_PLAN.inserts.map((insert) => ({
+    ...insert,
+    ...badge,
+    companyId,
+    status: "active" as const,
+    createdAt: now,
+    updatedAt: now,
+    createdBy: "system",
+  }));
+  return [...legacy, ...p16Inserts, ...duoInserts, ...newLeadInserts].sort(
+    (a, b) => a.sortOrder - b.sortOrder,
+  );
 }
 
 export function opensCustomFormFromCatalog(

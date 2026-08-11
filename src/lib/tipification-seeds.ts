@@ -219,3 +219,26 @@ export const DUO_TIPIFICATION_PLAN = {
     },
   ],
 } as const;
+
+/**
+ * Estado neutral con el que arranca toda conversación nueva (sin gestión
+ * guardada aún), hasta que se tipifique manualmente — sortOrder 0 para que
+ * aparezca primero en el selector. No dispara flujo de venta, no cierra la
+ * bandeja ni crea seguimiento: es un placeholder, no una disposición real.
+ */
+export const NEW_LEAD_TIPIFICATION_PLAN = {
+  inserts: [
+    {
+      id: "tipif-nuevo-lead",
+      slug: "nuevo_lead",
+      name: "Nuevo lead",
+      sortOrder: 0,
+      triggersSaleFlow: false,
+      closesInbox: false,
+      createsFollowUp: false,
+      opensCustomForm: false,
+      followUpMode: "none" as const,
+      followUpDefaultDays: null,
+    },
+  ],
+} as const;

@@ -52,13 +52,14 @@ import {
 } from "@/hooks/use-pending-tipification-label";
 import { useWatch } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
+import { NEW_LEAD_TIPIFICATION_SLUG } from "@/lib/tipification-system";
 
 function defaultsFor(c: AdminConversation): LeadFormValues {
   return {
     customerName: c.customerName,
     rut: c.rut,
     phone: c.phone,
-    type: "venta",
+    type: c.latestTipification?.slug ?? NEW_LEAD_TIPIFICATION_SLUG,
     observations: "",
     internalNotes: "",
     followUpDate: "",

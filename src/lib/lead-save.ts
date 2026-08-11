@@ -11,6 +11,7 @@ import type {
   SaveLeadInput,
 } from "@/types/lead";
 import type { NewSaleInput, SaleType } from "@/types/sale";
+import { NEW_LEAD_TIPIFICATION_SLUG } from "@/lib/tipification-system";
 
 const INTERNAL_NOTES_PREFIX = "\n\nNotas internas: ";
 
@@ -69,7 +70,7 @@ export function draftToFormValues(input: {
     customerName: input.draft?.customerName || input.conversation.customerName,
     rut: input.draft?.rut || input.conversation.rut,
     phone: input.conversation.phone,
-    type: input.draft?.type ?? "venta",
+    type: input.draft?.type ?? NEW_LEAD_TIPIFICATION_SLUG,
     observations,
     internalNotes,
     followUpDate: "",
