@@ -32,6 +32,20 @@ export async function GET() {
       });
     }
 
+    // RESP-1 — red de seguridad del timer SLA: reevalúa timers activos en
+    // cada poll de la bandeja (con su propio throttle interno), sin
+    // depender de que el job diferido de BullMQ haya disparado.
+    after(async () => {
+      try {
+        const { reconcileDueTimersThrottled } = await import(
+          "@/services/response-sla-sweep"
+        );
+        await reconcileDueTimersThrottled();
+      } catch (err) {
+        console.error("[reconcileDueTimersThrottled]", err);
+      }
+    });
+
     const conversations = await Promise.race([
       leadsService.getConversations(advisorId),
       new Promise<never>((_, reject) =>

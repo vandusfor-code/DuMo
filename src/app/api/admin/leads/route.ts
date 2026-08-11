@@ -76,6 +76,18 @@ export async function GET(request: NextRequest) {
       }
     });
 
+    // RESP-1 — misma red de seguridad del timer SLA que en /api/leads/conversations.
+    after(async () => {
+      try {
+        const { reconcileDueTimersThrottled } = await import(
+          "@/services/response-sla-sweep"
+        );
+        await reconcileDueTimersThrottled();
+      } catch (err) {
+        console.error("[reconcileDueTimersThrottled]", err);
+      }
+    });
+
     const data = await Promise.race([
       adminLeadsService.listConversations(),
       new Promise<never>((_, reject) =>

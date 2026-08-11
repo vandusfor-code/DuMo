@@ -338,6 +338,19 @@ class PostgresConversationRepository implements ConversationRepository {
       "@/server/realtime/emit"
     );
     emitLeadsMessageNew(messageNewPayloadFromIncoming(msg, assignedAdvisorId));
+
+    // RESP-1 — único punto de escritura de mensajes salientes de verdad (los
+    // distintos sendXMessage de leads.service.ts todos terminan aquí), así
+    // que es el lugar seguro para resolver el timer sin depender de que cada
+    // caller lo haga por su cuenta.
+    if (msg.direction === "out") {
+      const { resolveTimerAfterOutboundMessage } = await import(
+        "@/services/response-sla.service"
+      );
+      await resolveTimerAfterOutboundMessage(msg.conversationId).catch((err) =>
+        console.error("[saveMessage] resolveTimerAfterOutboundMessage", err),
+      );
+    }
   }
 
   async getAssignedAdvisorId(conversationId: string): Promise<string | null> {

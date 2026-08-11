@@ -130,6 +130,19 @@ export const leadsService = {
         );
         emitLeadsMessageNew(messageNewPayloadFromIncoming(msg, assignedAfter));
       }
+
+      // RESP-1 — se arma DESPUÉS de que P2 (reapertura) y el auto-assign ya
+      // corrieron, con `assignedAfter` (regla de desempate A): si P2 dejó la
+      // conversación sin asesora, no se arma nada — no hay a quién
+      // responsabilizar.
+      const { armTimerAfterInboundMessage } = await import(
+        "@/services/response-sla.service"
+      );
+      await armTimerAfterInboundMessage({
+        conversationId: msg.conversationId,
+        assignedAdvisorId: assignedAfter,
+        messageId: msg.waMessageId,
+      }).catch((err) => console.error("[receiveMessage] armTimerAfterInboundMessage", err));
     }
   },
 
