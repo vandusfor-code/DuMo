@@ -17,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { LeadTypeSelect } from "./lead-type-select";
 import { SaleDetails } from "./sale-details";
+import { DuoSaleForm } from "./duo-sale-form";
 import { ObservationField } from "./observation-field";
 import { FollowUpDateField } from "./follow-up-date-field";
 import { ActionButtons } from "./action-buttons";
@@ -36,7 +37,7 @@ import type { LeadFormValues } from "@/types/lead-form";
 import type { GeneratedSalesScript } from "@/types/sales-script";
 import type { SaveLeadAction } from "@/types/crm-client";
 import { cn } from "@/lib/utils";
-import { useSaleFlowType } from "@/hooks/use-tipification-catalog";
+import { useOpensCustomFormType, useSaleFlowType } from "@/hooks/use-tipification-catalog";
 
 export function LeadPanel({
   conversation,
@@ -53,6 +54,7 @@ export function LeadPanel({
   lastSaveAction = null,
   clientError,
   clientSaved = false,
+  duoSaleError,
   onSaveSale,
   onGenerateScript,
   onClose,
@@ -74,10 +76,12 @@ export function LeadPanel({
   lastSaveAction?: SaveLeadAction | null;
   clientError?: string | null;
   clientSaved?: boolean;
+  duoSaleError?: string | null;
 }) {
   const { control } = useFormContext<LeadFormValues>();
   const type = useWatch({ control, name: "type" });
   const isSaleFlow = useSaleFlowType(type);
+  const isDuoFlow = useOpensCustomFormType(type);
   const [activeTab, setActiveTab] = useState("gestion");
   const [scriptTabUnlocked, setScriptTabUnlocked] = useState(false);
   const {
@@ -160,6 +164,7 @@ export function LeadPanel({
             </SectionCard>
 
             {isSaleFlow && <SaleDetails />}
+            {isDuoFlow && <DuoSaleForm />}
 
             <SectionCard>
               <SectionCardHeader title="Notas de gestión" />
@@ -189,6 +194,19 @@ export function LeadPanel({
               <div className="flex items-start gap-2.5 rounded-card border border-warning/20 bg-warning-soft px-4 py-3 text-[13px] text-warning-ink">
                 <AlertCircle className="mt-0.5 size-[18px] shrink-0" />
                 <span>{saleError}</span>
+              </div>
+            ) : null}
+            {isSuccess && duoSaleError ? (
+              <div className="flex items-start gap-2.5 rounded-card border border-warning/20 bg-warning-soft px-4 py-3 text-[13px] text-warning-ink">
+                <AlertCircle className="mt-0.5 size-[18px] shrink-0" />
+                <span>{duoSaleError}</span>
+              </div>
+            ) : null}
+            {isSuccess && isDuoFlow && !duoSaleError ? (
+              <div className="flex items-center gap-2.5 rounded-card border border-success/20 bg-success-soft px-4 py-3 text-[13px] text-success-ink">
+                <CheckCircle2 className="size-[18px]" />
+                Caso de Operación Duo creado. Aparecerá en &ldquo;Ventas por cerrar&rdquo; para
+                que el admin asigne quién lo cierra por llamada.
               </div>
             ) : null}
             {isSuccess && !clientError && (

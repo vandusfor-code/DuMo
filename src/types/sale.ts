@@ -32,6 +32,8 @@ export interface SaleSummary {
   date: string;
   lines: number;
   status: SaleStatus;
+  /** DUO-5 — viene de Operación Duo: la comisión de esta venta es la mitad. */
+  isDuo?: boolean;
 }
 
 /** Extra fields the dashboard's "Últimas ventas" table shows. */

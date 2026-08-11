@@ -1,5 +1,6 @@
 import type { LeadFormValues, LeadLineValues } from "@/types/lead-form";
 import { EMPTY_LEAD_LINE } from "@/types/lead-form";
+import { EMPTY_DUO_SALE_FORM } from "@/types/duo-sale";
 import type {
   CurrentOperator,
   DeliveryType,
@@ -72,6 +73,7 @@ export function draftToFormValues(input: {
     internalNotes,
     followUpDate: "",
     lines: mapStoredLinesToForm(input.draft?.lines),
+    duo: { ...EMPTY_DUO_SALE_FORM },
   };
 }
 

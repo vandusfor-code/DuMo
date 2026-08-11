@@ -4,6 +4,7 @@ import type { TipificationFollowUpMode } from "@/types/tipification";
 export const TIPIFICATION_BEHAVIOR_DEFAULTS = {
   closesInbox: false,
   createsFollowUp: false,
+  opensCustomForm: false,
   followUpMode: "none" as TipificationFollowUpMode,
   followUpDefaultDays: null as number | null,
 };

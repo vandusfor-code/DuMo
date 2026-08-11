@@ -26,6 +26,12 @@ export interface Tipification {
   closesInbox: boolean;
   /** Si true, crea fila en lead_follow_ups (P4). */
   createsFollowUp: boolean;
+  /**
+   * Si true, el panel de gestión muestra un formulario propio en vez del
+   * flujo estándar (líneas de venta). Usado por Operación Duo; pensado para
+   * ser reutilizable por futuras tipificaciones con formulario especial.
+   */
+  opensCustomForm: boolean;
   followUpMode: TipificationFollowUpMode;
   /** Días para modo fixed o sugerencia en manual_suggested (ej. deuda +7). */
   followUpDefaultDays: number | null;
@@ -44,6 +50,7 @@ export type CreateTipificationInput = {
   triggersSaleFlow?: boolean;
   closesInbox?: boolean;
   createsFollowUp?: boolean;
+  opensCustomForm?: boolean;
   followUpMode?: TipificationFollowUpMode;
   followUpDefaultDays?: number | null;
   status?: TipificationStatus;

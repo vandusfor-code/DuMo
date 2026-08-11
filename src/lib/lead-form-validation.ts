@@ -14,6 +14,7 @@ export function validateLeadFormBeforeSave(input: {
   saveAction: SaveLeadAction;
   catalog: TipificationBehaviorCatalogItem[];
   triggersSaleFlow: (slug: string) => boolean;
+  opensCustomForm?: (slug: string) => boolean;
   isCompleteSaleLine: (line: LeadFormValues["lines"][number]) => boolean;
 }): { ok: true; followUpDate: string | null } | { ok: false; message: string; field?: keyof LeadFormValues } {
   if (input.triggersSaleFlow(input.values.type)) {
@@ -23,6 +24,18 @@ export function validateLeadFormBeforeSave(input: {
         ok: false,
         message:
           "Completa al menos una línea con número, tipo de venta, plan, región y comuna.",
+      };
+    }
+    return { ok: true, followUpDate: null };
+  }
+
+  if (input.opensCustomForm?.(input.values.type)) {
+    const duo = input.values.duo;
+    if (!duo.plan.trim() || !duo.saleType || !duo.region || !duo.comuna) {
+      return {
+        ok: false,
+        message:
+          "Completa al menos plan, tipo de venta, región y comuna de Operación Duo.",
       };
     }
     return { ok: true, followUpDate: null };

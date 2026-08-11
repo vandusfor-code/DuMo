@@ -2,6 +2,7 @@ import "server-only";
 import { getConversationRepository } from "@/repositories/conversation.repository";
 import { getConversationInboxState } from "@/repositories/inbox-lifecycle.repository";
 import { advisorBandejaIncludesInboxState } from "@/lib/inbox-band-filter";
+import { duoSalesService } from "@/services/duo-sales.service";
 import type { TenantScope } from "@/lib/tenant-scope";
 
 export class ConversationAccessError extends Error {
@@ -39,7 +40,18 @@ export async function assertConversationAccess(
     throw new ConversationAccessError("Conversación no encontrada.", 404);
   }
   if (assignedAdvisorId !== scope.userId) {
-    throw new ConversationAccessError("No autorizado para esta conversación.", 403);
+    // Excepción de Operación Duo: la asesora de cierre necesita leer y
+    // escribir en un chat cuyo "titular" en lead_conversations sigue siendo
+    // la asesora que concretó por chat, no ella. Se otorga acceso solo
+    // mientras el caso siga activo (no cerrado) y esté asignado a ella.
+    const isDuoClosingAdvisor = await duoSalesService.isActiveClosingAdvisor(
+      conversationId,
+      scope.userId,
+    );
+    if (!isDuoClosingAdvisor) {
+      throw new ConversationAccessError("No autorizado para esta conversación.", 403);
+    }
+    return;
   }
 
   const inboxState = await getConversationInboxState(conversationId);

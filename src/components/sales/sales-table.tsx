@@ -37,7 +37,17 @@ const columns = [
         <div className="flex items-center gap-3">
           <InitialsAvatar initials={getInitials(sale.customerName)} />
           <div className="leading-tight">
-            <p className="font-medium text-ink">{sale.customerName}</p>
+            <div className="flex items-center gap-1.5">
+              <p className="font-medium text-ink">{sale.customerName}</p>
+              {sale.isDuo && (
+                <span
+                  title="Operación Duo — cerrada por otra asesora, comisión dividida al 50/50."
+                  className="inline-flex items-center rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold text-brand"
+                >
+                  Operación Duo
+                </span>
+              )}
+            </div>
             <p className="text-[13px] text-muted">{sale.rut}</p>
           </div>
         </div>

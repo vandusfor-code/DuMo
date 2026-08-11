@@ -7,6 +7,7 @@ import {
   buildFallbackTipificationCatalog,
   getTipificationBadgeFromCatalog,
   getTipificationLabelFromCatalog,
+  opensCustomFormFromCatalog,
   tipificationSelectOptions,
   triggersSaleFlowFromCatalog,
 } from "@/lib/tipification-utils";
@@ -33,6 +34,7 @@ export function useTipificationCatalog() {
     isError: query.isError,
     usingFallback,
     triggersSaleFlow: (slug: string) => triggersSaleFlowFromCatalog(slug, catalog),
+    opensCustomForm: (slug: string) => opensCustomFormFromCatalog(slug, catalog),
     getLabel: (slug: string) => getTipificationLabelFromCatalog(slug, catalog),
     getBadge: (slug: string) => getTipificationBadgeFromCatalog(slug, catalog),
     refetch: query.refetch,
@@ -43,4 +45,11 @@ export function useSaleFlowType(slug: string | undefined) {
   const { triggersSaleFlow } = useTipificationCatalog();
   if (!slug) return false;
   return triggersSaleFlow(slug);
+}
+
+/** true cuando la tipificación seleccionada abre un formulario propio (Operación Duo). */
+export function useOpensCustomFormType(slug: string | undefined) {
+  const { opensCustomForm } = useTipificationCatalog();
+  if (!slug) return false;
+  return opensCustomForm(slug);
 }

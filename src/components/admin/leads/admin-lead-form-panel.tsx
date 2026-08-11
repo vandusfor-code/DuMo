@@ -35,6 +35,7 @@ import {
 } from "@/hooks/use-admin-leads";
 import type { AdminConversation, ClientProfile, LeadNote, LeadTimelineEvent } from "@/types/admin-lead";
 import { EMPTY_LEAD_LINE, type LeadFormValues } from "@/types/lead-form";
+import { EMPTY_DUO_SALE_FORM } from "@/types/duo-sale";
 import type { SaveLeadAction } from "@/types/crm-client";
 import type { SaveLeadInput } from "@/types/lead";
 import {
@@ -62,6 +63,7 @@ function defaultsFor(c: AdminConversation): LeadFormValues {
     internalNotes: "",
     followUpDate: "",
     lines: [{ ...EMPTY_LEAD_LINE }],
+    duo: { ...EMPTY_DUO_SALE_FORM },
   };
 }
 

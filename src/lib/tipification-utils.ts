@@ -1,4 +1,8 @@
-import { DEFAULT_TIPIFICATION_SEEDS, P16_TIPIFICATION_PLAN } from "@/lib/tipification-seeds";
+import {
+  DEFAULT_TIPIFICATION_SEEDS,
+  DUO_TIPIFICATION_PLAN,
+  P16_TIPIFICATION_PLAN,
+} from "@/lib/tipification-seeds";
 import { LEAD_TYPE_LABELS, type LeadType } from "@/types/lead";
 import { TIPIFICATION_BADGE_COLORS, type Tipification } from "@/types/tipification";
 
@@ -22,12 +26,30 @@ export function buildFallbackTipificationCatalog(companyId = "company-default"):
     ...badge,
     companyId,
     triggersSaleFlow: false,
+    opensCustomForm: false,
     status: "active" as const,
     createdAt: now,
     updatedAt: now,
     createdBy: "system",
   }));
-  return [...legacy, ...p16Inserts].sort((a, b) => a.sortOrder - b.sortOrder);
+  const duoInserts = DUO_TIPIFICATION_PLAN.inserts.map((insert) => ({
+    ...insert,
+    ...badge,
+    companyId,
+    status: "active" as const,
+    createdAt: now,
+    updatedAt: now,
+    createdBy: "system",
+  }));
+  return [...legacy, ...p16Inserts, ...duoInserts].sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+export function opensCustomFormFromCatalog(
+  slug: string,
+  catalog: Pick<Tipification, "slug" | "opensCustomForm">[],
+): boolean {
+  const match = catalog.find((item) => item.slug === slug);
+  return match?.opensCustomForm ?? false;
 }
 
 export function triggersSaleFlowFromCatalog(

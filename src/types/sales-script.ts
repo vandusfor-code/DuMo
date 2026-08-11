@@ -134,4 +134,6 @@ export type SaveLeadResult = {
   followUpDate?: string | null;
   /** P4.0 — fila creada en lead_follow_ups. */
   followUpCreated?: boolean;
+  /** DUO-1 — solo cuando type = "operacion_duo". */
+  duoSaleError?: string | null;
 };

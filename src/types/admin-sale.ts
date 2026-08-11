@@ -41,6 +41,10 @@ export interface AdminSale {
   dumoValue: number;
   status: AdminSaleStatus;
   lines: number;
+  /** DUO-4/5 — viene de Operación Duo: comisión partida + badge visual. */
+  isDuo?: boolean;
+  /** Comisión fija de esta venta (asesora de origen cobra la mitad); null/undefined = fórmula normal. */
+  commissionOverride?: number | null;
 }
 
 export interface AdminSalesFilters {

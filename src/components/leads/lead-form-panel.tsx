@@ -15,6 +15,7 @@ import {
   mapSaleLineForSave,
 } from "@/lib/lead-save";
 import { validateLeadFormBeforeSave } from "@/lib/lead-form-validation";
+import { DUO_TIPIFICATION_SLUG } from "@/types/duo-sale";
 import { useTipificationCatalog } from "@/hooks/use-tipification-catalog";
 import {
   clearPendingTipificationLabel,
@@ -33,7 +34,7 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
   const saveLead = useSaveLead(conversation.id);
   const gestionDraft = useLatestGestionDraft(conversation.id);
   const saveModeRef = useRef<SaveLeadAction>("close");
-  const { triggersSaleFlow, catalog } = useTipificationCatalog();
+  const { triggersSaleFlow, opensCustomForm, catalog } = useTipificationCatalog();
   const queryClient = useQueryClient();
   const methods = useForm<LeadFormValues>({
     defaultValues: draftToFormValues({ conversation }),
@@ -53,6 +54,7 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
       saveAction: saveModeRef.current,
       catalog,
       triggersSaleFlow,
+      opensCustomForm,
       isCompleteSaleLine,
     });
 
@@ -84,6 +86,7 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
       registerSale: saveModeRef.current === "sale",
       saveAction: saveModeRef.current,
       followUpDate: validation.followUpDate,
+      duoSale: values.type === DUO_TIPIFICATION_SLUG ? values.duo : undefined,
     };
     try {
       await saveLead.mutateAsync(input);
@@ -111,6 +114,7 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
           saleRegistered={Boolean(saveLead.data?.sale)}
           clientError={saveLead.data?.clientError ?? null}
           clientSaved={saveLead.data?.clientSaved ?? false}
+          duoSaleError={saveLead.data?.duoSaleError ?? null}
           lastSaveAction={saveLead.data?.saveAction ?? null}
           onSaveSale={() => {
             saveModeRef.current = "sale";

@@ -41,6 +41,10 @@ function mapRow(r: Record<string, unknown>): Tipification {
       r.creates_follow_up === undefined || r.creates_follow_up === null
         ? TIPIFICATION_BEHAVIOR_DEFAULTS.createsFollowUp
         : Boolean(r.creates_follow_up),
+    opensCustomForm:
+      r.opens_custom_form === undefined || r.opens_custom_form === null
+        ? TIPIFICATION_BEHAVIOR_DEFAULTS.opensCustomForm
+        : Boolean(r.opens_custom_form),
     followUpMode: parseTipificationFollowUpMode(r.follow_up_mode),
     followUpDefaultDays:
       defaultDaysRaw === undefined || defaultDaysRaw === null
@@ -109,6 +113,7 @@ class MockTipificationRepository implements TipificationRepository {
       triggersSaleFlow: input.triggersSaleFlow ?? false,
       closesInbox: input.closesInbox ?? TIPIFICATION_BEHAVIOR_DEFAULTS.closesInbox,
       createsFollowUp: input.createsFollowUp ?? TIPIFICATION_BEHAVIOR_DEFAULTS.createsFollowUp,
+      opensCustomForm: input.opensCustomForm ?? TIPIFICATION_BEHAVIOR_DEFAULTS.opensCustomForm,
       followUpMode: input.followUpMode ?? TIPIFICATION_BEHAVIOR_DEFAULTS.followUpMode,
       followUpDefaultDays:
         input.followUpDefaultDays ?? TIPIFICATION_BEHAVIOR_DEFAULTS.followUpDefaultDays,
@@ -135,6 +140,7 @@ class MockTipificationRepository implements TipificationRepository {
       triggersSaleFlow: input.triggersSaleFlow ?? current.triggersSaleFlow,
       closesInbox: input.closesInbox ?? current.closesInbox,
       createsFollowUp: input.createsFollowUp ?? current.createsFollowUp,
+      opensCustomForm: input.opensCustomForm ?? current.opensCustomForm,
       followUpMode: input.followUpMode ?? current.followUpMode,
       followUpDefaultDays:
         input.followUpDefaultDays !== undefined
@@ -231,7 +237,7 @@ class PostgresTipificationRepository implements TipificationRepository {
       INSERT INTO tipifications (
         id, company_id, slug, name, badge_bg, badge_text,
         sort_order, triggers_sale_flow,
-        closes_inbox, creates_follow_up, follow_up_mode, follow_up_default_days,
+        closes_inbox, creates_follow_up, opens_custom_form, follow_up_mode, follow_up_default_days,
         status, created_by
       )
       VALUES (
@@ -239,6 +245,7 @@ class PostgresTipificationRepository implements TipificationRepository {
         ${sortOrder}, ${input.triggersSaleFlow ?? false},
         ${input.closesInbox ?? TIPIFICATION_BEHAVIOR_DEFAULTS.closesInbox},
         ${input.createsFollowUp ?? TIPIFICATION_BEHAVIOR_DEFAULTS.createsFollowUp},
+        ${input.opensCustomForm ?? TIPIFICATION_BEHAVIOR_DEFAULTS.opensCustomForm},
         ${input.followUpMode ?? TIPIFICATION_BEHAVIOR_DEFAULTS.followUpMode},
         ${input.followUpDefaultDays ?? null},
         ${input.status ?? "active"}, ${createdBy}
@@ -262,6 +269,7 @@ class PostgresTipificationRepository implements TipificationRepository {
         triggers_sale_flow = ${input.triggersSaleFlow ?? current.triggersSaleFlow},
         closes_inbox = ${input.closesInbox ?? current.closesInbox},
         creates_follow_up = ${input.createsFollowUp ?? current.createsFollowUp},
+        opens_custom_form = ${input.opensCustomForm ?? current.opensCustomForm},
         follow_up_mode = ${input.followUpMode ?? current.followUpMode},
         follow_up_default_days = ${
           input.followUpDefaultDays !== undefined

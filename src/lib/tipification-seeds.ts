@@ -16,6 +16,7 @@ export const DEFAULT_TIPIFICATION_SEEDS: TipificationSeed[] = [
     triggersSaleFlow: true,
     closesInbox: true,
     createsFollowUp: false,
+    opensCustomForm: false,
     followUpMode: "none",
     followUpDefaultDays: null,
     status: "active",
@@ -29,6 +30,7 @@ export const DEFAULT_TIPIFICATION_SEEDS: TipificationSeed[] = [
     triggersSaleFlow: false,
     closesInbox: true,
     createsFollowUp: false,
+    opensCustomForm: false,
     followUpMode: "none",
     followUpDefaultDays: null,
     status: "active",
@@ -42,6 +44,7 @@ export const DEFAULT_TIPIFICATION_SEEDS: TipificationSeed[] = [
     triggersSaleFlow: false,
     closesInbox: true,
     createsFollowUp: true,
+    opensCustomForm: false,
     followUpMode: "manual",
     followUpDefaultDays: null,
     status: "active",
@@ -55,6 +58,7 @@ export const DEFAULT_TIPIFICATION_SEEDS: TipificationSeed[] = [
     triggersSaleFlow: false,
     closesInbox: true,
     createsFollowUp: false,
+    opensCustomForm: false,
     followUpMode: "none",
     followUpDefaultDays: null,
     status: "active",
@@ -68,6 +72,7 @@ export const DEFAULT_TIPIFICATION_SEEDS: TipificationSeed[] = [
     triggersSaleFlow: false,
     closesInbox: true,
     createsFollowUp: true,
+    opensCustomForm: false,
     followUpMode: "manual",
     followUpDefaultDays: null,
     status: "active",
@@ -81,6 +86,7 @@ export const DEFAULT_TIPIFICATION_SEEDS: TipificationSeed[] = [
     triggersSaleFlow: false,
     closesInbox: true,
     createsFollowUp: true,
+    opensCustomForm: false,
     followUpMode: "manual",
     followUpDefaultDays: null,
     status: "active",
@@ -94,6 +100,7 @@ export const DEFAULT_TIPIFICATION_SEEDS: TipificationSeed[] = [
     triggersSaleFlow: false,
     closesInbox: true,
     createsFollowUp: false,
+    opensCustomForm: false,
     followUpMode: "none",
     followUpDefaultDays: null,
     status: "active",
@@ -107,6 +114,7 @@ export const DEFAULT_TIPIFICATION_SEEDS: TipificationSeed[] = [
     triggersSaleFlow: false,
     closesInbox: true,
     createsFollowUp: false,
+    opensCustomForm: false,
     followUpMode: "none",
     followUpDefaultDays: null,
     status: "active",
@@ -185,6 +193,28 @@ export const P16_TIPIFICATION_PLAN = {
       closesInbox: true,
       createsFollowUp: true,
       followUpMode: "manual" as const,
+      followUpDefaultDays: null,
+    },
+  ],
+} as const;
+
+/**
+ * DUO-1 — tipificación "Operación Duo": aislada en su propio plan de
+ * migración (no reutiliza P16) para que sea fácil de revisar/revertir sin
+ * tocar el resto del catálogo.
+ */
+export const DUO_TIPIFICATION_PLAN = {
+  inserts: [
+    {
+      id: "tipif-operacion-duo",
+      slug: "operacion_duo",
+      name: "Operación Duo",
+      sortOrder: 13,
+      triggersSaleFlow: false,
+      closesInbox: true,
+      createsFollowUp: false,
+      opensCustomForm: true,
+      followUpMode: "none" as const,
       followUpDefaultDays: null,
     },
   ],

@@ -15,6 +15,8 @@ import { getDeliveryConfigurationRepository } from "@/repositories/delivery-conf
 import { tipificationService } from "@/services/tipification.service";
 import { getTipificationRepository } from "@/repositories/tipification.repository";
 import { applyInboxLifecycleAfterSave } from "@/services/inbox-lifecycle.service";
+import { duoSalesService } from "@/services/duo-sales.service";
+import { DUO_TIPIFICATION_SLUG } from "@/types/duo-sale";
 import { DEFAULT_COMPANY_ID } from "@/types/tenant";
 import type { SaveLeadInput } from "@/types/lead";
 import type { InboxState } from "@/types/inbox-state";
@@ -33,6 +35,32 @@ export async function saveLeadWithScript(
   const effectiveScope = await resolveAdvisorScopeForLeadSave(input.conversationId, scope);
   const lead = await getLeadRepository().saveLead(input, effectiveScope);
   const advisor = effectiveScope ? { name: effectiveScope.name, email: "" } : undefined;
+
+  // Operación Duo: crea la fila en duo_sales (cola paralela — no toca sales
+  // ni el flujo de venta estándar). Requiere asesora de sesión conocida.
+  let duoSaleError: string | null = null;
+  if (input.type === DUO_TIPIFICATION_SLUG && input.duoSale) {
+    if (effectiveScope) {
+      try {
+        await duoSalesService.create({
+          conversationId: input.conversationId,
+          gestionId: lead.id,
+          customerName: input.customerName,
+          rut: input.rut,
+          phone: input.phone,
+          originAdvisorId: effectiveScope.id,
+          originAdvisorName: effectiveScope.name,
+          ...input.duoSale,
+        });
+      } catch (error) {
+        console.error("[saveLeadWithScript] duo sale creation failed", error);
+        duoSaleError = "La gestión se guardó, pero no se pudo crear el caso de Operación Duo.";
+      }
+    } else {
+      duoSaleError =
+        "La gestión se guardó, pero no se pudo crear el caso de Operación Duo (asigna una asesora al chat).";
+    }
+  }
   let script = null;
   let scriptUnavailableReason: string | null = null;
   let sale = null;
@@ -205,6 +233,7 @@ export async function saveLeadWithScript(
     inboxState,
     followUpDate: followUpDatePersisted,
     followUpCreated,
+    duoSaleError,
   };
 
   logScriptSaveCheckpoint("saveLeadWithScript · antes de responder", {

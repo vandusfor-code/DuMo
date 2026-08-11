@@ -174,4 +174,6 @@ export interface SaveLeadInput {
   saveAction?: import("@/types/crm-client").SaveLeadAction;
   /** yyyy-mm-dd — fecha de seguimiento (validada en close; auto en fixed). */
   followUpDate?: string | null;
+  /** Solo cuando type = "operacion_duo" — crea la fila en duo_sales. */
+  duoSale?: import("@/types/duo-sale").DuoSaleFormInput;
 }

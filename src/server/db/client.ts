@@ -10,6 +10,18 @@ import {
 } from "@/server/db/migrations/advisor-presence-schema";
 import { runTipificationMigrations, runTipificationBehaviorMigrations, TIPIFICATION_REQUIRED_COLUMNS } from "@/server/db/migrations/tipifications-schema";
 import { runTipificationP16Migrations } from "@/server/db/migrations/tipification-p16-schema";
+import {
+  runTipificationDuoMigrations,
+  TIPIFICATION_DUO_REQUIRED_COLUMNS,
+} from "@/server/db/migrations/tipification-duo-schema";
+import {
+  runDuoSalesMigrations,
+  DUO_SALES_REQUIRED_COLUMNS,
+} from "@/server/db/migrations/duo-sales-schema";
+import {
+  runDuoSalesCloseMigrations,
+  DUO_SALES_CLOSE_REQUIRED_COLUMNS,
+} from "@/server/db/migrations/duo-sales-close-schema";
 import { runWebQrMigrations } from "@/server/db/migrations/web-qr-schema";
 import { runLeadAssignmentMigrations } from "@/server/db/migrations/lead-assignment-schema";
 import {
@@ -209,6 +221,9 @@ const REQUIRED_COLUMNS = [
   "crm_clients.conversation_id",
   ...QUICK_REPLY_REQUIRED_COLUMNS,
   ...TIPIFICATION_REQUIRED_COLUMNS,
+  ...TIPIFICATION_DUO_REQUIRED_COLUMNS,
+  ...DUO_SALES_REQUIRED_COLUMNS,
+  ...DUO_SALES_CLOSE_REQUIRED_COLUMNS,
   ...DULABS_CAMPAIGN_LEADS_REQUIRED_COLUMNS,
 ];
 
@@ -311,6 +326,9 @@ async function ensureIncrementalMigrations(sql: Sql): Promise<void> {
     await runLeadAssignmentMigrations(sql);
     await runTipificationBehaviorMigrations(sql);
     await runTipificationP16Migrations(sql);
+    await runTipificationDuoMigrations(sql);
+    await runDuoSalesMigrations(sql);
+    await runDuoSalesCloseMigrations(sql);
     await runInboxStateMigrations(sql);
 
     await runLeadFollowUpsMigrations(sql);
@@ -526,6 +544,9 @@ async function runMigrations(sql: Sql) {
     await runQuickReplyAndTenantMigrations(tx);
     await runTipificationMigrations(tx);
     await runTipificationP16Migrations(tx);
+    await runTipificationDuoMigrations(tx);
+    await runDuoSalesMigrations(tx);
+    await runDuoSalesCloseMigrations(tx);
     await runAdvisorPresenceMigrations(tx);
     await runLeadAssignmentMigrations(tx);
     await runTeleprompterScriptMigrations(tx);
@@ -613,8 +634,29 @@ export function ensureSchema(): Promise<void> {
   if (!sql) return Promise.resolve();
 
   if (!runtimeMigrationsEnabled()) {
-    schemaReady = true;
-    return Promise.resolve();
+    // Producción sin ALLOW_RUNTIME_MIGRATIONS: por diseño no corre DDL desde
+    // el camino de request (confía en `npm run db:migrate` en el deploy).
+    // Antes marcaba el esquema como listo sin comprobar nada — igual que el
+    // bug de ensureSchemaForRead. Ahora sí verifica (misma consulta barata)
+    // y, si falta algo, lo deja bien visible en los logs en vez de fallar
+    // en silencio: alguien tiene que correr la migración de deploy.
+    schemaPromise = schemaIsComplete(sql)
+      .then((complete) => {
+        if (!complete) {
+          console.error(
+            "[ensureSchema] ALERTA: el esquema está incompleto en producción y las " +
+              "migraciones de runtime están deshabilitadas. Corre `npm run db:migrate` " +
+              "(o el paso de deploy equivalente) — algunas funciones pueden fallar hasta " +
+              "entonces.",
+          );
+        }
+        schemaReady = true;
+      })
+      .catch((err) => {
+        console.error("[ensureSchema] no se pudo verificar el esquema", err);
+        schemaReady = true;
+      });
+    return schemaPromise;
   }
 
   if (!schemaPromise) {
@@ -638,10 +680,66 @@ export function ensureSchema(): Promise<void> {
   return schemaPromise;
 }
 
-/** Bandeja y lecturas: nunca ejecuta DDL — confía en migraciones de deploy/CI. */
+/**
+ * Memoiza la verificación real de ensureSchemaForRead (separada de
+ * schemaPromise/schemaReady) para no repetir la consulta al catálogo en
+ * cada lectura una vez confirmado que el esquema está completo.
+ */
+let readSchemaCheckPromise: Promise<void> | null = null;
+
+/**
+ * Bandeja y lecturas: no ejecuta DDL directamente, pero YA NO asume que el
+ * esquema está completo — lo verifica con la misma consulta barata que usa
+ * el camino de escritura (schemaIsComplete). Antes marcaba `schemaReady =
+ * true` sin comprobar nada; si esta función corría antes que ensureSchema()
+ * en un proceso, "envenenaba" el flag compartido y ninguna migración volvía
+ * a intentarse en ese proceso, aunque faltaran tablas o columnas reales
+ * (así fue como duo_sales/commission_extras y el flag opens_custom_form
+ * quedaron sin aplicar en producción sin que nada lo señalara).
+ *
+ * Si detecta que el esquema NO está completo, deja constancia con un log
+ * bien visible (para que se note de inmediato, no en un try/catch mudo) y
+ * delega en ensureSchema() para que se aplique lo que corresponda según el
+ * entorno (en runtime habilitado, corre las migraciones; en producción sin
+ * ALLOW_RUNTIME_MIGRATIONS, seguirá confiando en el deploy/CI, pero ahora
+ * quedará registrado que el esquema estaba incompleto en ese momento).
+ */
 export function ensureSchemaForRead(): Promise<void> {
-  schemaReady = true;
-  return Promise.resolve();
+  if (schemaReady) return Promise.resolve();
+  const sql = getSql();
+  if (!sql) {
+    schemaReady = true;
+    return Promise.resolve();
+  }
+
+  if (!readSchemaCheckPromise) {
+    readSchemaCheckPromise = schemaIsComplete(sql)
+      .then((complete) => {
+        if (complete) {
+          schemaReady = true;
+          return;
+        }
+        console.error(
+          "[ensureSchemaForRead] ALERTA: el esquema está incompleto (faltan " +
+            "columnas/tablas requeridas) pero se llegó por un camino de solo " +
+            "lectura que antes lo daba por bueno sin comprobarlo. Delegando en " +
+            "ensureSchema() — revisa si faltó aplicar `npm run db:migrate` tras " +
+            "el último deploy.",
+        );
+        // Permite reintentar la verificación en la próxima lectura (p. ej. si
+        // alguien corre la migración de deploy mientras el proceso sigue vivo).
+        readSchemaCheckPromise = null;
+        return ensureSchema();
+      })
+      .catch((err) => {
+        readSchemaCheckPromise = null;
+        console.error("[ensureSchemaForRead] no se pudo verificar el esquema", err);
+        // Un fallo puntual de la consulta de verificación no debe bloquear la
+        // bandeja/lecturas — se mantiene el comportamiento previo en ese caso.
+        schemaReady = true;
+      });
+  }
+  return readSchemaCheckPromise;
 }
 
 export async function pingDatabase(): Promise<{ ok: boolean; message: string }> {

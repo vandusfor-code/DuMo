@@ -6,6 +6,7 @@ import type {
   LeadType,
   LineAccountType,
 } from "./lead";
+import type { DuoSaleFormInput } from "./duo-sale";
 
 export interface LeadLineValues {
   phone: string;
@@ -45,6 +46,8 @@ export interface LeadFormValues {
   /** yyyy-mm-dd — seguimiento al guardar y cerrar (P1.3). */
   followUpDate: string;
   lines: LeadLineValues[];
+  /** Solo se usa/valida cuando type = "operacion_duo". */
+  duo: DuoSaleFormInput;
 }
 
 export const EMPTY_LEAD_LINE: LeadLineValues = {
