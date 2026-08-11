@@ -44,7 +44,9 @@ function appendMessageToCache(
   queryClient: ReturnType<typeof useQueryClient>,
   payload: MessageNewEvent,
 ) {
-  if (!payload.messageId || !payload.text || !payload.conversationId) return;
+  if (!payload.messageId || !payload.conversationId) return;
+  const isMedia = payload.messageType === "image" || payload.messageType === "audio";
+  if (!payload.text && !isMedia) return;
 
   const patch = (prev: ChatMessage[] | undefined) => {
     if (!prev) return prev;
