@@ -18,6 +18,8 @@ import { applyInboxLifecycleAfterSave } from "@/services/inbox-lifecycle.service
 import { duoSalesService } from "@/services/duo-sales.service";
 import { DUO_TIPIFICATION_SLUG } from "@/types/duo-sale";
 import { DEFAULT_COMPANY_ID } from "@/types/tenant";
+import { FolioNumberValidationError } from "@/lib/folio-number";
+import { validateFolioNumberForSale } from "@/services/folio-number.service";
 import type { SaveLeadInput } from "@/types/lead";
 import type { InboxState } from "@/types/inbox-state";
 import type { SaveLeadResult } from "@/types/sales-script";
@@ -32,6 +34,21 @@ export async function saveLeadWithScript(
   input: SaveLeadInput,
   scope?: AdvisorScope | null,
 ): Promise<SaveLeadResult> {
+  const companyId = DEFAULT_COMPANY_ID;
+  const isSaleFlow = await tipificationService.triggersSaleFlowForSlug(companyId, input.type);
+  const isDuoFlow = input.type === DUO_TIPIFICATION_SLUG;
+
+  /**
+   * El número de folio es opcional en cualquier gestión, pero obligatorio y
+   * único en todo el sistema cuando se guarda como venta u Operación Duo —
+   * se valida ANTES de guardar la gestión para que un folio inválido
+   * bloquee todo el guardado, no solo el registro de la venta.
+   */
+  if (isSaleFlow || isDuoFlow) {
+    const folioError = await validateFolioNumberForSale(input.folioNumber);
+    if (folioError) throw new FolioNumberValidationError(folioError);
+  }
+
   const effectiveScope = await resolveAdvisorScopeForLeadSave(input.conversationId, scope);
   const lead = await getLeadRepository().saveLead(input, effectiveScope);
   const advisor = effectiveScope ? { name: effectiveScope.name, email: "" } : undefined;
@@ -50,6 +67,7 @@ export async function saveLeadWithScript(
           phone: input.phone,
           originAdvisorId: effectiveScope.id,
           originAdvisorName: effectiveScope.name,
+          folioNumber: input.folioNumber?.trim() ?? "",
           ...input.duoSale,
         });
       } catch (error) {
@@ -72,8 +90,6 @@ export async function saveLeadWithScript(
   let followUpDatePersisted: string | null = null;
   let followUpCreated = false;
 
-  const companyId = DEFAULT_COMPANY_ID;
-  const isSaleFlow = await tipificationService.triggersSaleFlowForSlug(companyId, input.type);
   const saleFlowOptions = { isSaleFlowType: isSaleFlow };
 
   const saveAction: SaveLeadAction =

@@ -3,11 +3,33 @@
 import type { LeadFormValues } from "@/types/lead-form";
 import type { SaveLeadAction } from "@/types/crm-client";
 import type { Tipification } from "@/types/tipification";
+import { isValidFolioNumberFormat } from "@/lib/folio-number";
 import {
   resolveFollowUpDateForSave,
   validateFollowUpDateForCloseAction,
   type TipificationBehaviorCatalogItem,
 } from "@/lib/tipification-follow-up";
+
+function validateFolioForSave(
+  folioNumber: string,
+): { ok: false; message: string; field: keyof LeadFormValues } | null {
+  const value = folioNumber.trim();
+  if (!value) {
+    return {
+      ok: false,
+      message: "El número de folio es obligatorio para ventas y Operación Duo.",
+      field: "folioNumber",
+    };
+  }
+  if (!isValidFolioNumberFormat(value)) {
+    return {
+      ok: false,
+      message: "El número de folio solo puede contener números.",
+      field: "folioNumber",
+    };
+  }
+  return null;
+}
 
 export function validateLeadFormBeforeSave(input: {
   values: LeadFormValues;
@@ -26,6 +48,8 @@ export function validateLeadFormBeforeSave(input: {
           "Completa al menos una línea con número, tipo de venta, plan, región y comuna.",
       };
     }
+    const folioIssue = validateFolioForSave(input.values.folioNumber);
+    if (folioIssue) return folioIssue;
     return { ok: true, followUpDate: null };
   }
 
@@ -38,6 +62,8 @@ export function validateLeadFormBeforeSave(input: {
           "Completa al menos plan, tipo de venta, región y comuna de Operación Duo.",
       };
     }
+    const folioIssue = validateFolioForSave(input.values.folioNumber);
+    if (folioIssue) return folioIssue;
     return { ok: true, followUpDate: null };
   }
 

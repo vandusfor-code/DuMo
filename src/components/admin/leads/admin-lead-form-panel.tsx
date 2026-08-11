@@ -23,7 +23,7 @@ import { SaleDetails } from "@/components/leads/sale-details";
 import { ObservationField } from "@/components/leads/observation-field";
 import { FollowUpDateField } from "@/components/leads/follow-up-date-field";
 import { ActionButtons } from "@/components/leads/action-buttons";
-import { ClientCard } from "@/components/leads/client-card";
+import { ClientCard, FolioNumberField } from "@/components/leads/client-card";
 import { SalesScriptTab } from "@/components/leads/sales-script-tab";
 import { OfferEngineTab } from "@/components/leads/offer-engine/offer-engine-tab";
 import { useSalesScript } from "@/hooks/use-sales-script";
@@ -64,6 +64,7 @@ function defaultsFor(c: AdminConversation): LeadFormValues {
     followUpDate: "",
     lines: [{ ...EMPTY_LEAD_LINE }],
     duo: { ...EMPTY_DUO_SALE_FORM },
+    folioNumber: "",
   };
 }
 
@@ -147,6 +148,7 @@ export function AdminLeadFormPanel({
       registerSale: saveModeRef.current === "sale",
       saveAction: saveModeRef.current,
       followUpDate: validation.followUpDate,
+      folioNumber: values.folioNumber,
     };
     try {
       await saveLead.mutateAsync(input);
@@ -203,6 +205,7 @@ export function AdminLeadFormPanel({
             <div className="min-h-0 flex-1 overflow-y-auto p-3 lg:p-4">
               <TabsContent value="gestion" className="space-y-4 outline-none">
                 <ClientCard />
+                <FolioNumberField required={isSaleFlow} />
                 <LeadTypeSelect />
                 {!isSaleFlow ? <FollowUpDateField /> : null}
                 {isSaleFlow && <SaleDetails />}

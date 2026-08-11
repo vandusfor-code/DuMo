@@ -100,6 +100,11 @@ export const saveLeadSchema = z.object({
   saveAction: z.enum(["tipify", "script", "sale", "close"]).optional().default("script"),
   followUpDate: z.string().trim().optional().nullable(),
   duoSale: duoSaleFormSchema.optional(),
+  /** Radicado escrito por la asesora. Opcional aquí — se exige y valida
+   * (formato + unicidad) en la ruta, solo para venta/Operación Duo, porque
+   * eso depende del catálogo dinámico de tipificaciones (no algo que Zod
+   * pueda resolver de forma síncrona). */
+  folioNumber: z.string().trim().optional().default(""),
 });
 
 export type SaveLeadValues = z.infer<typeof saveLeadSchema>;

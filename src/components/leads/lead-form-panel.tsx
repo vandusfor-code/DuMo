@@ -87,6 +87,7 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
       saveAction: saveModeRef.current,
       followUpDate: validation.followUpDate,
       duoSale: values.type === DUO_TIPIFICATION_SLUG ? values.duo : undefined,
+      folioNumber: values.folioNumber,
     };
     try {
       await saveLead.mutateAsync(input);

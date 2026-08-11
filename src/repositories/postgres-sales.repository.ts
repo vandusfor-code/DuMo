@@ -36,6 +36,7 @@ import {
 } from "@/lib/commercial-settings";
 import { ADMIN_DASHBOARD_MOCK } from "@/data/mock/admin-dashboard.mock";
 import { ensureSchema, getSql, withDbRetry, withQueryTimeout } from "@/server/db/client";
+import { FolioNumberValidationError } from "@/lib/folio-number";
 import {
   adminDateInPeriod,
   adminTypeToCanonical,
@@ -72,6 +73,7 @@ type SaleRow = {
   commission_override?: number | string | null;
   /** DUO-4/5 — referencia a duo_sales cuando esta venta viene de un cierre. */
   duo_sale_id?: string | null;
+  folio_number?: string | null;
 };
 
 type LineRow = {
@@ -187,6 +189,7 @@ function rowToAdminSale(
       row.commission_override === null || row.commission_override === undefined
         ? null
         : Number(row.commission_override),
+    folioNumber: row.folio_number ?? "",
   };
 }
 
@@ -259,6 +262,7 @@ export class PostgresSalesStore {
         lines: lineCount(row),
         status: toAdvisorStatus(row.status),
         isDuo: Boolean(row.duo_sale_id),
+        folioNumber: row.folio_number ?? "",
       }));
     } catch (err) {
       console.error("[listSummaries]", err);
@@ -302,6 +306,7 @@ export class PostgresSalesStore {
       status: toAdvisorStatus(row.status),
       createdAt: isoFromRow(row),
       notes: row.notes ?? "",
+      folioNumber: row.folio_number ?? "",
       lines: lines.map((l) => ({
         phoneNumber: l.phone_number,
         saleType: adminTypeToCanonical(toAdminSaleType(l.sale_type)),
@@ -349,23 +354,38 @@ export class PostgresSalesStore {
     const operatorValue = primaryPlan?.womValue ?? 0;
     const dumoValue = primaryPlan?.dumoValue ?? 0;
 
-    await withDbRetry(async () => {
-      await sql`
+    const folioNumber = input.folioNumber?.trim() ?? "";
+
+    await sql.begin(async (tx) => {
+      if (folioNumber) {
+        // Registro atómico de unicidad — si el folio ya fue usado (por otra
+        // venta o por un cierre de Operación Duo), la PK duplicada revierte
+        // toda la transacción antes de tocar sales/sale_lines.
+        try {
+          await tx`INSERT INTO folio_numbers (folio_number, sale_id) VALUES (${folioNumber}, ${id})`;
+        } catch {
+          throw new FolioNumberValidationError(
+            "Ese número de folio ya fue usado en otra venta. Verifícalo e intenta de nuevo.",
+          );
+        }
+      }
+
+      await tx`
         INSERT INTO sales (
           id, customer_name, rut, phone, email, advisor_id, advisor_name,
-          status, sale_type, plan, operator_value, dumo_value, sale_date, notes, created_at
+          status, sale_type, plan, operator_value, dumo_value, sale_date, notes, created_at, folio_number
         ) VALUES (
           ${id}, ${input.customerName}, ${input.rut}, ${input.phone},
           ${input.email ?? ""}, ${advisorId}, ${advisorName}, ${"registrada"},
           ${adminType}, ${planName}, ${operatorValue}, ${dumoValue}, ${today},
-          ${input.notes ?? ""}, ${now.toISOString()}
+          ${input.notes ?? ""}, ${now.toISOString()}, ${folioNumber}
         )
       `;
       for (let i = 0; i < input.lines.length; i++) {
         const l = input.lines[i];
         const lineAdminType = canonicalToAdminType(l.saleType);
         const linePlanId = l.planId?.trim() ?? primaryLine?.planId?.trim() ?? "";
-        await sql`
+        await tx`
           INSERT INTO sale_lines (
             id, sale_id, phone_number, sale_type, device_name, plan_id, status
           ) VALUES (
@@ -848,6 +868,7 @@ export class PostgresSalesStore {
           status: toAdvisorStatus(v.status),
           saleType: adminTypeToCanonical(toAdminSaleType(v.sale_type)),
           plan: v.plan ?? "",
+          folioNumber: v.folio_number ?? "",
         }));
 
       const pending = rows.filter((v) => toAdvisorStatus(v.status) === "pending").length;

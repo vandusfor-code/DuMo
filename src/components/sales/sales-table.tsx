@@ -60,6 +60,10 @@ const columns = [
       <span className="text-muted">{formatLongDate(info.getValue())}</span>
     ),
   }),
+  columnHelper.accessor("folioNumber", {
+    header: "Número folio",
+    cell: (info) => <span className="text-muted">{info.getValue() || "—"}</span>,
+  }),
   columnHelper.accessor("lines", {
     header: "Líneas",
     cell: (info) => <span className="text-muted">{info.getValue()}</span>,

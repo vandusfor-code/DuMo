@@ -78,6 +78,7 @@ export function VentasPorCerrarTable({
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             <TableHead className="pl-6">Cliente</TableHead>
+            <TableHead>Número folio</TableHead>
             <TableHead>Asesora que concretó</TableHead>
             <TableHead>Fecha</TableHead>
             <TableHead>Plan / Producto</TableHead>
@@ -102,6 +103,10 @@ export function VentasPorCerrarTable({
                       </p>
                     </div>
                   </div>
+                </TableCell>
+
+                <TableCell>
+                  <span className="text-ink">{sale.folioNumber || "—"}</span>
                 </TableCell>
 
                 <TableCell>

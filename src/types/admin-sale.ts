@@ -45,6 +45,8 @@ export interface AdminSale {
   isDuo?: boolean;
   /** Comisión fija de esta venta (asesora de origen cobra la mitad); null/undefined = fórmula normal. */
   commissionOverride?: number | null;
+  /** Radicado escrito por la asesora al registrar la venta. */
+  folioNumber?: string;
 }
 
 export interface AdminSalesFilters {

@@ -48,6 +48,8 @@ export interface LeadFormValues {
   lines: LeadLineValues[];
   /** Solo se usa/valida cuando type = "operacion_duo". */
   duo: DuoSaleFormInput;
+  /** Radicado escrito por la asesora. Opcional salvo venta/Operación Duo. */
+  folioNumber: string;
 }
 
 export const EMPTY_LEAD_LINE: LeadLineValues = {

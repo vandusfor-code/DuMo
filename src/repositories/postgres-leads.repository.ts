@@ -59,11 +59,11 @@ export class PostgresLeadRepository {
       sql`
         INSERT INTO lead_gestiones (
           id, conversation_id, phone, customer_name, rut, gestion_type,
-          notes, advisor_id, advisor_name, lines, created_at
+          notes, advisor_id, advisor_name, lines, created_at, folio_number
         ) VALUES (
           ${id}, ${input.conversationId}, ${input.phone}, ${input.customerName},
           ${input.rut}, ${input.type}, ${input.notes}, ${advisorId || null},
-          ${advisorName}, ${JSON.stringify(input.lines)}, ${now}
+          ${advisorName}, ${JSON.stringify(input.lines)}, ${now}, ${input.folioNumber?.trim() ?? ""}
         )
       `,
     );
@@ -144,9 +144,10 @@ export class PostgresLeadRepository {
           notes: string;
           lines: SaveLeadInput["lines"] | null;
           sales_script: GeneratedSalesScript | null;
+          folio_number: string | null;
         }[]
       >`
-        SELECT id, customer_name, rut, gestion_type, notes, lines, sales_script
+        SELECT id, customer_name, rut, gestion_type, notes, lines, sales_script, folio_number
         FROM lead_gestiones
         WHERE conversation_id = ${conversationId}
         ORDER BY created_at DESC
@@ -163,6 +164,7 @@ export class PostgresLeadRepository {
       notes: row.notes ?? "",
       lines: Array.isArray(row.lines) ? row.lines : [],
       hasScript: row.sales_script != null,
+      folioNumber: row.folio_number ?? "",
     };
   }
 

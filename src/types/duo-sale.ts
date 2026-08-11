@@ -72,6 +72,8 @@ export interface DuoSale extends DuoSaleFormInput {
   assignedAt: string | null;
   closedAt: string | null;
   createdAt: string;
+  /** Radicado escrito por la asesora de origen — se copia a la venta al cerrar. */
+  folioNumber?: string;
 }
 
 export interface CreateDuoSaleInput extends DuoSaleFormInput {
@@ -82,6 +84,7 @@ export interface CreateDuoSaleInput extends DuoSaleFormInput {
   phone: string;
   originAdvisorId: string;
   originAdvisorName: string;
+  folioNumber: string;
 }
 
 /** DUO-4 — resultado del cierre: el caso actualizado + cuánto cobra cada asesora. */

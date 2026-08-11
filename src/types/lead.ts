@@ -129,6 +129,7 @@ export type LatestGestionDraft = {
   notes: string;
   lines: SaveLeadInput["lines"];
   hasScript: boolean;
+  folioNumber: string;
 };
 
 /** Payload que la UI envía para guardar una gestión. */
@@ -176,4 +177,6 @@ export interface SaveLeadInput {
   followUpDate?: string | null;
   /** Solo cuando type = "operacion_duo" — crea la fila en duo_sales. */
   duoSale?: import("@/types/duo-sale").DuoSaleFormInput;
+  /** Radicado escrito por la asesora. Opcional salvo venta/Operación Duo. */
+  folioNumber?: string;
 }

@@ -21,7 +21,7 @@ import { DuoSaleForm } from "./duo-sale-form";
 import { ObservationField } from "./observation-field";
 import { FollowUpDateField } from "./follow-up-date-field";
 import { ActionButtons } from "./action-buttons";
-import { ClientIdentityFields, ClientPhoneField } from "./client-card";
+import { ClientIdentityFields, ClientPhoneField, FolioNumberField } from "./client-card";
 import { SalesScriptTab } from "./sales-script-tab";
 import { OfferEngineTab } from "./offer-engine/offer-engine-tab";
 import { useSalesScript } from "@/hooks/use-sales-script";
@@ -153,6 +153,7 @@ export function LeadPanel({
               <SectionCardBody className="space-y-4 pt-0">
                 <ClientIdentityFields />
                 <ClientPhoneField />
+                <FolioNumberField required={isSaleFlow || isDuoFlow} />
                 <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
                   <span className="text-[13px] font-medium text-muted">Estado</span>
                   <StatusBadge variant="in_progress">En gestión</StatusBadge>

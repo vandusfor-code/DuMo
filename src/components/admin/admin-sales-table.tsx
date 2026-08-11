@@ -110,6 +110,10 @@ function buildColumns(
       header: "ID Venta",
       cell: (i) => <span className="font-semibold text-ink">{i.getValue()}</span>,
     }),
+    columnHelper.accessor("folioNumber", {
+      header: "Número folio",
+      cell: (i) => <span className="text-muted">{i.getValue() || "—"}</span>,
+    }),
     columnHelper.accessor("date", {
       header: "Fecha",
       cell: (i) => (

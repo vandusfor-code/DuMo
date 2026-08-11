@@ -63,6 +63,7 @@ export function DuoCaseDetailPanel({ sale }: { sale: DuoSale }) {
         />
         <SectionCardBody className="grid grid-cols-2 gap-4 pt-0">
           <Field label="Cliente" value={sale.customerName} />
+          <Field label="Número folio" value={sale.folioNumber ?? ""} />
           <Field label="RUT" value={sale.rut} />
           <Field label="Teléfono" value={sale.phone} />
           <Field label="Correo" value={sale.email} />

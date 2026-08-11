@@ -79,10 +79,19 @@ async function advisorFetch<T>(url: string, init: RequestInit & { timeoutMs?: nu
       cache: "no-store",
     });
     if (!res.ok) {
-      throw new AdvisorFetchError(
-        `No se pudo completar (error ${res.status}). Reintentando…`,
-        res.status,
-      );
+      // El backend a veces manda un mensaje específico y accionable (ej. folio
+      // faltante/duplicado) en el body — sin esto, el usuario solo veía
+      // "error 422" genérico y no sabía qué corregir.
+      let message = `No se pudo completar (error ${res.status}). Reintentando…`;
+      try {
+        const body = await res.json();
+        if (body && typeof body.error === "string" && body.error.trim()) {
+          message = body.error;
+        }
+      } catch {
+        // body no era JSON legible — se mantiene el mensaje genérico.
+      }
+      throw new AdvisorFetchError(message, res.status);
     }
     if (res.status === 204) return undefined as T;
     return (await res.json()) as T;

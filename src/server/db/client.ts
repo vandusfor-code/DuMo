@@ -26,6 +26,10 @@ import {
   runSalesReconciliationMigrations,
   SALES_RECONCILIATION_REQUIRED_COLUMNS,
 } from "@/server/db/migrations/sales-reconciliation-schema";
+import {
+  runFolioNumberMigrations,
+  FOLIO_NUMBER_REQUIRED_COLUMNS,
+} from "@/server/db/migrations/folio-number-schema";
 import { runWebQrMigrations } from "@/server/db/migrations/web-qr-schema";
 import { runLeadAssignmentMigrations } from "@/server/db/migrations/lead-assignment-schema";
 import {
@@ -229,6 +233,7 @@ const REQUIRED_COLUMNS = [
   ...DUO_SALES_REQUIRED_COLUMNS,
   ...DUO_SALES_CLOSE_REQUIRED_COLUMNS,
   ...SALES_RECONCILIATION_REQUIRED_COLUMNS,
+  ...FOLIO_NUMBER_REQUIRED_COLUMNS,
   ...DULABS_CAMPAIGN_LEADS_REQUIRED_COLUMNS,
 ];
 
@@ -335,6 +340,7 @@ async function ensureIncrementalMigrations(sql: Sql): Promise<void> {
     await runDuoSalesMigrations(sql);
     await runDuoSalesCloseMigrations(sql);
     await runSalesReconciliationMigrations(sql);
+    await runFolioNumberMigrations(sql);
     await runInboxStateMigrations(sql);
 
     await runLeadFollowUpsMigrations(sql);
@@ -554,6 +560,7 @@ async function runMigrations(sql: Sql) {
     await runDuoSalesMigrations(tx);
     await runDuoSalesCloseMigrations(tx);
     await runSalesReconciliationMigrations(tx);
+    await runFolioNumberMigrations(tx);
     await runAdvisorPresenceMigrations(tx);
     await runLeadAssignmentMigrations(tx);
     await runTeleprompterScriptMigrations(tx);

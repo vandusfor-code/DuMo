@@ -111,10 +111,11 @@ export function SaleDetailView({
       </div>
 
       {/* Top meta cards */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <MetaCard icon={<Calendar className="size-[18px]" />} label="Fecha de registro" value={formatLongDate(sale.createdAt)} />
         <MetaCard icon={<Hash className="size-[18px]" />} label="ID de venta" value={sale.id} />
         <MetaCard icon={<User className="size-[18px]" />} label="Asesora" value={sale.advisor} />
+        <MetaCard icon={<Hash className="size-[18px]" />} label="Número folio" value={sale.folioNumber || "—"} />
       </div>
 
       {/* Customer info */}

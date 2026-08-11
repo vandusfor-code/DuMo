@@ -7,6 +7,7 @@ import type {
   DuoSaleStatus,
 } from "@/types/duo-sale";
 import { ensureSchema, getSql, hasDatabase, withDbRetry, withQueryTimeout } from "@/server/db/client";
+import { FolioNumberValidationError } from "@/lib/folio-number";
 import { getCommercialConfigurationRepository } from "@/repositories/commercial-configuration.repository";
 import { findPlanCommission } from "@/data/mock/commercial-config.mock";
 import { canonicalToAdminType } from "@/server/db/sales-mappers";
@@ -204,6 +205,7 @@ type DuoSaleRow = {
   dumo_registered_name: string;
   call_time: string;
   comments: string;
+  folio_number: string;
   closing_notes: DuoClosingNote[];
   closed_sale_id: string | null;
   assigned_at: string | null;
@@ -237,6 +239,7 @@ function mapRow(r: DuoSaleRow): DuoSale {
     dumoRegisteredName: r.dumo_registered_name,
     callTime: r.call_time,
     comments: r.comments,
+    folioNumber: r.folio_number,
     closingNotes: Array.isArray(r.closing_notes) ? r.closing_notes : [],
     closedSaleId: r.closed_sale_id,
     assignedAt: r.assigned_at ? new Date(r.assigned_at).toISOString() : null,
@@ -256,23 +259,37 @@ class PostgresDuoSalesRepository implements DuoSalesRepository {
     await ensureSchema();
     const sql = requireSql();
     const id = newDuoSaleId();
-    const rows = await withDbRetry(() =>
-      sql<DuoSaleRow[]>`
+    const folioNumber = input.folioNumber.trim();
+
+    const row = await sql.begin(async (tx) => {
+      if (folioNumber) {
+        try {
+          await tx`INSERT INTO folio_numbers (folio_number, duo_sale_id) VALUES (${folioNumber}, ${id})`;
+        } catch {
+          throw new FolioNumberValidationError(
+            "Ese número de folio ya fue usado en otra venta. Verifícalo e intenta de nuevo.",
+          );
+        }
+      }
+
+      const rows = await tx<DuoSaleRow[]>`
         INSERT INTO duo_sales (
           id, conversation_id, gestion_id, customer_name, rut, phone,
           origin_advisor_id, origin_advisor_name,
           current_company, email, region, comuna, street, house_number,
-          plan, equipment, sale_type, dispatch, dumo_registered_name, call_time, comments
+          plan, equipment, sale_type, dispatch, dumo_registered_name, call_time, comments, folio_number
         ) VALUES (
           ${id}, ${input.conversationId}, ${input.gestionId}, ${input.customerName}, ${input.rut}, ${input.phone},
           ${input.originAdvisorId}, ${input.originAdvisorName},
           ${input.currentCompany}, ${input.email}, ${input.region}, ${input.comuna}, ${input.street}, ${input.houseNumber},
-          ${input.plan}, ${input.equipment}, ${input.saleType}, ${input.dispatch}, ${input.dumoRegisteredName}, ${input.callTime}, ${input.comments}
+          ${input.plan}, ${input.equipment}, ${input.saleType}, ${input.dispatch}, ${input.dumoRegisteredName}, ${input.callTime}, ${input.comments}, ${folioNumber}
         )
         RETURNING *
-      `,
-    );
-    return mapRow(rows[0]!);
+      `;
+      return rows[0]!;
+    });
+
+    return mapRow(row);
   }
 
   async listAll(): Promise<DuoSale[]> {
@@ -398,15 +415,19 @@ class PostgresDuoSalesRepository implements DuoSalesRepository {
         INSERT INTO sales (
           id, customer_name, rut, phone, email, advisor_id, advisor_name,
           status, sale_type, plan, operator_value, dumo_value, sale_date, notes,
-          created_at, commission_override, duo_sale_id
+          created_at, commission_override, duo_sale_id, folio_number
         ) VALUES (
           ${saleId}, ${current.customer_name}, ${current.rut}, ${current.phone},
           ${current.email}, ${current.origin_advisor_id}, ${current.origin_advisor_name},
           ${"registrada"}, ${adminType}, ${current.plan}, ${womValue}, ${dumoValue},
           ${today}, ${"Operación Duo — cerrada por " + current.closing_advisor_name},
-          ${nowIso}, ${half}, ${id}
+          ${nowIso}, ${half}, ${id}, ${current.folio_number}
         )
       `;
+
+      if (current.folio_number) {
+        await tx`UPDATE folio_numbers SET sale_id = ${saleId} WHERE folio_number = ${current.folio_number}`;
+      }
 
       await tx`
         INSERT INTO sale_lines (

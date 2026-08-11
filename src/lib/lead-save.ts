@@ -61,6 +61,7 @@ export function draftToFormValues(input: {
     type: string;
     notes: string;
     lines: SaveLeadInput["lines"];
+    folioNumber?: string;
   } | null;
 }): LeadFormValues {
   const { observations, internalNotes } = splitGestionNotes(input.draft?.notes ?? "");
@@ -74,6 +75,7 @@ export function draftToFormValues(input: {
     followUpDate: "",
     lines: mapStoredLinesToForm(input.draft?.lines),
     duo: { ...EMPTY_DUO_SALE_FORM },
+    folioNumber: input.draft?.folioNumber ?? "",
   };
 }
 
@@ -165,6 +167,7 @@ export function leadGestionToNewSaleInput(
     phone: input.phone,
     email: input.lines.find((l) => l.email?.trim())?.email || undefined,
     notes: input.notes || undefined,
+    folioNumber: input.folioNumber?.trim() || undefined,
     lines: input.lines.map((line) => ({
       phoneNumber: line.phone,
       saleType: mapLeadLineToSaleType(line.saleType, line.equipmentMode ?? "none"),
