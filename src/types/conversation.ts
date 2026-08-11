@@ -46,7 +46,7 @@ export interface Conversation {
   /** RESP-2 — aviso de tiempo de respuesta activo (min 1/2 o 4 de los escenarios A/B). */
   activeSlaWarning?: {
     scenario: "first_contact" | "follow_up";
-    status: "warning_sent" | "final_warning_sent";
+    status: "warning_sent" | "final_warning_sent" | "escalated_no_advisor";
     minutesUnanswered: number;
   } | null;
 }

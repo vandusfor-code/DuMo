@@ -3,10 +3,14 @@ import { getResponseSlaRepository } from "@/repositories/response-sla.repository
 import { cancelSlaCheck, scheduleSlaCheck } from "@/server/queue/sla-queue";
 import {
   RESPONSE_SLA_THRESHOLDS,
+  SLA_ESCALATION_RETRY_MS,
+  buildSlaAdminAlertMessage,
   delayMsUntilThreshold,
   nextThresholdMinutes,
+  slaChannelLabel,
   type ResponseSlaScenario,
 } from "@/types/response-sla";
+import { resolveConversationChannel } from "@/lib/conversation-channel";
 
 /**
  * RESP-1 — se llama al FINAL de `leadsService.receiveMessage()`, después de
@@ -62,6 +66,80 @@ export async function resolveTimerAfterOutboundMessage(conversationId: string): 
   }
 }
 
+function elapsedMinutesSince(armedAt: string): number {
+  return Math.max(0, Math.round((Date.now() - new Date(armedAt).getTime()) / 60_000));
+}
+
+/**
+ * RESP-3 — al vencer el umbral: intenta reasignar a otra asesora disponible
+ * (excluyéndola a ella explícitamente); si no hay ninguna, entra en
+ * Escenario C — alerta web a la propia asesora + WhatsApp real a los
+ * admins (con cooldown), y se reprograma para reintentar en 1 minuto,
+ * indefinidamente, hasta que alguien responda o quede disponible una
+ * asesora. Efectos externos (socket, WhatsApp) fuera de la transacción de
+ * `reconcileEscalation` a propósito — si fallan, el estado en BD ya quedó
+ * correcto y no hay que revertir nada.
+ */
+export async function escalateOrReassignTimer(conversationId: string): Promise<void> {
+  const repo = getResponseSlaRepository();
+  const result = await repo.reconcileEscalation(conversationId);
+  if (result.kind === "noop") return;
+
+  const { emitLeadsConversationUpdated, emitLeadsSlaWarning } = await import("@/server/realtime/emit");
+
+  if (result.kind === "reassigned") {
+    // La conversación cambió de dueña sin un mensaje entrante nuevo — se
+    // arma el timer de la nueva asesora igual que si acabara de recibir el
+    // mismo mensaje sin responder, para que el ciclo siga vigilando.
+    await armTimerAfterInboundMessage({
+      conversationId,
+      assignedAdvisorId: result.newAdvisor.id,
+      messageId: result.timer.triggerMessageId,
+    });
+    emitLeadsConversationUpdated({
+      conversationId,
+      assignedAdvisorId: result.newAdvisor.id,
+      reason: "auto-assign",
+    });
+    emitLeadsConversationUpdated({
+      conversationId,
+      assignedAdvisorId: result.oldAdvisorId,
+      reason: "auto-assign",
+    });
+    return;
+  }
+
+  // Escenario C.
+  const customerName = await repo.getCustomerName(conversationId);
+  const elapsedMinutes = elapsedMinutesSince(result.timer.armedAt);
+
+  emitLeadsSlaWarning({
+    conversationId,
+    advisorId: result.timer.advisorId,
+    customerName,
+    scenario: result.timer.scenario,
+    status: "escalated_no_advisor",
+    minutesUnanswered: elapsedMinutes,
+  });
+
+  if (result.shouldSendAdminAlert) {
+    const { sendSlaAdminAlert } = await import("@/server/web-qr/admin-alerts");
+    const advisorName = await repo.getAdvisorName(result.timer.advisorId);
+    const message = buildSlaAdminAlertMessage({
+      customerName,
+      advisorName,
+      minutesUnanswered: elapsedMinutes,
+      channelLabel: slaChannelLabel(resolveConversationChannel(conversationId)),
+      conversationId,
+    });
+    await sendSlaAdminAlert(message).catch((err) =>
+      console.error("[escalateOrReassignTimer] sendSlaAdminAlert", err),
+    );
+  }
+
+  await scheduleSlaCheck(conversationId, SLA_ESCALATION_RETRY_MS);
+}
+
 /**
  * Núcleo compartido por el worker de BullMQ y el barrido periódico — misma
  * función, dos caminos de disparo. Relee el estado real (FOR UPDATE) antes
@@ -70,6 +148,15 @@ export async function resolveTimerAfterOutboundMessage(conversationId: string): 
  */
 export async function reconcileConversationTimer(conversationId: string): Promise<void> {
   const repo = getResponseSlaRepository();
+
+  // Escenario C ya activo: no pasa por la máquina de estados de umbrales de
+  // nuevo, solo reintenta encontrar asesora / re-alertar.
+  const current = await repo.getTimer(conversationId);
+  if (current?.status === "escalated_no_advisor") {
+    await escalateOrReassignTimer(conversationId);
+    return;
+  }
+
   const result = await repo.reconcileOne(conversationId);
   if (!result.transitioned || !result.timer || !result.newStatus) return;
 
@@ -81,22 +168,23 @@ export async function reconcileConversationTimer(conversationId: string): Promis
       import("@/server/realtime/emit"),
       repo.getCustomerName(conversationId),
     ]);
-    const elapsedMinutes = Math.max(
-      0,
-      Math.round((Date.now() - new Date(result.timer.armedAt).getTime()) / 60_000),
-    );
     emitLeadsSlaWarning({
       conversationId,
       advisorId: result.timer.advisorId,
       customerName,
       scenario: result.timer.scenario,
       status: result.newStatus,
-      minutesUnanswered: elapsedMinutes,
+      minutesUnanswered: elapsedMinutesSince(result.timer.armedAt),
     });
   }
 
+  if (result.newStatus === "threshold_reached") {
+    await escalateOrReassignTimer(conversationId);
+    return;
+  }
+
   const nextMinutes = nextThresholdMinutes(result.timer.scenario, result.newStatus);
-  if (nextMinutes === null) return; // threshold_reached — RESP-3 continúa desde aquí.
+  if (nextMinutes === null) return;
 
   const delayMs = delayMsUntilThreshold(nextMinutes, result.timer.armedAt);
   await scheduleSlaCheck(conversationId, delayMs);

@@ -77,7 +77,7 @@ export type LeadsSlaWarningPayload = {
   advisorId: string;
   customerName: string;
   scenario: "first_contact" | "follow_up";
-  status: "warning_sent" | "final_warning_sent";
+  status: "warning_sent" | "final_warning_sent" | "escalated_no_advisor";
   minutesUnanswered: number;
 };
 

@@ -163,7 +163,13 @@ function toStatus(value: string): ConversationStatus {
 }
 
 function mapSlaWarning(r: ConvRow): Conversation["activeSlaWarning"] {
-  if (r.sla_status !== "warning_sent" && r.sla_status !== "final_warning_sent") return null;
+  if (
+    r.sla_status !== "warning_sent" &&
+    r.sla_status !== "final_warning_sent" &&
+    r.sla_status !== "escalated_no_advisor"
+  ) {
+    return null;
+  }
   if (r.sla_scenario !== "first_contact" && r.sla_scenario !== "follow_up") return null;
   if (!r.sla_armed_at) return null;
   const armedMs = new Date(r.sla_armed_at).getTime();
@@ -223,7 +229,7 @@ class PostgresConversationRepository implements ConversationRepository {
               LEFT JOIN tipifications t
                 ON t.slug = lg.gestion_type AND t.company_id = ${DEFAULT_COMPANY_ID}
               LEFT JOIN response_sla_timers s
-                ON s.conversation_id = c.id AND s.status IN ('warning_sent', 'final_warning_sent')
+                ON s.conversation_id = c.id AND s.status IN ('warning_sent', 'final_warning_sent', 'escalated_no_advisor')
               WHERE c.assigned_advisor_id = ${advisorId}
                 AND c.inbox_state = 'active'
                 AND NOT EXISTS (
@@ -255,7 +261,7 @@ class PostgresConversationRepository implements ConversationRepository {
               LEFT JOIN tipifications t
                 ON t.slug = lg.gestion_type AND t.company_id = ${DEFAULT_COMPANY_ID}
               LEFT JOIN response_sla_timers s
-                ON s.conversation_id = c.id AND s.status IN ('warning_sent', 'final_warning_sent')
+                ON s.conversation_id = c.id AND s.status IN ('warning_sent', 'final_warning_sent', 'escalated_no_advisor')
               ORDER BY c.last_message_at DESC
             `,
       ),

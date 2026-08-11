@@ -9,12 +9,15 @@ export interface SlaWarningEvent {
   conversationId: string;
   customerName: string;
   scenario: "first_contact" | "follow_up";
-  status: "warning_sent" | "final_warning_sent";
+  status: "warning_sent" | "final_warning_sent" | "escalated_no_advisor";
   minutesUnanswered: number;
 }
 
 function warningMessage(event: SlaWarningEvent): string {
   const name = event.customerName || "el cliente";
+  if (event.status === "escalated_no_advisor") {
+    return `Cliente esperando respuesta — no hay otra asesora disponible. Por favor responde ahora a ${name}.`;
+  }
   if (event.status === "final_warning_sent") {
     return `Por favor responder a ${name}, o será reasignado en 1 minuto.`;
   }
@@ -46,7 +49,7 @@ export function SlaWarningBanners({
           key={event.id}
           className={cn(
             "pointer-events-auto flex items-start gap-2.5 rounded-card border px-4 py-3 shadow-lg",
-            event.status === "final_warning_sent"
+            event.status === "final_warning_sent" || event.status === "escalated_no_advisor"
               ? "border-danger/30 bg-danger-soft text-danger-ink"
               : "border-warning/30 bg-warning-soft text-warning-ink",
           )}

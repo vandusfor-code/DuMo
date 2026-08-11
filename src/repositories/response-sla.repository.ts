@@ -1,11 +1,22 @@
 import "server-only";
 import { ensureSchema, getSql, hasDatabase, withDbRetry } from "@/server/db/client";
+import { ADVISOR_ONLINE_WINDOW_MINUTES } from "@/lib/advisor-presence";
 import {
   RESPONSE_SLA_THRESHOLDS,
   type ResponseSlaScenario,
   type ResponseSlaStatus,
   type ResponseSlaTimer,
 } from "@/types/response-sla";
+
+export type EscalationResult =
+  | { kind: "noop" }
+  | {
+      kind: "reassigned";
+      timer: ResponseSlaTimer;
+      oldAdvisorId: string;
+      newAdvisor: { id: string; name: string };
+    }
+  | { kind: "escalated"; timer: ResponseSlaTimer; shouldSendAdminAlert: boolean };
 
 export interface ArmTimerInput {
   conversationId: string;
@@ -27,6 +38,8 @@ export interface ResponseSlaRepository {
   hasPriorOutboundMessage(conversationId: string): Promise<boolean>;
   /** RESP-2 — para el payload del aviso en tiempo real. */
   getCustomerName(conversationId: string): Promise<string>;
+  /** RESP-3 — para el mensaje de WhatsApp a admins (Escenario C). */
+  getAdvisorName(advisorId: string): Promise<string>;
   armOrReset(input: ArmTimerInput): Promise<void>;
   /** Marca el timer resuelto (la asesora respondió). Devuelve el jobId activo (si había) para cancelarlo. */
   resolve(
@@ -41,6 +54,15 @@ export interface ResponseSlaRepository {
    * job/barrido que llamó a esta función.
    */
   reconcileOne(conversationId: string): Promise<ReconcileResult>;
+  /**
+   * RESP-3 — al llegar a `threshold_reached` (o reintentando desde
+   * `escalated_no_advisor`): busca otra asesora disponible EXCLUYENDO a la
+   * actual explícitamente (WHERE u.id != excludeAdvisorId — nunca puede
+   * "reasignarse" a sí misma); si no hay ninguna, entra/permanece en
+   * Escenario C. Todo dentro de una transacción con FOR UPDATE — relee el
+   * estado real antes de actuar (misma regla de desempate B).
+   */
+  reconcileEscalation(conversationId: string): Promise<EscalationResult>;
 }
 
 function mapRow(r: Record<string, unknown>): ResponseSlaTimer {
@@ -106,6 +128,9 @@ class MockResponseSlaRepository implements ResponseSlaRepository {
   async getCustomerName(): Promise<string> {
     return "";
   }
+  async getAdvisorName(): Promise<string> {
+    return "";
+  }
   async armOrReset(): Promise<void> {}
   async resolve(): Promise<{ hadActiveTimer: boolean; bullmqJobId: string | null; advisorId: string | null }> {
     return { hadActiveTimer: false, bullmqJobId: null, advisorId: null };
@@ -118,6 +143,9 @@ class MockResponseSlaRepository implements ResponseSlaRepository {
   }
   async reconcileOne(): Promise<ReconcileResult> {
     return { transitioned: false, previousStatus: null, newStatus: null, timer: null };
+  }
+  async reconcileEscalation(): Promise<EscalationResult> {
+    return { kind: "noop" };
   }
 }
 
@@ -144,6 +172,15 @@ class PostgresResponseSlaRepository implements ResponseSlaRepository {
       `,
     );
     return rows[0]?.customer_name ?? "";
+  }
+
+  async getAdvisorName(advisorId: string): Promise<string> {
+    await ensureSchema();
+    const sql = requireSql();
+    const rows = await withDbRetry(() =>
+      sql<{ name: string }[]>`SELECT name FROM users WHERE id = ${advisorId} LIMIT 1`,
+    );
+    return rows[0]?.name ?? "";
   }
 
   async armOrReset(input: ArmTimerInput): Promise<void> {
@@ -267,6 +304,121 @@ class PostgresResponseSlaRepository implements ResponseSlaRepository {
       `;
       const updated = mapRow(updatedRows[0] as Record<string, unknown>);
       return { transitioned: true, previousStatus: timer.status, newStatus: next, timer: updated };
+    });
+  }
+
+  async reconcileEscalation(conversationId: string): Promise<EscalationResult> {
+    await ensureSchema();
+    const sql = requireSql();
+
+    return sql.begin(async (tx) => {
+      const rows = await tx`
+        SELECT * FROM response_sla_timers WHERE conversation_id = ${conversationId} FOR UPDATE
+      `;
+      const row = rows[0] as Record<string, unknown> | undefined;
+      if (!row) return { kind: "noop" as const };
+      const timer = mapRow(row);
+      if (timer.status !== "threshold_reached" && timer.status !== "escalated_no_advisor") {
+        return { kind: "noop" as const };
+      }
+
+      const originalRows = await tx<{ name: string }[]>`
+        SELECT name FROM users WHERE id = ${timer.advisorId} LIMIT 1
+      `;
+      const originalAdvisorName = originalRows[0]?.name ?? "";
+
+      // Candidata: otra asesora activa, disponible y conectada — EXCLUYE
+      // explícitamente a la asesora actual (nunca puede "reasignarse" a sí
+      // misma). Desempate por carga actual (menos conversaciones activas
+      // primero), luego por quien lleva más tiempo sin actividad.
+      const candidates = await tx<{ id: string; name: string }[]>`
+        SELECT u.id, u.name
+        FROM users u
+        WHERE u.role = 'asesora'
+          AND u.active = true
+          AND u.id != ${timer.advisorId}
+          AND u.presence_status = 'disponible'
+          AND u.last_seen_at IS NOT NULL
+          AND u.last_seen_at > now() - make_interval(mins => ${ADVISOR_ONLINE_WINDOW_MINUTES})
+        ORDER BY (
+          SELECT count(*) FROM lead_conversations c
+          WHERE c.assigned_advisor_id = u.id AND c.inbox_state = 'active'
+        ) ASC, u.last_seen_at ASC
+        LIMIT 1
+      `;
+      const candidate = candidates[0];
+
+      if (candidate) {
+        await tx`
+          UPDATE lead_conversations SET
+            assigned_advisor_id = ${candidate.id},
+            assigned_advisor_name = ${candidate.name},
+            assigned_advisor_at = now()
+          WHERE id = ${conversationId}
+        `;
+        const updatedRows = await tx`
+          UPDATE response_sla_timers SET
+            status = 'reassigned', bullmq_job_id = NULL, updated_at = now()
+          WHERE conversation_id = ${conversationId}
+          RETURNING *
+        `;
+        const updated = mapRow(updatedRows[0] as Record<string, unknown>);
+        const t = RESPONSE_SLA_THRESHOLDS[timer.scenario];
+        const logId = `sla-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        await tx`
+          INSERT INTO sla_reassignment_log (
+            id, conversation_id, original_advisor_id, original_advisor_name,
+            new_advisor_id, new_advisor_name, scenario, reason,
+            unanswered_message_id, minutes_unanswered
+          ) VALUES (
+            ${logId}, ${conversationId}, ${timer.advisorId}, ${originalAdvisorName},
+            ${candidate.id}, ${candidate.name}, ${timer.scenario},
+            ${`no_response_${t.escalateMinutes}min`},
+            ${timer.triggerMessageId}, ${t.escalateMinutes}
+          )
+        `;
+
+        return {
+          kind: "reassigned" as const,
+          timer: updated,
+          oldAdvisorId: timer.advisorId,
+          newAdvisor: candidate,
+        };
+      }
+
+      // Escenario C — sin candidata disponible.
+      const isFirstEscalation = timer.escalationCycleCount === 0;
+      const cooldownMs = 2 * 60_000;
+      const cooldownOk =
+        !timer.lastAdminAlertAt || Date.now() - new Date(timer.lastAdminAlertAt).getTime() >= cooldownMs;
+
+      const updatedRows = await tx`
+        UPDATE response_sla_timers SET
+          status = 'escalated_no_advisor',
+          escalation_cycle_count = escalation_cycle_count + 1,
+          last_admin_alert_at = CASE WHEN ${cooldownOk} THEN now() ELSE last_admin_alert_at END,
+          updated_at = now()
+        WHERE conversation_id = ${conversationId}
+        RETURNING *
+      `;
+      const updated = mapRow(updatedRows[0] as Record<string, unknown>);
+
+      if (isFirstEscalation) {
+        const logId = `sla-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        await tx`
+          INSERT INTO sla_reassignment_log (
+            id, conversation_id, original_advisor_id, original_advisor_name,
+            new_advisor_id, new_advisor_name, scenario, reason,
+            unanswered_message_id, minutes_unanswered
+          ) VALUES (
+            ${logId}, ${conversationId}, ${timer.advisorId}, ${originalAdvisorName},
+            NULL, NULL, ${timer.scenario}, 'no_advisor_available',
+            ${timer.triggerMessageId}, ${RESPONSE_SLA_THRESHOLDS[timer.scenario].escalateMinutes}
+          )
+        `;
+      }
+
+      return { kind: "escalated" as const, timer: updated, shouldSendAdminAlert: cooldownOk };
     });
   }
 }
