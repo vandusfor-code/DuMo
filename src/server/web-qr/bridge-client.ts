@@ -116,6 +116,17 @@ export async function bridgeSendAudio(input: {
   });
 }
 
+/** Validación PCS — consulta en lote (~20-30 números) si tienen WhatsApp activo. */
+export async function bridgeCheckNumbers(input: {
+  channelId: string;
+  numeros: string[];
+}): Promise<{ pcs: string; exists: boolean; jid: string | null }[]> {
+  return bridgeFetch("/check-numbers", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 /** Prueba el webhook Railway → Vercel con el secreto de la sesión activa. */
 export async function bridgeTestWebhook(channelId: string): Promise<{
   ok: boolean;

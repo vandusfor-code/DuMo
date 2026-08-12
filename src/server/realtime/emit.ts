@@ -101,3 +101,16 @@ export function emitSessionRevoked(userId: string, reason: SessionRevokedPayload
   io.to(`advisor:${userId}`).emit("session:revoked", payload);
   io.in(`advisor:${userId}`).disconnectSockets(true);
 }
+
+/** Validación PCS — progreso en vivo, a la misma room que ya reciben admin/supervisor. */
+export function emitPcsValidationProgress(jobId: string, procesados: number, total: number) {
+  const io = getIo();
+  if (!io) return;
+  io.to("admin:leads").emit("pcs:validation:progress", { jobId, procesados, total });
+}
+
+export function emitPcsValidationDone(jobId: string, status: "done" | "error", error?: string) {
+  const io = getIo();
+  if (!io) return;
+  io.to("admin:leads").emit("pcs:validation:done", { jobId, status, error: error ?? null });
+}

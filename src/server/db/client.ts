@@ -46,6 +46,10 @@ import {
   DULABS_CAMPAIGN_LEADS_REQUIRED_COLUMNS,
   runDulabsCampaignLeadsMigrations,
 } from "@/server/db/migrations/dulabs-campaign-leads-schema";
+import {
+  PCS_VALIDATION_REQUIRED_COLUMNS,
+  runPcsValidationMigrations,
+} from "@/server/db/migrations/pcs-validation-schema";
 
 let sqlSingleton: Sql | null = null;
 let schemaPromise: Promise<void> | null = null;
@@ -241,6 +245,7 @@ const REQUIRED_COLUMNS = [
   ...FOLIO_NUMBER_REQUIRED_COLUMNS,
   ...RESPONSE_SLA_REQUIRED_COLUMNS,
   ...DULABS_CAMPAIGN_LEADS_REQUIRED_COLUMNS,
+  ...PCS_VALIDATION_REQUIRED_COLUMNS,
 ];
 
 /** ¿Está el esquema completo? Una sola consulta al catálogo. */
@@ -353,6 +358,7 @@ async function ensureIncrementalMigrations(sql: Sql): Promise<void> {
 
     await runLeadFollowUpsMigrations(sql);
     await runDulabsCampaignLeadsMigrations(sql);
+    await runPcsValidationMigrations(sql);
   } catch (err) {
     console.error("[ensureIncrementalMigrations]", err);
   }
@@ -576,6 +582,7 @@ async function runMigrations(sql: Sql) {
     await runTeleprompterScriptMigrations(tx);
     await runWebQrMigrations(tx);
     await runDulabsCampaignLeadsMigrations(tx);
+    await runPcsValidationMigrations(tx);
 
     await tx`
       INSERT INTO users (id, username, email, password_hash, name, role, active, avatar_url, company_id)

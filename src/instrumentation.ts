@@ -4,6 +4,8 @@ export async function register() {
     ensureInboundMessageWorker();
     const { ensureSlaWorker } = await import("@/server/queue/sla-worker");
     ensureSlaWorker();
+    const { ensurePcsValidationWorker } = await import("@/server/queue/pcs-validation-worker");
+    ensurePcsValidationWorker();
 
     /**
      * Dispara la migración de esquema al arrancar el proceso, no cuando la

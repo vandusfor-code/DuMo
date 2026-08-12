@@ -1074,6 +1074,48 @@ app.post("/send-audio", auth, async (req, res) => {
   }
 });
 
+/**
+ * Validación PCS — consulta en lote si los números tienen WhatsApp activo,
+ * usando la sesión ya conectada (no crea sesión nueva). Lote pensado para
+ * ~20-30 números por llamada; el llamador (worker de DuMo) es responsable
+ * de trocear listas grandes y pausar entre lotes.
+ */
+app.post("/check-numbers", auth, async (req, res) => {
+  const { channelId, numeros } = req.body ?? {};
+  if (!channelId) return res.status(400).json({ error: "channelId requerido" });
+  if (!Array.isArray(numeros) || numeros.length === 0) {
+    return res.status(400).json({ error: "numeros (array) requerido" });
+  }
+
+  let session;
+  try {
+    session = await getConnectedSession(channelId);
+  } catch (err) {
+    const mapped = mapOutboundSessionError(err, res);
+    if (mapped) return mapped;
+    throw err;
+  }
+
+  try {
+    const results = await session.sock.onWhatsApp(...numeros);
+    const foundByDigits = new Map(
+      (results ?? [])
+        .filter((r) => r?.exists)
+        .map((r) => [phoneFromJid(r.jid), r.jid]),
+    );
+    const payload = numeros.map((pcs) => {
+      const jid = foundByDigits.get(String(pcs).replace(/\D/g, ""));
+      return { pcs, exists: Boolean(jid), jid: jid ?? null };
+    });
+    res.json(payload);
+  } catch (err) {
+    log.error({ err, channelId, count: numeros.length }, "check-numbers falló");
+    res.status(502).json({
+      error: err instanceof Error ? err.message : "No se pudo consultar WhatsApp",
+    });
+  }
+});
+
 app.post("/test-webhook", auth, async (req, res) => {
   const { channelId } = req.body ?? {};
   if (!channelId) return res.status(400).json({ error: "channelId requerido" });

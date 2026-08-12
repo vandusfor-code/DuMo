@@ -148,6 +148,23 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       forceSessionLogout("revoked");
     });
 
+    socket.on(
+      "pcs:validation:progress",
+      (payload: { jobId: string; procesados: number; total: number }) => {
+        if (!payload?.jobId) return;
+        queryClient.setQueryData(
+          ["pcs", "validate", payload.jobId],
+          (prev: { progreso?: { total: number; procesados: number } } | undefined) =>
+            prev ? { ...prev, progreso: { total: payload.total, procesados: payload.procesados } } : prev,
+        );
+      },
+    );
+
+    socket.on("pcs:validation:done", (payload: { jobId: string }) => {
+      if (!payload?.jobId) return;
+      queryClient.invalidateQueries({ queryKey: ["pcs", "validate", payload.jobId] });
+    });
+
     socket.on("connect", () => {
       invalidateBandeja(queryClient);
     });
