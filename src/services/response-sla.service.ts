@@ -160,10 +160,16 @@ export async function reconcileConversationTimer(conversationId: string): Promis
 
   const repo = getResponseSlaRepository();
 
-  // Escenario C ya activo: no pasa por la máquina de estados de umbrales de
-  // nuevo, solo reintenta encontrar asesora / re-alertar.
+  // BUG REAL encontrado en producción (2026-08-12): un timer que llega a
+  // `threshold_reached` pero cuya escalación falla a medias (o cuyo intento
+  // de reconcile nunca llegó a llamar escalateOrReassignTimer) se quedaba
+  // atascado ahí para siempre — reconcileOne() no tiene transición DESDE
+  // threshold_reached, así que `transitioned` volvía false y la función
+  // retornaba temprano sin reintentar. Confirmado con 2 conversaciones
+  // reales atascadas 3+ horas. Mismo tratamiento que escalated_no_advisor:
+  // se reintenta la escalación en cada pasada hasta que se resuelva.
   const current = await repo.getTimer(conversationId);
-  if (current?.status === "escalated_no_advisor") {
+  if (current?.status === "escalated_no_advisor" || current?.status === "threshold_reached") {
     await escalateOrReassignTimer(conversationId);
     return;
   }
