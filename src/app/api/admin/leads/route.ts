@@ -98,6 +98,18 @@ export async function GET(request: NextRequest) {
       }
     });
 
+    // Red de seguridad del barrido de presencia — mismo patrón que arriba.
+    after(async () => {
+      try {
+        const { reconcileStalePresenceThrottled } = await import(
+          "@/services/advisor-presence-sweep"
+        );
+        await reconcileStalePresenceThrottled();
+      } catch (err) {
+        console.error("[reconcileStalePresenceThrottled]", err);
+      }
+    });
+
     const data = await Promise.race([
       adminLeadsService.listConversations(),
       new Promise<never>((_, reject) =>

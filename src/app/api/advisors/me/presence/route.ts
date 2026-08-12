@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 15;
 
-/** Asesora (o cualquier usuario autenticado): cambia su propio estado de presencia. */
+/** Cualquier usuario autenticado (asesora, admin, supervisor): cambia su propio estado de presencia. */
 export async function PATCH(request: NextRequest) {
   const scope = await getAdvisorTenantScope();
   if (!scope) {
@@ -23,13 +23,6 @@ export async function PATCH(request: NextRequest) {
   const status = String((body as { status?: string }).status ?? "").trim();
   if (!status) {
     return NextResponse.json({ error: "status requerido." }, { status: 422 });
-  }
-
-  if (scope.role !== "asesora") {
-    return NextResponse.json(
-      { error: "Solo las asesoras pueden cambiar su estado operativo desde aquí." },
-      { status: 403 },
-    );
   }
 
   try {

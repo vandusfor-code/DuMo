@@ -35,3 +35,23 @@ export function effectiveAdvisorPresenceStatus(
   if (!isOnline) return "desconectado";
   return stored;
 }
+
+/** Mensaje de WhatsApp a Monica/Duvan cada vez que una asesora cambia de estado. */
+export function buildPresenceChangeAlertMessage(input: {
+  advisorName: string;
+  status: AdvisorPresenceStatus;
+  auto?: boolean;
+}): string {
+  const fecha = new Intl.DateTimeFormat("es-CO", {
+    dateStyle: "short",
+    timeStyle: "short",
+    timeZone: "America/Bogota",
+  }).format(new Date());
+  const suffix = input.auto
+    ? "\n\n(Desconexión automática por inactividad — no se marcó manualmente)"
+    : "";
+  return `🔔 DuMo - Cambio de estado
+Asesora: ${input.advisorName}
+Nuevo estado: ${ADVISOR_PRESENCE_LABELS[input.status]}
+Fecha: ${fecha}${suffix}`;
+}

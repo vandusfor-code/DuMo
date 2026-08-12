@@ -7,11 +7,13 @@ import { APP_SIDEBAR_OFFSET_CLASS } from "@/components/layout/app-shell.constant
 import { Sidebar } from "@/components/layout/sidebar";
 import { AdvisorMessageNotifications } from "@/components/messaging/message-notification-listener";
 import { AdvisorPresenceSelect } from "@/components/leads/advisor-presence-select";
+import { usePresenceDisconnectBeacon } from "@/hooks/use-presence-disconnect-beacon";
 
 /** Shell del área asesora: sidebar fijo + contenido con separación lateral. */
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const fullBleed = pathname?.startsWith("/dashboard/leads") ?? false;
+  usePresenceDisconnectBeacon();
 
   // Leads: bloquear scroll del documento; solo scrollean las columnas internas.
   useEffect(() => {

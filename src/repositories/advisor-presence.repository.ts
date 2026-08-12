@@ -21,6 +21,8 @@ export interface AdvisorPresenceRepository {
     tokenVersion: number;
     sessionRevoked: boolean;
   }>;
+  /** Asesoras "conectadas" (disponible/baño/almuerzo) sin heartbeat reciente — PC apagado sin marcarse desconectada. */
+  listStaleAdvisorIds(): Promise<string[]>;
 }
 
 function requireSql() {
@@ -295,6 +297,24 @@ class PostgresAdvisorPresenceRepository implements AdvisorPresenceRepository {
       tokenVersion: Number(row.token_version ?? 0),
       sessionRevoked: status === "desconectado" && revokeOnDisconnect,
     };
+  }
+
+  async listStaleAdvisorIds(): Promise<string[]> {
+    await ensureSchema();
+    const sql = requireSql();
+    const rows = await withQueryTimeout(
+      sql<{ id: string }[]>`
+        SELECT id FROM users
+        WHERE role = 'asesora' AND active = true
+          AND presence_status IN ('disponible', 'bano', 'almuerzo')
+          AND (
+            last_seen_at IS NULL
+            OR last_seen_at < now() - make_interval(mins => ${ADVISOR_ONLINE_WINDOW_MINUTES})
+          )
+      `,
+      8_000,
+    );
+    return rows.map((r) => r.id);
   }
 }
 

@@ -22,5 +22,20 @@ export async function register() {
     ensureSchema().catch((err) => {
       console.error("[instrumentation] ensureSchema al arrancar falló", err);
     });
+
+    /**
+     * Barrido periódico de presencia: si a una asesora se le "olvida"
+     * marcarse desconectada (apaga el PC, cierra el navegador de golpe) deja
+     * de recibir leads nuevos igual, sin depender de que alguien más esté
+     * navegando la app para disparar el barrido oportunista de las rutas.
+     */
+    const { reconcileStalePresenceThrottled } = await import(
+      "@/services/advisor-presence-sweep"
+    );
+    setInterval(() => {
+      reconcileStalePresenceThrottled().catch((err) => {
+        console.error("[instrumentation] reconcileStalePresenceThrottled falló", err);
+      });
+    }, 60_000);
   }
 }
