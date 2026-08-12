@@ -38,10 +38,16 @@ type LeadIntakePayload = {
 };
 
 function resumenLead(payload: LeadIntakePayload): string {
-  const lineas = [`🎯 Lead capturado por campaña${payload.campaign_name ? ` "${payload.campaign_name}"` : ""}`];
+  // El nombre real de la campaña/plantilla (payload.campaign_name) queda
+  // guardado en lead_conversations.campaign_name para reportes, pero acá se
+  // muestra siempre "Masivos DuMo" -- a la asesora no le sirve saber si fue
+  // masivo_wom o cualquier otra plantilla de prueba, solo que es un lead de
+  // campaña masiva.
+  const lineas = ["🎯 Lead capturado por la campaña Masivos DuMo"];
   if (payload.rut) lineas.push(`📄 RUT: ${payload.rut}`);
   if (payload.phone_provided) lineas.push(`📱 Teléfono: ${payload.phone_provided}`);
   if (payload.current_company_raw) lineas.push(`📡 Compañía actual: ${payload.current_company_raw}`);
+  lineas.push("", "Por favor, envíale un mensaje de saludo inicial y continúa la gestión de este lead.");
   return lineas.join("\n");
 }
 
