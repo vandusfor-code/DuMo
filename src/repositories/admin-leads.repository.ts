@@ -18,12 +18,7 @@ import { formatChatTime } from "@/lib/format";
 import { resolveConversationChannel } from "@/lib/conversation-channel";
 import { isWebQrConversation } from "@/lib/web-qr/conversation-id";
 import { formatWhatsAppDisplayPhone, isLikelyWhatsAppLid } from "@/lib/whatsapp/phone";
-import {
-  ADVISOR_ONLINE_WINDOW_MINUTES,
-  ADVISOR_PRESENCE_LABELS,
-  advisorReceivesLeads,
-  type AdvisorPresenceStatus,
-} from "@/lib/advisor-presence";
+import { ADVISOR_ONLINE_WINDOW_MINUTES } from "@/lib/advisor-presence";
 import { withLatency } from "@/lib/mock";
 import { mapConversationTipification } from "@/lib/conversation-tipification";
 import { DEFAULT_COMPANY_ID } from "@/types/tenant";
@@ -210,17 +205,11 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
     const advisor = await getAuthRepository().findById(input.advisorId);
     if (!advisor) throw new Error("Asesora no encontrada");
 
-    const presenceRows = await sql<{ presence_status: string }[]>`
-      SELECT presence_status FROM users WHERE id = ${advisor.id} LIMIT 1
-    `;
-    const presence = (presenceRows[0]?.presence_status ?? "disponible") as AdvisorPresenceStatus;
-    if (!advisorReceivesLeads(presence)) {
-      const label = ADVISOR_PRESENCE_LABELS[presence] ?? presence;
-      throw new Error(
-        `No se puede asignar manualmente: la asesora está en estado "${label}".`,
-      );
-    }
-
+    // La asignación manual es una decisión explícita del admin — a
+    // diferencia del round-robin automático, no se bloquea por el estado de
+    // presencia (baño/almuerzo/desconectado). El admin puede tener razones
+    // válidas para asignarle un chat a alguien aunque no esté "disponible"
+    // en este momento.
     await sql`
       UPDATE lead_conversations SET
         assigned_advisor_id = ${advisor.id},
