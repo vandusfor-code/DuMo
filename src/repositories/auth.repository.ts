@@ -41,6 +41,7 @@ function mapRow(r: {
   company_id?: string | null;
   monthly_sales_goal?: number | null;
   token_version?: number | null;
+  presence_status?: string | null;
 }): AuthUser {
   return {
     id: r.id,
@@ -56,6 +57,7 @@ function mapRow(r: {
         ? Number(r.monthly_sales_goal)
         : null,
     tokenVersion: Number(r.token_version ?? 0) || 0,
+    presenceStatus: r.presence_status ?? null,
   };
 }
 
@@ -129,22 +131,19 @@ class PostgresAuthRepository implements AuthRepository {
     if (!row || !verifyPassword(password, row.password_hash)) return null;
 
     try {
-      await sql`
-        UPDATE users SET
-          presence_status = CASE
-            WHEN presence_status = 'desconectado' THEN 'disponible'
-            ELSE presence_status
-          END,
-          last_seen_at = now()
-        WHERE id = ${row.id}
-      `;
+      // Antes esto volteaba presence_status de 'desconectado' a 'disponible'
+      // en cada login — toda asesora quedaba "conectada" automáticamente al
+      // entrar, saltándose el requisito de que ellas mismas se marquen
+      // disponibles a mano. Ahora el login SOLO actualiza last_seen_at; el
+      // estado operativo nunca cambia sin que la asesora lo elija.
+      await sql`UPDATE users SET last_seen_at = now() WHERE id = ${row.id}`;
     } catch (err) {
       // No bloquear login si la migración de presencia aún no corrió en prod.
       console.error("[authenticate] presence touch failed", err);
     }
 
     const refreshed = await sql`
-      SELECT id, username, email, name, role, active, avatar_url, company_id, token_version
+      SELECT id, username, email, name, role, active, avatar_url, company_id, token_version, presence_status
       FROM users WHERE id = ${row.id} LIMIT 1
     `;
     const userRow = refreshed[0];
@@ -156,7 +155,7 @@ class PostgresAuthRepository implements AuthRepository {
     const sql = requireSql();
     const rows = await withQueryTimeout(
       sql`
-        SELECT id, username, email, name, role, active, avatar_url, company_id, monthly_sales_goal, token_version
+        SELECT id, username, email, name, role, active, avatar_url, company_id, monthly_sales_goal, token_version, presence_status
         FROM users WHERE id = ${id} LIMIT 1
       `,
       5_000,
@@ -169,7 +168,7 @@ class PostgresAuthRepository implements AuthRepository {
   async listUsers(): Promise<AuthUser[]> {
     const sql = requireSql();
     const rows = await withDbRetry(() => sql`
-      SELECT id, username, email, name, role, active, avatar_url, company_id, monthly_sales_goal, token_version
+      SELECT id, username, email, name, role, active, avatar_url, company_id, monthly_sales_goal, token_version, presence_status
       FROM users
       ORDER BY name ASC
     `);
@@ -203,7 +202,7 @@ class PostgresAuthRepository implements AuthRepository {
 
     const id = `usr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     await sql`
-      INSERT INTO users (id, username, email, password_hash, name, role, active, avatar_url, company_id)
+      INSERT INTO users (id, username, email, password_hash, name, role, active, avatar_url, company_id, presence_status)
       VALUES (
         ${id},
         ${input.username.trim()},
@@ -213,7 +212,8 @@ class PostgresAuthRepository implements AuthRepository {
         ${input.role},
         ${input.active ?? true},
         '',
-        ${DEFAULT_COMPANY_ID}
+        ${DEFAULT_COMPANY_ID},
+        'desconectado'
       )
     `;
     const user = await this.findById(id);
@@ -351,5 +351,6 @@ export function authUserToPublicUser(user: AuthUser) {
     roleKey: user.role,
     avatarUrl: user.avatarUrl,
     active: user.active,
+    presenceStatus: user.presenceStatus ?? null,
   };
 }

@@ -20,6 +20,8 @@ export interface AuthUser {
   monthlySalesGoal?: number | null;
   /** Contador de revocación de sesión — incrementa al forzar desconexión. */
   tokenVersion?: number;
+  /** Estado operativo (solo asesoras): 'disponible' | 'bano' | 'almuerzo' | 'desconectado'. */
+  presenceStatus?: string | null;
 }
 
 export interface LoginResult {

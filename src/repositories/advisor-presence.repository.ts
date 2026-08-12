@@ -14,6 +14,7 @@ export interface AdvisorPresenceRepository {
     advisorId: string,
     status: AdvisorPresenceStatus,
     updatedBy: string,
+    options?: { revokeSessionOnDisconnect?: boolean },
   ): Promise<{
     presenceStatus: AdvisorPresenceStatus;
     updatedAt: string;
@@ -248,6 +249,7 @@ class PostgresAdvisorPresenceRepository implements AdvisorPresenceRepository {
     advisorId: string,
     status: AdvisorPresenceStatus,
     updatedBy: string,
+    options?: { revokeSessionOnDisconnect?: boolean },
   ): Promise<{
     presenceStatus: AdvisorPresenceStatus;
     updatedAt: string;
@@ -256,6 +258,12 @@ class PostgresAdvisorPresenceRepository implements AdvisorPresenceRepository {
   }> {
     await ensureSchema();
     const sql = requireSql();
+    // Por defecto (panel Live del admin forzando a otra asesora) SÍ revoca
+    // la sesión — es la forma de "desconectar" a alguien de verdad. Cuando
+    // la propia asesora se marca "Desconectado" desde su selector, NO debe
+    // cerrarle la sesión — solo deja de recibir leads nuevos, sigue
+    // trabajando sus chats ya asignados.
+    const revokeOnDisconnect = options?.revokeSessionOnDisconnect ?? true;
     const rows = await withDbRetry(() =>
       sql<
         {
@@ -269,7 +277,7 @@ class PostgresAdvisorPresenceRepository implements AdvisorPresenceRepository {
             presence_updated_at = now(),
             presence_updated_by = ${updatedBy},
             token_version = CASE
-              WHEN ${status} = 'desconectado' THEN token_version + 1
+              WHEN ${status} = 'desconectado' AND ${revokeOnDisconnect} THEN token_version + 1
               ELSE token_version
             END
         WHERE id = ${advisorId}
@@ -285,7 +293,7 @@ class PostgresAdvisorPresenceRepository implements AdvisorPresenceRepository {
           ? row.presence_updated_at.toISOString()
           : new Date(String(row.presence_updated_at)).toISOString(),
       tokenVersion: Number(row.token_version ?? 0),
-      sessionRevoked: status === "desconectado",
+      sessionRevoked: status === "desconectado" && revokeOnDisconnect,
     };
   }
 }

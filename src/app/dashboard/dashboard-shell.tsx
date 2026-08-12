@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { APP_SIDEBAR_OFFSET_CLASS } from "@/components/layout/app-shell.constants";
 import { Sidebar } from "@/components/layout/sidebar";
 import { AdvisorMessageNotifications } from "@/components/messaging/message-notification-listener";
+import { AdvisorPresenceSelect } from "@/components/leads/advisor-presence-select";
 
 /** Shell del área asesora: sidebar fijo + contenido con separación lateral. */
 export function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -29,6 +30,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     <div className={fullBleed ? "h-dvh overflow-hidden bg-canvas" : "min-h-screen bg-canvas"}>
       <AdvisorMessageNotifications />
       <Sidebar />
+      <div className="fixed right-[88px] top-4 z-40">
+        <AdvisorPresenceSelect />
+      </div>
       <main
         className={
           fullBleed

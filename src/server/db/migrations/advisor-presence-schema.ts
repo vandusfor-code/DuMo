@@ -18,6 +18,12 @@ export async function runAdvisorPresenceMigrations(tx: MigrationSql): Promise<vo
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS presence_status text NOT NULL DEFAULT 'disponible'
   `;
+  // Cuentas nuevas arrancan desconectadas — deben marcarse disponibles a
+  // mano. No toca el valor de asesoras ya existentes (evita "apagarlas" en
+  // silencio con este deploy); solo cambia el default para INSERTs futuros.
+  await tx`
+    ALTER TABLE users ALTER COLUMN presence_status SET DEFAULT 'desconectado'
+  `;
   await tx`
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS presence_updated_at timestamptz

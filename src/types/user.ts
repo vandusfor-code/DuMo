@@ -5,4 +5,6 @@ export interface User {
   email: string;
   username?: string;
   avatarUrl: string;
+  /** Estado operativo (solo asesoras): 'disponible' | 'bano' | 'almuerzo' | 'desconectado'. */
+  presenceStatus?: string | null;
 }

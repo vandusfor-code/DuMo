@@ -37,6 +37,7 @@ export async function PATCH(request: NextRequest) {
       scope.userId,
       status,
       scope.userId,
+      { revokeSessionOnDisconnect: false },
     );
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {

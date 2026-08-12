@@ -13,6 +13,7 @@ export const adminLiveService = {
     advisorId: string,
     rawStatus: string,
     updatedBy: string,
+    options?: { revokeSessionOnDisconnect?: boolean },
   ): Promise<AdvisorPresenceUpdateResult> {
     const status = rawStatus.trim().toLowerCase();
     if (!isAdvisorPresenceStatus(status)) {
@@ -28,6 +29,7 @@ export const adminLiveService = {
       advisorId,
       status,
       updatedBy,
+      options,
     );
 
     if (result.sessionRevoked) {
