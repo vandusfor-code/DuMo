@@ -3,6 +3,7 @@ import { withAdminFallback } from "@/lib/admin-api-fallbacks";
 import { requireAdminSession } from "@/lib/require-admin";
 import { authService } from "@/services/auth.service";
 import { adminLeadsService } from "@/services/admin-leads.service";
+import { getSlaAutoReassignSettings, setSlaAutoReassignEnabled } from "@/lib/sla-settings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +19,7 @@ export async function GET(request: NextRequest) {
   const conversationId = p.get("conversationId");
   const advisors = p.get("advisors");
   const settings = p.get("settings");
+  const slaSettings = p.get("slaSettings");
 
   try {
     if (settings === "1") {
@@ -25,6 +27,14 @@ export async function GET(request: NextRequest) {
         () => adminLeadsService.getAutoAssignSettings(),
         { enabled: true, lastAdvisorIndex: 0 },
         "GET /api/admin/leads settings",
+      );
+      return NextResponse.json(data);
+    }
+    if (slaSettings === "1") {
+      const data = await withAdminFallback(
+        () => getSlaAutoReassignSettings(),
+        { enabled: true },
+        "GET /api/admin/leads slaSettings",
       );
       return NextResponse.json(data);
     }
@@ -122,6 +132,10 @@ export async function POST(request: NextRequest) {
     }
     if (body.action === "setAutoAssign") {
       const settings = await adminLeadsService.setAutoAssignEnabled(Boolean(body.enabled));
+      return NextResponse.json(settings);
+    }
+    if (body.action === "setSlaAutoReassign") {
+      const settings = await setSlaAutoReassignEnabled(Boolean(body.enabled));
       return NextResponse.json(settings);
     }
     const lead = await adminLeadsService.saveLead(body);

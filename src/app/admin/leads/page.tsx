@@ -22,6 +22,8 @@ import {
   useDeleteAllConversations,
   useDeleteConversation,
   useSetAutoAssign,
+  useSlaAutoReassignSettings,
+  useSetSlaAutoReassign,
 } from "@/hooks/use-admin-leads";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +45,8 @@ function AdminLeadsPageContent() {
   const { data: advisors = [] } = useAdminAdvisors();
   const { data: autoAssign } = useAutoAssignSettings();
   const setAutoAssign = useSetAutoAssign();
+  const { data: slaAutoReassign } = useSlaAutoReassignSettings();
+  const setSlaAutoReassign = useSetSlaAutoReassign();
   const [selectedId, setSelectedId] = useState<string | null>(conversationFromUrl);
   const [listCollapsed, setListCollapsed] = useState(false);
   const assign = useAssignAdvisor();
@@ -116,11 +120,14 @@ function AdminLeadsPageContent() {
             selectedId={selectedId}
             autoAssignEnabled={autoAssign?.enabled ?? false}
             autoAssignLoading={setAutoAssign.isPending}
+            slaAutoReassignEnabled={slaAutoReassign?.enabled ?? false}
+            slaAutoReassignLoading={setSlaAutoReassign.isPending}
             onSelect={setSelectedId}
             onAssign={(conversationId, advisorId) =>
               assign.mutate({ conversationId, advisorId })
             }
             onToggleAutoAssign={(enabled) => setAutoAssign.mutate(enabled)}
+            onToggleSlaAutoReassign={(enabled) => setSlaAutoReassign.mutate(enabled)}
             collapsed={listCollapsed}
             onCollapsedChange={handleListCollapsed}
           />

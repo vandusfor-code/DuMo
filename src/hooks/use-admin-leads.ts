@@ -153,6 +153,25 @@ export function useSetAutoAssign() {
   });
 }
 
+export function useSlaAutoReassignSettings() {
+  return useQuery({
+    queryKey: ["admin", "leads", "sla-auto-reassign"],
+    queryFn: () => apiGet<{ enabled: boolean }>("/api/admin/leads?slaSettings=1"),
+  });
+}
+
+export function useSetSlaAutoReassign() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) =>
+      apiPost<{ enabled: boolean }>("/api/admin/leads", {
+        action: "setSlaAutoReassign",
+        enabled,
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "leads", "sla-auto-reassign"] }),
+  });
+}
+
 export function useAdminSendMessage(conversationId: string | null) {
   const qc = useQueryClient();
   return useMutation({

@@ -11,6 +11,7 @@ import {
   type ResponseSlaScenario,
 } from "@/types/response-sla";
 import { resolveConversationChannel } from "@/lib/conversation-channel";
+import { isSlaAutoReassignEnabled } from "@/lib/sla-settings";
 
 /**
  * RESP-1 — se llama al FINAL de `leadsService.receiveMessage()`, después de
@@ -18,6 +19,10 @@ import { resolveConversationChannel } from "@/lib/conversation-channel";
  * P2 siempre se resuelve primero, el timer se arma después con el estado ya
  * actualizado). Si no hay asesora asignada tras ese proceso, no se arma nada
  * — no hay a quién responsabilizar.
+ *
+ * Interruptor real (admin, "Alerta de respuesta automática"): si está
+ * apagado, no se arma ningún timer nuevo — corte total, igual que
+ * "Asignación automática" apagada.
  */
 export async function armTimerAfterInboundMessage(input: {
   conversationId: string;
@@ -25,6 +30,7 @@ export async function armTimerAfterInboundMessage(input: {
   messageId: string;
 }): Promise<void> {
   if (!input.assignedAdvisorId) return;
+  if (!(await isSlaAutoReassignEnabled())) return;
 
   const repo = getResponseSlaRepository();
   const hadPriorReply = await repo.hasPriorOutboundMessage(input.conversationId);
@@ -147,6 +153,11 @@ export async function escalateOrReassignTimer(conversationId: string): Promise<v
  * reprograma el siguiente chequeo diferido.
  */
 export async function reconcileConversationTimer(conversationId: string): Promise<void> {
+  // Interruptor real: si está apagado, ningún timer activo avanza — se
+  // congelan tal como estén hasta que se reactive. Corte total, no solo
+  // "dejar de armar nuevos".
+  if (!(await isSlaAutoReassignEnabled())) return;
+
   const repo = getResponseSlaRepository();
 
   // Escenario C ya activo: no pasa por la máquina de estados de umbrales de

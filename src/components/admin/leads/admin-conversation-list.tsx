@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, SquarePen, Zap } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, SquarePen, Zap } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConversationSearch } from "@/components/leads/conversation-search";
 import { ConversationAvatarItem } from "@/components/leads/conversation-avatar-item";
@@ -32,9 +32,12 @@ export function AdminConversationList({
   selectedId,
   autoAssignEnabled,
   autoAssignLoading,
+  slaAutoReassignEnabled,
+  slaAutoReassignLoading,
   onSelect,
   onAssign,
   onToggleAutoAssign,
+  onToggleSlaAutoReassign,
   collapsed = false,
   onCollapsedChange,
 }: {
@@ -44,9 +47,12 @@ export function AdminConversationList({
   selectedId: string | null;
   autoAssignEnabled: boolean;
   autoAssignLoading?: boolean;
+  slaAutoReassignEnabled: boolean;
+  slaAutoReassignLoading?: boolean;
   onSelect: (id: string) => void;
   onAssign: (conversationId: string, advisorId: string) => void;
   onToggleAutoAssign: (enabled: boolean) => void;
+  onToggleSlaAutoReassign: (enabled: boolean) => void;
   collapsed?: boolean;
   onCollapsedChange?: (collapsed: boolean) => void;
 }) {
@@ -172,6 +178,43 @@ export function AdminConversationList({
                 className={cn(
                   "absolute top-0.5 size-5 rounded-full bg-white shadow transition-transform",
                   autoAssignEnabled ? "translate-x-5" : "translate-x-0.5",
+                )}
+              />
+            </span>
+          </button>
+
+          <button
+            type="button"
+            disabled={slaAutoReassignLoading}
+            onClick={() => onToggleSlaAutoReassign(!slaAutoReassignEnabled)}
+            className={cn(
+              "flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left transition-colors",
+              slaAutoReassignEnabled
+                ? "border-brand/30 bg-brand-soft"
+                : "border-line bg-canvas hover:bg-card",
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <AlertTriangle className={cn("size-4", slaAutoReassignEnabled ? "text-brand" : "text-muted")} />
+              <div>
+                <p className="text-[13px] font-semibold text-ink">Alerta de respuesta automática</p>
+                <p className="text-[11px] text-muted">
+                  {slaAutoReassignEnabled
+                    ? "Activa — avisa y reasigna chats sin responder"
+                    : "Inactiva — sin avisos ni reasignación automática"}
+                </p>
+              </div>
+            </div>
+            <span
+              className={cn(
+                "relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors",
+                slaAutoReassignEnabled ? "bg-brand" : "bg-line",
+              )}
+            >
+              <span
+                className={cn(
+                  "absolute top-0.5 size-5 rounded-full bg-white shadow transition-transform",
+                  slaAutoReassignEnabled ? "translate-x-5" : "translate-x-0.5",
                 )}
               />
             </span>
