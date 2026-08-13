@@ -60,6 +60,13 @@ export async function GET(request: NextRequest) {
             setTimeout(() => reject(new Error("GET /api/admin/leads messages timeout")), 12_000),
           ),
         ]);
+        // Igual que en /api/leads/conversations/[id]/messages: abrir el chat
+        // marca los mensajes como leídos. El admin nunca disparaba esto, así
+        // que el contador de no leídos se quedaba pegado aunque ya se hubiera
+        // respondido.
+        void adminLeadsService.markRead(conversationId).catch((err) => {
+          console.error("[GET /api/admin/leads messages] markRead", err);
+        });
         return NextResponse.json(data, {
           headers: { "Cache-Control": "no-store" },
         });

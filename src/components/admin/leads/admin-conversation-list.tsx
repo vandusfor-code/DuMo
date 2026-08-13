@@ -1,8 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, ChevronLeft, ChevronRight, SquarePen, Zap } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, SquarePen, Zap } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ConversationSearch } from "@/components/leads/conversation-search";
 import { ConversationAvatarItem } from "@/components/leads/conversation-avatar-item";
 import type { AdminAdvisor, AdminConversation, AdminLeadFilter } from "@/types/admin-lead";
@@ -10,6 +16,24 @@ import type { Conversation } from "@/types/conversation";
 import { AdminConversationFilters } from "./admin-conversation-filters";
 import { AdminConversationItem } from "./admin-conversation-item";
 import { cn } from "@/lib/utils";
+
+function ToggleSwitch({ on }: { on: boolean }) {
+  return (
+    <span
+      className={cn(
+        "relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors",
+        on ? "bg-brand" : "bg-line",
+      )}
+    >
+      <span
+        className={cn(
+          "absolute top-0.5 size-4 rounded-full bg-white shadow transition-transform",
+          on ? "translate-x-4" : "translate-x-0.5",
+        )}
+      />
+    </span>
+  );
+}
 
 function toConversation(c: AdminConversation): Conversation {
   return {
@@ -146,79 +170,65 @@ export function AdminConversationList({
             </button>
           </div>
 
-          <button
-            type="button"
-            disabled={autoAssignLoading}
-            onClick={() => onToggleAutoAssign(!autoAssignEnabled)}
-            className={cn(
-              "flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left transition-colors",
-              autoAssignEnabled
-                ? "border-brand/30 bg-brand-soft"
-                : "border-line bg-canvas hover:bg-card",
-            )}
-          >
-            <div className="flex items-center gap-2">
-              <Zap className={cn("size-4", autoAssignEnabled ? "text-brand" : "text-muted")} />
-              <div>
-                <p className="text-[13px] font-semibold text-ink">Asignación automática</p>
-                <p className="text-[11px] text-muted">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              disabled={autoAssignLoading || slaAutoReassignLoading}
+              className="flex w-full items-center justify-between rounded-xl border border-line bg-canvas px-3 py-2 text-left transition-colors hover:bg-card"
+            >
+              <span className="flex items-center gap-2 text-[13px] font-semibold text-ink">
+                <SlidersHorizontal className="size-4 text-muted" />
+                Automatizaciones
+                {autoAssignEnabled || slaAutoReassignEnabled ? (
+                  <span className="rounded-full bg-brand-soft px-1.5 py-0.5 text-[10px] font-semibold text-brand">
+                    {[autoAssignEnabled, slaAutoReassignEnabled].filter(Boolean).length}
+                  </span>
+                ) : null}
+              </span>
+              <ChevronDown className="size-4 text-muted" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-[300px]">
+              <DropdownMenuItem
+                onSelect={(e) => {
+                  e.preventDefault();
+                  onToggleAutoAssign(!autoAssignEnabled);
+                }}
+                className="flex-col items-stretch gap-0.5"
+              >
+                <span className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    <Zap className="size-4" />
+                    Asignación automática
+                  </span>
+                  <ToggleSwitch on={autoAssignEnabled} />
+                </span>
+                <span className="pl-[26px] text-[11px] font-normal text-muted">
                   {autoAssignEnabled
                     ? "Activa — nuevos chats van a asesoras conectadas"
                     : "Inactiva — asignación manual"}
-                </p>
-              </div>
-            </div>
-            <span
-              className={cn(
-                "relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors",
-                autoAssignEnabled ? "bg-brand" : "bg-line",
-              )}
-            >
-              <span
-                className={cn(
-                  "absolute top-0.5 size-5 rounded-full bg-white shadow transition-transform",
-                  autoAssignEnabled ? "translate-x-5" : "translate-x-0.5",
-                )}
-              />
-            </span>
-          </button>
-
-          <button
-            type="button"
-            disabled={slaAutoReassignLoading}
-            onClick={() => onToggleSlaAutoReassign(!slaAutoReassignEnabled)}
-            className={cn(
-              "flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left transition-colors",
-              slaAutoReassignEnabled
-                ? "border-brand/30 bg-brand-soft"
-                : "border-line bg-canvas hover:bg-card",
-            )}
-          >
-            <div className="flex items-center gap-2">
-              <AlertTriangle className={cn("size-4", slaAutoReassignEnabled ? "text-brand" : "text-muted")} />
-              <div>
-                <p className="text-[13px] font-semibold text-ink">Alerta de respuesta automática</p>
-                <p className="text-[11px] text-muted">
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={(e) => {
+                  e.preventDefault();
+                  onToggleSlaAutoReassign(!slaAutoReassignEnabled);
+                }}
+                className="flex-col items-stretch gap-0.5"
+              >
+                <span className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    <AlertTriangle className="size-4" />
+                    Alerta de respuesta automática
+                  </span>
+                  <ToggleSwitch on={slaAutoReassignEnabled} />
+                </span>
+                <span className="pl-[26px] text-[11px] font-normal text-muted">
                   {slaAutoReassignEnabled
                     ? "Activa — avisa y reasigna chats sin responder"
                     : "Inactiva — sin avisos ni reasignación automática"}
-                </p>
-              </div>
-            </div>
-            <span
-              className={cn(
-                "relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors",
-                slaAutoReassignEnabled ? "bg-brand" : "bg-line",
-              )}
-            >
-              <span
-                className={cn(
-                  "absolute top-0.5 size-5 rounded-full bg-white shadow transition-transform",
-                  slaAutoReassignEnabled ? "translate-x-5" : "translate-x-0.5",
-                )}
-              />
-            </span>
-          </button>
+                </span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <ConversationSearch value={search} onChange={setSearch} />
           <AdminConversationFilters value={filter} onChange={setFilter} counts={counts} />

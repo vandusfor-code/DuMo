@@ -17,8 +17,6 @@ import { commercialPlansService } from "@/services/commercial-plans.service";
 import { businessDateISO } from "@/lib/date";
 import { getDefaultClientProfile } from "@/data/mock/admin-leads.mock";
 import { ensureSchema, getSql, withDbRetry } from "@/server/db/client";
-import { tipificationService } from "@/services/tipification.service";
-import { DEFAULT_COMPANY_ID } from "@/types/tenant";
 import type postgres from "postgres";
 
 function buildLead(id: string, input: SaveLeadInput, advisorId: string): Lead {
@@ -68,19 +66,21 @@ export class PostgresLeadRepository {
       `,
     );
 
-    const isSaleFlow = await tipificationService.triggersSaleFlowForSlug(
-      DEFAULT_COMPANY_ID,
-      input.type,
+    // Cualquier gestión guardada significa que hubo contacto con el cliente —
+    // antes esto solo avanzaba admin_status en flujo de venta, así que
+    // tipificar y "Guardar y cerrar" en cualquier otro tipo (consulta,
+    // seguimiento, etc.) dejaba el lead pegado en "Nuevo" para siempre en el
+    // panel admin, aunque la conversación ya estuviera cerrada. Solo avanza
+    // desde nuevo/asignado — nunca retrocede un lead que ya iba más adelante
+    // en el embudo (negociación/convertido/perdido).
+    await withDbRetry(() =>
+      sql`
+        UPDATE lead_conversations
+        SET admin_status = ${"contactado"}
+        WHERE id = ${input.conversationId}
+          AND admin_status IN ('nuevo', 'asignado')
+      `,
     );
-    if (isSaleFlow) {
-      await withDbRetry(() =>
-        sql`
-          UPDATE lead_conversations
-          SET admin_status = ${"contactado"}
-          WHERE id = ${input.conversationId}
-        `,
-      );
-    }
 
     return buildLead(id, input, advisorId || "unknown");
   }
