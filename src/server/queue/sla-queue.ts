@@ -11,6 +11,7 @@ function getSlaQueue(): Queue<SlaCheckJob> | null {
   if (!connection) return null;
   if (!queue) {
     queue = new Queue<SlaCheckJob>(SLA_QUEUE_NAME, { connection });
+    queue.on("error", (err) => console.error("[sla-queue] error", err));
   }
   return queue;
 }

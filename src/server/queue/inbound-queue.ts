@@ -16,6 +16,7 @@ function getInboundQueue(): Queue | null {
   if (!connection) return null;
   if (!queue) {
     queue = new Queue(INBOUND_QUEUE_NAME, { connection });
+    queue.on("error", (err) => console.error("[inbound-queue] error", err));
   }
   return queue;
 }

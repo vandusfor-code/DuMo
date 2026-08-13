@@ -14,6 +14,7 @@ function getPcsValidationQueue(): Queue<PcsValidationJobData> | null {
   if (!connection) return null;
   if (!queue) {
     queue = new Queue<PcsValidationJobData>(PCS_VALIDATION_QUEUE_NAME, { connection });
+    queue.on("error", (err) => console.error("[pcs-validation-queue] error", err));
   }
   return queue;
 }
