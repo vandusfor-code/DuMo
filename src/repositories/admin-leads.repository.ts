@@ -122,7 +122,7 @@ function requireSql() {
 }
 
 class PostgresAdminLeadsRepository implements AdminLeadsRepository {
-  private async fetchRows(advisorId?: string): Promise<ConvRow[]> {
+  private async fetchRows(advisorId?: string, activeOnly?: boolean): Promise<ConvRow[]> {
     await ensureSchemaForRead();
     const sql = requireSql();
     return withQueryTimeout(
@@ -147,6 +147,7 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
               LEFT JOIN tipifications t
                 ON t.slug = lg.gestion_type AND t.company_id = ${DEFAULT_COMPANY_ID}
               WHERE c.assigned_advisor_id = ${advisorId}
+                AND (${activeOnly ?? false}::boolean IS FALSE OR c.inbox_state = 'active')
               ORDER BY c.last_message_at DESC
             `
           : sql<ConvRow[]>`
@@ -167,6 +168,7 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
               ) lg ON true
               LEFT JOIN tipifications t
                 ON t.slug = lg.gestion_type AND t.company_id = ${DEFAULT_COMPANY_ID}
+              WHERE (${activeOnly ?? false}::boolean IS FALSE OR c.inbox_state = 'active')
               ORDER BY c.last_message_at DESC
             `,
       ),
@@ -179,12 +181,18 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
     // con `after()` de Next. Lanzarlo sin esperar (void) dentro de una función
     // serverless puede cortarse al responder y dejar la conexión del pool en
     // mal estado, provocando fallos intermitentes en el listado.
-    const rows = await this.fetchRows();
+    //
+    // activeOnly=true: una vez "Guardar y cerrar" cierra la conversación
+    // (inbox_state='closed'), debe salir de la bandeja de trabajo — igual
+    // que ya pasa en la bandeja de asesora. Antes esta lista mostraba TODO
+    // para siempre, así que un chat cerrado se quedaba visible ahí sin
+    // ninguna diferencia salvo la etiqueta de estado.
+    const rows = await this.fetchRows(undefined, true);
     return rows.map(mapConversation);
   }
 
   async listConversationsForAdvisor(advisorId: string) {
-    const rows = await this.fetchRows(advisorId);
+    const rows = await this.fetchRows(advisorId, true);
     return rows.map(mapConversation);
   }
 
