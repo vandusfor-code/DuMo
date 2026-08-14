@@ -36,7 +36,7 @@ export type LeadsConversationUpdatedPayload = {
   conversationId: string;
   assignedAdvisorId?: string | null;
   unread?: number;
-  reason?: "message" | "read" | "assign" | "auto-assign" | "reopen" | "sla-resolved";
+  reason?: "message" | "read" | "assign" | "auto-assign" | "reopen" | "sla-resolved" | "tipify";
 };
 
 type IoLike = {

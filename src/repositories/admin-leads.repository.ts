@@ -132,7 +132,7 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
               SELECT
                 c.id, c.phone, c.customer_name, c.rut, c.last_message, c.last_message_at, c.last_message_direction,
                 c.unread, c.online, c.assigned_advisor_id, c.assigned_advisor_name, c.admin_status,
-                lg.gestion_type AS latest_tipification_slug,
+                COALESCE(NULLIF(c.current_tipification_slug, ''), lg.gestion_type) AS latest_tipification_slug,
                 t.name AS latest_tipification_name,
                 t.badge_bg,
                 t.badge_text
@@ -145,7 +145,7 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
                 LIMIT 1
               ) lg ON true
               LEFT JOIN tipifications t
-                ON t.slug = lg.gestion_type AND t.company_id = ${DEFAULT_COMPANY_ID}
+                ON t.slug = COALESCE(NULLIF(c.current_tipification_slug, ''), lg.gestion_type) AND t.company_id = ${DEFAULT_COMPANY_ID}
               WHERE c.assigned_advisor_id = ${advisorId}
                 AND (${activeOnly ?? false}::boolean IS FALSE OR c.inbox_state = 'active')
               ORDER BY c.last_message_at DESC
@@ -154,7 +154,7 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
               SELECT
                 c.id, c.phone, c.customer_name, c.rut, c.last_message, c.last_message_at, c.last_message_direction,
                 c.unread, c.online, c.assigned_advisor_id, c.assigned_advisor_name, c.admin_status,
-                lg.gestion_type AS latest_tipification_slug,
+                COALESCE(NULLIF(c.current_tipification_slug, ''), lg.gestion_type) AS latest_tipification_slug,
                 t.name AS latest_tipification_name,
                 t.badge_bg,
                 t.badge_text
@@ -167,7 +167,7 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
                 LIMIT 1
               ) lg ON true
               LEFT JOIN tipifications t
-                ON t.slug = lg.gestion_type AND t.company_id = ${DEFAULT_COMPANY_ID}
+                ON t.slug = COALESCE(NULLIF(c.current_tipification_slug, ''), lg.gestion_type) AND t.company_id = ${DEFAULT_COMPANY_ID}
               WHERE (${activeOnly ?? false}::boolean IS FALSE OR c.inbox_state = 'active')
               ORDER BY c.last_message_at DESC
             `,

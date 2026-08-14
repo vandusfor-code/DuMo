@@ -41,6 +41,10 @@ import {
   INBOX_LIFECYCLE_REQUIRED_COLUMNS,
   runInboxStateMigrations,
 } from "@/server/db/migrations/inbox-lifecycle-schema";
+import {
+  CONVERSATION_CURRENT_TIPIFICATION_REQUIRED_COLUMNS,
+  runConversationCurrentTipificationMigrations,
+} from "@/server/db/migrations/conversation-current-tipification-schema";
 import { runLeadFollowUpsMigrations } from "@/server/db/migrations/lead-follow-ups-schema";
 import {
   DULABS_CAMPAIGN_LEADS_REQUIRED_COLUMNS,
@@ -235,6 +239,7 @@ const REQUIRED_COLUMNS = [
   "lead_conversations.last_message_direction",
   "lead_conversations.wa_chat_jid",
   ...INBOX_LIFECYCLE_REQUIRED_COLUMNS,
+  ...CONVERSATION_CURRENT_TIPIFICATION_REQUIRED_COLUMNS,
   "lead_messages.conversation_id",
   "connected_numbers.access_token",
   "lead_notes.conversation_id",
@@ -363,6 +368,7 @@ async function ensureIncrementalMigrations(sql: Sql): Promise<void> {
     await runFolioNumberMigrations(sql);
     await runResponseSlaMigrations(sql);
     await runInboxStateMigrations(sql);
+    await runConversationCurrentTipificationMigrations(sql);
 
     await runLeadFollowUpsMigrations(sql);
     await runDulabsCampaignLeadsMigrations(sql);
@@ -471,6 +477,7 @@ async function runMigrations(sql: Sql) {
     await tx`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS last_message_direction text DEFAULT 'in'`;
     await tx`ALTER TABLE lead_conversations ADD COLUMN IF NOT EXISTS wa_chat_jid text`;
     await runInboxStateMigrations(tx);
+    await runConversationCurrentTipificationMigrations(tx);
     await runLeadFollowUpsMigrations(tx);
     await tx`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_at timestamptz`;
     await tx`ALTER TABLE users ADD COLUMN IF NOT EXISTS monthly_sales_goal integer`;

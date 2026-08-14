@@ -105,7 +105,7 @@ export function shouldCloseInboxAfterSave(input: {
     );
   }
 
-  return input.saveAction === "close" || input.saveAction === "tipify";
+  return input.saveAction === "close";
 }
 
 export type TipificationBehaviorCatalogItem = Pick<

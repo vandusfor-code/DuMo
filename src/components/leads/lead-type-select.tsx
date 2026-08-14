@@ -2,6 +2,7 @@
 
 import { Controller, useFormContext } from "react-hook-form";
 import { Loader2, Tag } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Select,
   SelectContent,
@@ -11,11 +12,16 @@ import {
 } from "@/components/ui/select";
 import { FormField } from "@/components/forms/form-field";
 import { useTipificationCatalog } from "@/hooks/use-tipification-catalog";
+import {
+  commitTipificationLabel,
+  persistConversationTipification,
+} from "@/hooks/use-pending-tipification-label";
 import type { LeadFormValues } from "@/types/lead-form";
 
-export function LeadTypeSelect() {
+export function LeadTypeSelect({ conversationId }: { conversationId: string }) {
   const { control } = useFormContext<LeadFormValues>();
-  const { options, isLoading, usingFallback } = useTipificationCatalog();
+  const { options, isLoading, usingFallback, catalog } = useTipificationCatalog();
+  const queryClient = useQueryClient();
 
   return (
     <FormField label="Tipificación">
@@ -23,7 +29,16 @@ export function LeadTypeSelect() {
         control={control}
         name="type"
         render={({ field }) => (
-          <Select value={field.value} onValueChange={field.onChange}>
+          <Select
+            value={field.value}
+            onValueChange={(slug) => {
+              field.onChange(slug);
+              commitTipificationLabel(queryClient, conversationId, slug, catalog);
+              void persistConversationTipification(conversationId, slug).catch((err) =>
+                console.error("[LeadTypeSelect] persist tipification", err),
+              );
+            }}
+          >
             <SelectTrigger inputSize>
               <span className="flex items-center gap-2">
                 {isLoading ? (

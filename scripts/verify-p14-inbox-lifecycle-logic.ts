@@ -56,6 +56,15 @@ assert(
   "consulta + guardar y cerrar → cierra bandeja",
 );
 
+assert(
+  !shouldCloseInboxAfterSave({
+    behavior: consultaBehavior,
+    saveAction: "tipify",
+    saleRegistered: false,
+  }),
+  "consulta + solo tipificar → NO cierra bandeja",
+);
+
 if (process.exitCode) {
   console.error("\nVerificación lógica P1.4 falló.");
   process.exit(1);

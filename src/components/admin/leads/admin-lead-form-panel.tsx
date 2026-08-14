@@ -207,7 +207,7 @@ export function AdminLeadFormPanel({
               <TabsContent value="gestion" className="space-y-4 outline-none">
                 <ClientCard />
                 <FolioNumberField required={isSaleFlow} />
-                <LeadTypeSelect />
+                <LeadTypeSelect conversationId={conversation.id} />
                 {!isSaleFlow ? <FollowUpDateField /> : null}
                 {isSaleFlow && <SaleDetails />}
                 <ObservationField

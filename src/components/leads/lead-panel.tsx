@@ -159,7 +159,7 @@ export function LeadPanel({
                   <StatusBadge variant="in_progress">En gestión</StatusBadge>
                   {type ? <DynamicTipificationBadge slug={type} /> : null}
                 </div>
-                <LeadTypeSelect />
+                <LeadTypeSelect conversationId={conversation.id} />
                 {!isSaleFlow ? <FollowUpDateField /> : null}
               </SectionCardBody>
             </SectionCard>

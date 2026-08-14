@@ -81,6 +81,13 @@ export class PostgresLeadRepository {
           AND admin_status IN ('nuevo', 'asignado')
       `,
     );
+    await withDbRetry(() =>
+      sql`
+        UPDATE lead_conversations
+        SET current_tipification_slug = ${input.type}
+        WHERE id = ${input.conversationId}
+      `,
+    );
 
     return buildLead(id, input, advisorId || "unknown");
   }

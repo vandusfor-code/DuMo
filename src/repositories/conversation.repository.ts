@@ -63,6 +63,7 @@ export interface ConversationRepository {
   /** phone_number_id registrados como conectados a DuMo (números activos). */
   listConnectedPhoneIds(): Promise<string[]>;
   registerNumber(number: ConnectedNumber): Promise<void>;
+  setCurrentTipificationSlug(conversationId: string, slug: string): Promise<void>;
 }
 
 /* ----------------------------- Mock ----------------------------- */
@@ -111,6 +112,9 @@ class MockConversationRepository implements ConversationRepository {
     return Promise.resolve([] as string[]);
   }
   registerNumber() {
+    return Promise.resolve();
+  }
+  setCurrentTipificationSlug() {
     return Promise.resolve();
   }
 }
@@ -211,7 +215,7 @@ class PostgresConversationRepository implements ConversationRepository {
           ? sql<ConvRow[]>`
               SELECT
                 c.*,
-                lg.gestion_type AS latest_tipification_slug,
+                COALESCE(NULLIF(c.current_tipification_slug, ''), lg.gestion_type) AS latest_tipification_slug,
                 t.name AS latest_tipification_name,
                 t.badge_bg,
                 t.badge_text,
@@ -227,7 +231,7 @@ class PostgresConversationRepository implements ConversationRepository {
                 LIMIT 1
               ) lg ON true
               LEFT JOIN tipifications t
-                ON t.slug = lg.gestion_type AND t.company_id = ${DEFAULT_COMPANY_ID}
+                ON t.slug = COALESCE(NULLIF(c.current_tipification_slug, ''), lg.gestion_type) AND t.company_id = ${DEFAULT_COMPANY_ID}
               LEFT JOIN response_sla_timers s
                 ON s.conversation_id = c.id AND s.status IN ('warning_sent', 'final_warning_sent', 'escalated_no_advisor')
               WHERE c.assigned_advisor_id = ${advisorId}
@@ -243,7 +247,7 @@ class PostgresConversationRepository implements ConversationRepository {
           : sql<ConvRow[]>`
               SELECT
                 c.*,
-                lg.gestion_type AS latest_tipification_slug,
+                COALESCE(NULLIF(c.current_tipification_slug, ''), lg.gestion_type) AS latest_tipification_slug,
                 t.name AS latest_tipification_name,
                 t.badge_bg,
                 t.badge_text,
@@ -259,7 +263,7 @@ class PostgresConversationRepository implements ConversationRepository {
                 LIMIT 1
               ) lg ON true
               LEFT JOIN tipifications t
-                ON t.slug = lg.gestion_type AND t.company_id = ${DEFAULT_COMPANY_ID}
+                ON t.slug = COALESCE(NULLIF(c.current_tipification_slug, ''), lg.gestion_type) AND t.company_id = ${DEFAULT_COMPANY_ID}
               LEFT JOIN response_sla_timers s
                 ON s.conversation_id = c.id AND s.status IN ('warning_sent', 'final_warning_sent', 'escalated_no_advisor')
               ORDER BY c.last_message_at DESC
@@ -390,6 +394,17 @@ class PostgresConversationRepository implements ConversationRepository {
       SELECT assigned_advisor_id FROM lead_conversations WHERE id = ${conversationId}
     `) as unknown as { assigned_advisor_id: string | null }[];
     return rows[0]?.assigned_advisor_id ?? null;
+  }
+
+  async setCurrentTipificationSlug(conversationId: string, slug: string): Promise<void> {
+    await ensureSchema();
+    const sql = getSql();
+    if (!sql) throw new Error("Base de datos no configurada");
+    await sql`
+      UPDATE lead_conversations
+      SET current_tipification_slug = ${slug}
+      WHERE id = ${conversationId}
+    `;
   }
 
   async updateMessageBodyIfPlaceholder(waMessageId: string, body: string): Promise<boolean> {

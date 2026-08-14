@@ -6,7 +6,7 @@ import type { Control } from "react-hook-form";
 import { useWatch } from "react-hook-form";
 import { useTipificationCatalog } from "@/hooks/use-tipification-catalog";
 import { getTipificationBadgeFromCatalog, getTipificationLabelFromCatalog } from "@/lib/tipification-utils";
-import { leadKeys } from "@/hooks/use-leads";
+import { authHeader } from "@/lib/auth/client-token";
 import type { LeadFormValues } from "@/types/lead-form";
 import type { ConversationTipification } from "@/types/conversation";
 import type { Conversation } from "@/types/conversation";
@@ -67,7 +67,7 @@ export function commitTipificationLabel(
 ) {
   const label = tipificationLabelFromSlug(slug, catalog);
   clearPendingTipificationLabel(queryClient, conversationId);
-  queryClient.setQueryData<Conversation[]>(leadKeys.conversations, (prev) =>
+  queryClient.setQueryData<Conversation[]>(["leads", "conversations"], (prev) =>
     patchTipificationInList(prev, conversationId, label),
   );
   queryClient.setQueryData<AdminConversation[]>(["admin", "leads", "conversations"], (prev) =>
@@ -85,9 +85,31 @@ export function useDisplayTipification(conversation: {
     queryFn: (): ConversationTipification | null => null,
     staleTime: Infinity,
     gcTime: 30 * 60_000,
-    initialData: null,
+    enabled: false,
   });
   return pending ?? conversation.latestTipification ?? null;
+}
+
+export async function persistConversationTipification(
+  conversationId: string,
+  slug: string,
+): Promise<void> {
+  const res = await fetch(
+    `/api/leads/conversations/${encodeURIComponent(conversationId)}/tipification`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...authHeader(),
+      },
+      body: JSON.stringify({ slug }),
+    },
+  );
+  if (!res.ok) {
+    throw new Error("No se pudo guardar la tipificación.");
+  }
 }
 
 /** Sincroniza el dropdown de tipificación con la etiqueta en la lista lateral. */
