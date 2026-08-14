@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, SquarePen, UserRound, Zap } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, SquarePen, Tags, UserRound, Zap } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
@@ -90,18 +90,38 @@ export function AdminConversationList({
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<AdminLeadFilter>("all");
   const [advisorFilter, setAdvisorFilter] = useState<string>("all");
+  const [tipificationFilter, setTipificationFilter] = useState<string>("all");
 
-  const byAdvisor = useMemo(() => {
-    if (advisorFilter === "all") return conversations;
-    if (advisorFilter === "unassigned") {
-      return conversations.filter((c) => !c.assignedAdvisor);
+  const tipificationOptions = useMemo(() => {
+    const bySlug = new Map<string, string>();
+    for (const c of conversations) {
+      const tip = c.latestTipification;
+      if (!tip?.slug) continue;
+      if (!bySlug.has(tip.slug)) bySlug.set(tip.slug, tip.name);
     }
-    return conversations.filter((c) => c.assignedAdvisor?.id === advisorFilter);
-  }, [conversations, advisorFilter]);
+    return [...bySlug.entries()]
+      .map(([slug, name]) => ({ slug, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, "es"));
+  }, [conversations]);
+
+  const scoped = useMemo(() => {
+    return conversations.filter((c) => {
+      const matchesAdvisor =
+        advisorFilter === "all" ||
+        (advisorFilter === "unassigned"
+          ? !c.assignedAdvisor
+          : c.assignedAdvisor?.id === advisorFilter);
+      const slug = c.latestTipification?.slug;
+      const matchesTip =
+        tipificationFilter === "all" ||
+        (tipificationFilter === "none" ? !slug : slug === tipificationFilter);
+      return matchesAdvisor && matchesTip;
+    });
+  }, [conversations, advisorFilter, tipificationFilter]);
 
   const counts = useMemo(() => {
     const base: Record<AdminLeadFilter, number> = {
-      all: byAdvisor.length,
+      all: scoped.length,
       nuevo: 0,
       asignado: 0,
       contactado: 0,
@@ -109,13 +129,13 @@ export function AdminConversationList({
       convertido: 0,
       perdido: 0,
     };
-    for (const c of byAdvisor) base[c.status] += 1;
+    for (const c of scoped) base[c.status] += 1;
     return base;
-  }, [byAdvisor]);
+  }, [scoped]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return byAdvisor.filter((c) => {
+    return scoped.filter((c) => {
       const matchesFilter = filter === "all" || c.status === filter;
       const matchesSearch =
         !q ||
@@ -125,7 +145,7 @@ export function AdminConversationList({
         (c.assignedAdvisor?.name.toLowerCase().includes(q) ?? false);
       return matchesFilter && matchesSearch;
     });
-  }, [byAdvisor, search, filter]);
+  }, [scoped, search, filter]);
 
   const listBody = isLoading ? (
     collapsed ? (
@@ -248,26 +268,53 @@ export function AdminConversationList({
 
           <ConversationSearch value={search} onChange={setSearch} />
 
-          <Select value={advisorFilter} onValueChange={setAdvisorFilter}>
-            <SelectTrigger
-              aria-label="Filtrar por asesora"
-              className="h-auto rounded-xl border-line bg-canvas px-3 py-2 text-[13px] font-semibold"
-            >
-              <span className="flex min-w-0 items-center gap-2">
-                <UserRound className="size-4 shrink-0 text-muted" />
-                <SelectValue placeholder="Todas las asesoras" />
-              </span>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas las asesoras</SelectItem>
-              <SelectItem value="unassigned">Sin asignar</SelectItem>
-              {advisors.map((a) => (
-                <SelectItem key={a.id} value={a.id}>
-                  {a.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="grid grid-cols-2 gap-2">
+            <Select value={advisorFilter} onValueChange={setAdvisorFilter}>
+              <SelectTrigger
+                aria-label="Filtrar por asesora"
+                className="h-auto min-w-0 rounded-xl border-line bg-canvas px-2.5 py-2 text-[13px] font-semibold"
+              >
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <UserRound className="size-4 shrink-0 text-muted" />
+                  <span className="min-w-0 truncate">
+                    <SelectValue placeholder="Asesoras" />
+                  </span>
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las asesoras</SelectItem>
+                <SelectItem value="unassigned">Sin asignar</SelectItem>
+                {advisors.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={tipificationFilter} onValueChange={setTipificationFilter}>
+              <SelectTrigger
+                aria-label="Filtrar por tipificación"
+                className="h-auto min-w-0 rounded-xl border-line bg-canvas px-2.5 py-2 text-[13px] font-semibold"
+              >
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <Tags className="size-4 shrink-0 text-muted" />
+                  <span className="min-w-0 truncate">
+                    <SelectValue placeholder="Tipificaciones" />
+                  </span>
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las tipificaciones</SelectItem>
+                <SelectItem value="none">Sin tipificar</SelectItem>
+                {tipificationOptions.map((t) => (
+                  <SelectItem key={t.slug} value={t.slug}>
+                    {t.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           <AdminConversationFilters value={filter} onChange={setFilter} counts={counts} />
         </div>
