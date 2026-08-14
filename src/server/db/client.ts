@@ -97,10 +97,18 @@ export function getSql(): Sql | null {
       }
     },
     // Varias conexiones por instancia: la app hace consultas concurrentes
-    // (polling de conversaciones + mensajes + markRead + perfil). Con max:1 se
-    // encolaban todas en una sola conexión y bajo latencia de Neon se
-    // congestionaban hasta el timeout. Requiere la URI con pooler de Neon.
-    max: Number(process.env.DB_POOL_MAX ?? 3) || 3,
+    // (polling de conversaciones + mensajes + markRead + perfil, más los
+    // workers de BullMQ y los barridos periódicos). Con solo 3 conexiones
+    // compartidas por TODO el proceso (único servidor persistente en
+    // Railway, no serverless), cualquier ráfaga real de varias asesoras +
+    // admin a la vez encolaba consultas hasta que alguna superaba el
+    // timeout de 12s de las rutas — eso es "no se pudo cargar la bandeja"
+    // intermitente reportado en producción. El servidor de Postgres actual
+    // (Railway) reporta max_connections=100 y solo ~4 en uso en operación
+    // normal, así que 3 era un límite autoimpuesto sin relación con la
+    // capacidad real de la base — no con el pooler de Neon al que refería
+    // el comentario original de esta constante, ya migrado.
+    max: Number(process.env.DB_POOL_MAX ?? 15) || 15,
     idle_timeout: 20,
     connect_timeout: 15,
     max_lifetime: 60 * 5,
