@@ -20,10 +20,16 @@ export class AdvisorFetchError extends Error {
 }
 
 /**
- * REGLA: la sesión SOLO se cierra cuando el usuario pulsa "Cerrar sesión".
- * Nunca redirigimos al login desde aquí — un 401/403 puntual (o un fallo
- * transitorio) no debe sacar a nadie de la aplicación. Se avisa, se reintenta
- * y se conservan los últimos datos buenos.
+ * REGLA: la sesión SOLO se cierra cuando el usuario pulsa "Cerrar sesión" —
+ * salvo 401. Un 403 puntual (u otro fallo transitorio) no debe sacar a nadie
+ * de la aplicación, así que ahí se avisa y se reintenta. Pero un 401 es la
+ * cookie fallando la verificación de firma/expiración/token_version en el
+ * servidor — eso NUNCA se arregla solo reintentando con la misma cookie, así
+ * que dejarlo "reintentando…" para siempre deja a la asesora con la bandeja
+ * rota sin ninguna pista de que el arreglo es cerrar sesión y volver a
+ * entrar. Antes de esto, una sesión revocada mientras la pestaña estaba
+ * cerrada (se pierde el push de "session:revoked" por socket) dejaba a la
+ * asesora atascada indefinidamente viendo "revisa tu conexión".
  */
 export async function advisorApiGet<T>(url: string, timeoutMs = 15_000): Promise<T> {
   const controller = new AbortController();
@@ -38,9 +44,12 @@ export async function advisorApiGet<T>(url: string, timeoutMs = 15_000): Promise
       signal: controller.signal,
       cache: "no-store",
     });
+    if (res.status === 401) {
+      const { forceSessionLogout } = await import("@/lib/auth/force-logout");
+      forceSessionLogout("expired");
+    }
     if (!res.ok) {
       // El código va en el mensaje: así se sabe de inmediato qué falló.
-      // NUNCA se redirige al login desde aquí.
       throw new AdvisorFetchError(
         `No se pudo cargar (error ${res.status}). Reintentando…`,
         res.status,
@@ -78,6 +87,10 @@ async function advisorFetch<T>(url: string, init: RequestInit & { timeoutMs?: nu
       signal: controller.signal,
       cache: "no-store",
     });
+    if (res.status === 401) {
+      const { forceSessionLogout } = await import("@/lib/auth/force-logout");
+      forceSessionLogout("expired");
+    }
     if (!res.ok) {
       // El backend a veces manda un mensaje específico y accionable (ej. folio
       // faltante/duplicado) en el body — sin esto, el usuario solo veía
