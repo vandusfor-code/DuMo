@@ -382,29 +382,28 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
   }
 
   /**
-   * Asigna conversaciones sin asesora de forma equitativa: cada chat va a
-   * quien tenga menos conversaciones activas en ese momento. Así una asesora
-   * con 10 no sigue recibiendo al mismo ritmo que otra con 200 — los nuevos
-   * van a la de menor carga hasta empatar.
+   * Asigna conversaciones nuevas a turno entre las asesoras del pool
+   * (mitad y mitad si hay dos). No usa el tamaño de la bandeja: si Carolina
+   * ya tiene 200 chats viejos y Mónica 100, los nuevos siguen alternando.
    *
-   * Solo entra en el pool quien tenga `presence_status = 'disponible'`.
+   * El turno es quien recibió una asignación hace más tiempo
+   * (`assigned_advisor_at`). Solo entra quien esté `disponible`.
    * `onlyOnline=true` limita además a last_seen en los últimos 10 min.
    */
-  private async assignPendingLeastLoad(
+  private async assignPendingRoundRobin(
     conversationId: string | null,
     onlyOnline: boolean,
   ): Promise<number> {
     const sql = requireSql();
     const rows = await withQueryTimeout(
       sql.begin(async (tx) => {
-        const advisors = await tx<{ id: string; name: string; load: number }[]>`
+        const advisors = await tx<{ id: string; name: string; last_assign: Date | null }[]>`
           SELECT u.id, u.name,
                  (
-                   SELECT count(*)::int
+                   SELECT max(c.assigned_advisor_at)
                    FROM lead_conversations c
                    WHERE c.assigned_advisor_id = u.id
-                     AND c.inbox_state = 'active'
-                 ) AS load
+                 ) AS last_assign
           FROM users u
           WHERE u.role = 'asesora' AND u.active = true
             AND u.presence_status = 'disponible'
@@ -435,21 +434,23 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
             `;
         if (pending.length === 0) return [] as { id: string; assigned_advisor_id: string | null }[];
 
-        const loads = advisors.map((a) => ({
+        const roster = advisors.map((a) => ({
           id: a.id,
           name: a.name,
-          load: Number(a.load) || 0,
+          lastAssign: a.last_assign ? new Date(a.last_assign).getTime() : 0,
         }));
         const convIds: string[] = [];
         const advisorIds: string[] = [];
         const advisorNames: string[] = [];
+        let seq = 0;
         for (const conv of pending) {
-          loads.sort((a, b) => a.load - b.load || a.name.localeCompare(b.name, "es"));
-          const pick = loads[0]!;
+          roster.sort((a, b) => a.lastAssign - b.lastAssign || a.name.localeCompare(b.name, "es"));
+          const pick = roster[0]!;
           convIds.push(conv.id);
           advisorIds.push(pick.id);
           advisorNames.push(pick.name);
-          pick.load += 1;
+          pick.lastAssign = Date.now() + seq;
+          seq += 1;
         }
 
         return tx<{ id: string; assigned_advisor_id: string | null }[]>`
@@ -494,7 +495,7 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
    * - Si nadie conectado: reparte entre todas las activas disponibles (offline).
    */
   private async autoAssignWithFallback(conversationId: string | null): Promise<number> {
-    const assignedOnline = await this.assignPendingLeastLoad(conversationId, true);
+    const assignedOnline = await this.assignPendingRoundRobin(conversationId, true);
     if (assignedOnline > 0) return assignedOnline;
 
     const sql = requireSql();
@@ -522,7 +523,7 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
       return 0;
     }
 
-    return this.assignPendingLeastLoad(conversationId, false);
+    return this.assignPendingRoundRobin(conversationId, false);
   }
 
   /** Asigna una conversación concreta (la llama el webhook al entrar un mensaje). */

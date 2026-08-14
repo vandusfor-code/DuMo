@@ -124,7 +124,7 @@ async function emitReopen(conversationId: string, assignedAdvisorId: string | nu
 /**
  * P2.1 + P2.2 — Inbound en conversación cerrada:
  * 1) tipificador original disponible → reasignar a ella;
- * 2) si no → auto-asignar a la asesora disponible con menor carga;
+ * 2) si no → auto-asignar a turno entre asesoras disponibles;
  * 3) si nadie disponible → reabrir sin asesora (pendiente hasta auto-assign).
  */
 export async function maybeReopenClosedConversationOnInbound(
