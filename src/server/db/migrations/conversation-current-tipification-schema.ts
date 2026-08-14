@@ -19,16 +19,4 @@ export async function runConversationCurrentTipificationMigrations(
     ALTER TABLE lead_conversations
     ADD COLUMN IF NOT EXISTS current_tipification_slug text
   `;
-
-  await tx`
-    UPDATE lead_conversations c
-    SET current_tipification_slug = lg.gestion_type
-    FROM (
-      SELECT DISTINCT ON (conversation_id) conversation_id, gestion_type
-      FROM lead_gestiones
-      ORDER BY conversation_id, created_at DESC
-    ) lg
-    WHERE c.id = lg.conversation_id
-      AND (c.current_tipification_slug IS NULL OR c.current_tipification_slug = '')
-  `;
 }
