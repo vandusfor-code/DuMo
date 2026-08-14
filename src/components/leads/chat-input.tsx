@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useSendMediaMessage, useSendMessage } from "@/hooks/use-leads";
 import { useAdminSendMediaMessage, useAdminSendMessage } from "@/hooks/use-admin-leads";
 import {
@@ -15,6 +15,7 @@ import {
   useVoiceRecorder,
   VoiceRecordingIndicator,
 } from "@/components/messaging/chat-composer";
+import { EmojiPicker, insertTextAtCursor } from "@/components/messaging/emoji-picker";
 import { PinnedQuickReplies } from "@/components/leads/premium/pinned-quick-replies";
 import type { ChatUiTheme } from "@/components/leads/premium/chat-theme";
 import { cn } from "@/lib/utils";
@@ -41,7 +42,9 @@ export function ChatInput({
   const isMessenger = isMessengerConversation(conversationId);
   const canRecord = true;
   const [value, setValue] = useState("");
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const textInputRef = useRef<HTMLInputElement>(null);
   const advisorSend = useSendMessage(conversationId);
   const advisorSendMedia = useSendMediaMessage(conversationId);
   const adminSend = useAdminSendMessage(conversationId);
@@ -60,6 +63,7 @@ export function ChatInput({
     onInsertText: (text) => {
       setValue(text);
       picker.closePicker();
+      setEmojiOpen(false);
     },
     onSent: () => {
       setValue("");
@@ -80,6 +84,7 @@ export function ChatInput({
 
   const submit = () => {
     if (isSending) return;
+    setEmojiOpen(false);
 
     if (voice.isRecording) {
       voice.stop();
@@ -122,6 +127,21 @@ export function ChatInput({
     if (enableTemplates) picker.onValueChange(next);
   };
 
+  const insertEmoji = (emoji: string) => {
+    if (media.attachment?.kind === "image") {
+      media.setCaption(`${media.attachment.caption}${emoji}`);
+      return;
+    }
+    const { next, caret } = insertTextAtCursor(value, emoji, textInputRef.current);
+    handleChange(next);
+    requestAnimationFrame(() => {
+      const el = textInputRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(caret, caret);
+    });
+  };
+
   return (
     <div
       className={cn(
@@ -147,6 +167,12 @@ export function ChatInput({
           }}
         />
       ) : null}
+
+      <EmojiPicker
+        open={emojiOpen}
+        onSelect={insertEmoji}
+        onClose={() => setEmojiOpen(false)}
+      />
 
       {media.attachment ? (
         <MediaAttachmentPreview
@@ -179,6 +205,13 @@ export function ChatInput({
         isRecording={voice.isRecording}
         onAttach={media.openFilePicker}
         onSubmit={submit}
+        onEmojiToggle={() => {
+          setEmojiOpen((open) => {
+            if (!open) picker.closePicker();
+            return !open;
+          });
+        }}
+        emojiOpen={emojiOpen}
         fileInputRef={media.fileInputRef}
         onFileSelected={handleMediaFile}
         dragActive={dragActive}
@@ -203,6 +236,7 @@ export function ChatInput({
         }}
       >
         <input
+          ref={textInputRef}
           value={value}
           onChange={(e) => handleChange(e.target.value)}
           onKeyDown={(e) => {

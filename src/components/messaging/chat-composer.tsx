@@ -300,6 +300,8 @@ export function ChatComposerControls({
   isRecording = false,
   onAttach,
   onSubmit,
+  onEmojiToggle,
+  emojiOpen = false,
   fileInputRef,
   onFileSelected,
   onPaste,
@@ -315,6 +317,8 @@ export function ChatComposerControls({
   isRecording?: boolean;
   onAttach: () => void;
   onSubmit: () => void;
+  onEmojiToggle?: () => void;
+  emojiOpen?: boolean;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   onFileSelected: (file: File) => void;
   onPaste: (e: React.ClipboardEvent) => void;
@@ -354,9 +358,13 @@ export function ChatComposerControls({
       <button
         type="button"
         aria-label="Emoji"
+        aria-pressed={emojiOpen}
+        onClick={onEmojiToggle}
+        disabled={isSending || isRecording || !onEmojiToggle}
         className={cn(
-          "grid place-items-center rounded-btn text-muted transition-colors duration-200 hover:bg-hover hover:text-ink",
+          "grid place-items-center rounded-btn text-muted transition-colors duration-200 hover:bg-hover hover:text-ink disabled:opacity-60",
           premium ? "size-10" : "size-9 hover:bg-brand-soft hover:text-brand",
+          emojiOpen && "bg-brand-soft text-brand",
         )}
       >
         <Smile className={premium ? "size-[18px]" : "size-5"} />
