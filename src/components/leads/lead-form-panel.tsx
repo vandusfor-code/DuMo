@@ -20,7 +20,6 @@ import { useTipificationCatalog } from "@/hooks/use-tipification-catalog";
 import {
   clearPendingTipificationLabel,
   commitTipificationLabel,
-  useSyncPendingTipificationLabel,
 } from "@/hooks/use-pending-tipification-label";
 import { useForm, FormProvider } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
@@ -39,8 +38,6 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
   const methods = useForm<LeadFormValues>({
     defaultValues: draftToFormValues({ conversation }),
   });
-
-  useSyncPendingTipificationLabel(conversation.id, methods.control);
 
   useEffect(() => {
     if (gestionDraft.isLoading) return;

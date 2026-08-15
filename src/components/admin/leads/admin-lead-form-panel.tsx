@@ -45,11 +45,7 @@ import {
 } from "@/lib/lead-save";
 import { validateLeadFormBeforeSave } from "@/lib/lead-form-validation";
 import { useSaleFlowType, useTipificationCatalog } from "@/hooks/use-tipification-catalog";
-import {
-  clearPendingTipificationLabel,
-  commitTipificationLabel,
-  useSyncPendingTipificationLabel,
-} from "@/hooks/use-pending-tipification-label";
+import { commitTipificationLabel } from "@/hooks/use-pending-tipification-label";
 import { useWatch } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 import { NEW_LEAD_TIPIFICATION_SLUG } from "@/lib/tipification-system";
@@ -89,7 +85,6 @@ export function AdminLeadFormPanel({
   const script = saveLead.data?.script ?? fetchedScript ?? null;
   const methods = useForm<LeadFormValues>({ defaultValues: defaultsFor(conversation) });
   const queryClient = useQueryClient();
-  useSyncPendingTipificationLabel(conversation.id, methods.control);
   const type = useWatch({ control: methods.control, name: "type" });
   const isSaleFlow = useSaleFlowType(type);
   const { triggersSaleFlow, catalog } = useTipificationCatalog();

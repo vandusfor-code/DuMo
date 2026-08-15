@@ -1,13 +1,8 @@
 "use client";
 
-import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
-import type { Control } from "react-hook-form";
-import { useWatch } from "react-hook-form";
-import { useTipificationCatalog } from "@/hooks/use-tipification-catalog";
+import { type QueryClient } from "@tanstack/react-query";
 import { getTipificationBadgeFromCatalog, getTipificationLabelFromCatalog } from "@/lib/tipification-utils";
 import { authHeader } from "@/lib/auth/client-token";
-import type { LeadFormValues } from "@/types/lead-form";
 import type { ConversationTipification } from "@/types/conversation";
 import type { Conversation } from "@/types/conversation";
 import type { AdminConversation } from "@/types/admin-lead";
@@ -75,19 +70,26 @@ export function commitTipificationLabel(
   );
 }
 
-/** Etiqueta visible: draft en gestión (dropdown) o última guardada en BD. */
+/**
+ * Etiqueta visible en la lista.
+ *
+ * Antes esto priorizaba una etiqueta "pending" en caché sobre el dato real
+ * de `conversation.latestTipification` — pero esa caché la fija
+ * useSyncPendingTipificationLabel() al montar el panel (o al elegir en el
+ * dropdown) y después queda pegada sin refrescarse mientras el panel siga
+ * montado, así que podía desincronizarse del valor real y mostrar una
+ * tipificación vieja/equivocada. commitTipificationLabel() YA escribe el
+ * valor nuevo directo en la caché de la lista al elegir en el dropdown o al
+ * guardar — instantáneo, sin necesitar esta capa "pending" aparte — así que
+ * confiar solo en `conversation.latestTipification` (que además ya viene de
+ * current_tipification_slug, que un mensaje nuevo no toca) es más simple y
+ * no se puede desincronizar.
+ */
 export function useDisplayTipification(conversation: {
   id: string;
   latestTipification?: ConversationTipification | null;
 }) {
-  const { data: pending } = useQuery({
-    queryKey: pendingTipificationKeys.byConversation(conversation.id),
-    queryFn: (): ConversationTipification | null => null,
-    staleTime: Infinity,
-    gcTime: 30 * 60_000,
-    enabled: false,
-  });
-  return pending ?? conversation.latestTipification ?? null;
+  return conversation.latestTipification ?? null;
 }
 
 export async function persistConversationTipification(
@@ -110,26 +112,4 @@ export async function persistConversationTipification(
   if (!res.ok) {
     throw new Error("No se pudo guardar la tipificación.");
   }
-}
-
-/** Sincroniza el dropdown de tipificación con la etiqueta en la lista lateral. */
-export function useSyncPendingTipificationLabel(
-  conversationId: string,
-  control: Control<LeadFormValues>,
-) {
-  const queryClient = useQueryClient();
-  const type = useWatch({ control, name: "type" });
-  const { catalog } = useTipificationCatalog();
-
-  useEffect(() => {
-    if (!conversationId || !type) {
-      clearPendingTipificationLabel(queryClient, conversationId);
-      return;
-    }
-    setPendingTipificationLabel(
-      queryClient,
-      conversationId,
-      tipificationLabelFromSlug(type, catalog),
-    );
-  }, [conversationId, type, catalog, queryClient]);
 }
