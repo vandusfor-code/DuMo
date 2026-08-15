@@ -4,6 +4,7 @@ import { getConversationRepository } from "@/repositories/conversation.repositor
 import { getSql, ensureSchema } from "@/server/db/client";
 import { normalizeWhatsAppPhoneDigits } from "@/lib/whatsapp/phone";
 import { adminLeadsService } from "@/services/admin-leads.service";
+import { maybeSendNewLeadWelcome } from "@/services/new-lead-welcome.service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -149,7 +150,18 @@ export async function POST(request: NextRequest) {
   // Mismo punto de entrada que usa cualquier mensaje entrante real
   // (src/services/leads.service.ts) -- no se reimplementa la asignación,
   // se reutiliza la única que existe en el sistema.
+  const priorAssign = (await sql`
+    SELECT assigned_advisor_id FROM lead_conversations WHERE id = ${conversationId}
+  `) as unknown as { assigned_advisor_id: string | null }[];
+  const hadAdvisor = Boolean(priorAssign[0]?.assigned_advisor_id);
+
   await adminLeadsService.autoAssignIfNeeded(conversationId);
+
+  if (!hadAdvisor) {
+    await maybeSendNewLeadWelcome(conversationId).catch((err) =>
+      console.error("[POST /api/whatsapp/lead-intake] maybeSendNewLeadWelcome", err),
+    );
+  }
 
   const asignado = (await sql`
     SELECT assigned_advisor_id FROM lead_conversations WHERE id = ${conversationId}

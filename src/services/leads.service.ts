@@ -143,6 +143,15 @@ export const leadsService = {
         assignedAdvisorId: assignedAfter,
         messageId: msg.waMessageId,
       }).catch((err) => console.error("[receiveMessage] armTimerAfterInboundMessage", err));
+
+      // Primer contacto WhatsApp: dos mensajes automáticos. Nunca en reapertura
+      // ni si el chat ya tenía asesora. El envío no debe tumbar el inbound.
+      if (!wasClosed && !assignedBefore) {
+        const { maybeSendNewLeadWelcome } = await import("@/services/new-lead-welcome.service");
+        await maybeSendNewLeadWelcome(msg.conversationId).catch((err) =>
+          console.error("[receiveMessage] maybeSendNewLeadWelcome", err),
+        );
+      }
     }
   },
 
