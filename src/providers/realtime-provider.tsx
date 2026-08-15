@@ -6,6 +6,7 @@ import { io, type Socket } from "socket.io-client";
 import { getClientToken } from "@/lib/auth/client-token";
 import { forceSessionLogout } from "@/lib/auth/force-logout";
 import { leadKeys } from "@/hooks/use-leads";
+import { playInboundClientMessageSound } from "@/lib/message-notifications";
 import type { ChatMessage, Conversation } from "@/types/conversation";
 import { SlaWarningBanners, type SlaWarningEvent } from "@/components/leads/sla-warning-banner";
 
@@ -114,6 +115,12 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       if (!payload?.conversationId) return;
       appendMessageToCache(queryClient, payload);
       invalidateBandeja(queryClient);
+      if (payload.direction === "in") {
+        playInboundClientMessageSound({
+          conversationId: payload.conversationId,
+          messageId: payload.messageId,
+        });
+      }
     });
 
     socket.on("leads:conversation:updated", (payload: ConversationUpdatedEvent) => {
