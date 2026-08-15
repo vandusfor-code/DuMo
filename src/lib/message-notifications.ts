@@ -73,6 +73,8 @@ export function shouldPlayPollInboundSound(conversationId: string): boolean {
   const last = lastSoundByConversation.get(conversationId) ?? 0;
   return Date.now() - last > 2500;
 }
+
+export async function requestMessageNotificationPermission(): Promise<boolean> {
   if (typeof window === "undefined" || !("Notification" in window)) return false;
   if (Notification.permission === "granted") return true;
   if (Notification.permission === "denied") return false;
