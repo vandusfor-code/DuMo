@@ -58,6 +58,10 @@ import {
   CARRIER_REQUIRED_COLUMNS,
   runCarrierMigrations,
 } from "@/server/db/migrations/carrier-schema";
+import {
+  CAMPAIGNS_REQUIRED_COLUMNS,
+  runCampaignsMigrations,
+} from "@/server/db/migrations/campaigns-schema";
 
 let sqlSingleton: Sql | null = null;
 let schemaPromise: Promise<void> | null = null;
@@ -264,6 +268,7 @@ const REQUIRED_COLUMNS = [
   ...DULABS_CAMPAIGN_LEADS_REQUIRED_COLUMNS,
   ...PCS_VALIDATION_REQUIRED_COLUMNS,
   ...CARRIER_REQUIRED_COLUMNS,
+  ...CAMPAIGNS_REQUIRED_COLUMNS,
 ];
 
 /** ¿Está el esquema completo? Una sola consulta al catálogo. */
@@ -379,6 +384,7 @@ async function ensureIncrementalMigrations(sql: Sql): Promise<void> {
     await runDulabsCampaignLeadsMigrations(sql);
     await runPcsValidationMigrations(sql);
     await runCarrierMigrations(sql);
+    await runCampaignsMigrations(sql);
   } catch (err) {
     console.error("[ensureIncrementalMigrations]", err);
   }
@@ -605,6 +611,7 @@ async function runMigrations(sql: Sql) {
     await runDulabsCampaignLeadsMigrations(tx);
     await runPcsValidationMigrations(tx);
     await runCarrierMigrations(tx);
+    await runCampaignsMigrations(tx);
 
     await tx`
       INSERT INTO users (id, username, email, password_hash, name, role, active, avatar_url, company_id)

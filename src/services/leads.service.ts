@@ -115,6 +115,13 @@ export const leadsService = {
     }
     await repo.saveMessage(msg);
     if (msg.direction === "in") {
+      const { maybeMarkCampaignResponse } = await import(
+        "@/services/campaign-response-link.service"
+      );
+      await maybeMarkCampaignResponse(msg.conversationId).catch((err) =>
+        console.error("[receiveMessage] maybeMarkCampaignResponse", err),
+      );
+
       if (wasClosed) {
         const { maybeReopenClosedConversationOnInbound } = await import(
           "@/services/inbox-reopen.service"

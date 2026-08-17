@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, SquarePen, Tags, UserRound, Zap } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, Download, SlidersHorizontal, SquarePen, Tags, UserRound, Zap } from "lucide-react";
+import { LeadsExportDialog } from "./leads-export-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
@@ -91,6 +92,7 @@ export function AdminConversationList({
   const [filter, setFilter] = useState<AdminLeadFilter>("all");
   const [advisorFilter, setAdvisorFilter] = useState<string>("all");
   const [tipificationFilter, setTipificationFilter] = useState<string>("all");
+  const [exportOpen, setExportOpen] = useState(false);
 
   const tipificationOptions = useMemo(() => {
     const bySlug = new Map<string, string>();
@@ -197,13 +199,24 @@ export function AdminConversationList({
         <div className="space-y-4 border-b border-line px-5 pb-4 pt-5">
           <div className="flex items-center justify-between">
             <h2 className="text-[18px] font-semibold leading-[1.45] text-ink">Conversaciones</h2>
-            <button
-              type="button"
-              aria-label="Nueva conversación"
-              className="grid size-9 place-items-center rounded-btn bg-brand text-white transition-colors hover:bg-brand-hover"
-            >
-              <SquarePen className="size-[18px]" />
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                aria-label="Exportar leads por fecha"
+                title="Exportar leads por fecha"
+                onClick={() => setExportOpen(true)}
+                className="grid size-9 place-items-center rounded-btn text-muted transition-colors hover:bg-canvas hover:text-ink"
+              >
+                <Download className="size-[18px]" />
+              </button>
+              <button
+                type="button"
+                aria-label="Nueva conversación"
+                className="grid size-9 place-items-center rounded-btn bg-brand text-white transition-colors hover:bg-brand-hover"
+              >
+                <SquarePen className="size-[18px]" />
+              </button>
+            </div>
           </div>
 
           <DropdownMenu>
@@ -346,6 +359,8 @@ export function AdminConversationList({
           </button>
         </div>
       ) : null}
+
+      {exportOpen ? <LeadsExportDialog onClose={() => setExportOpen(false)} /> : null}
     </div>
   );
 }

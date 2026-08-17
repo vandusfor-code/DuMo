@@ -172,6 +172,18 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       queryClient.invalidateQueries({ queryKey: ["pcs", "validate", payload.jobId] });
     });
 
+    socket.on("campaign:progress", (payload: { campaignId: string }) => {
+      if (!payload?.campaignId) return;
+      queryClient.invalidateQueries({ queryKey: ["admin", "campaigns", payload.campaignId] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "campaigns", "list"] });
+    });
+
+    socket.on("campaign:event", (payload: { campaignId: string }) => {
+      if (!payload?.campaignId) return;
+      queryClient.invalidateQueries({ queryKey: ["admin", "campaigns", payload.campaignId] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "campaigns", "list"] });
+    });
+
     socket.on("connect", () => {
       invalidateBandeja(queryClient);
     });

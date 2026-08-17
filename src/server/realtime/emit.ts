@@ -114,3 +114,34 @@ export function emitPcsValidationDone(jobId: string, status: "done" | "error", e
   if (!io) return;
   io.to("admin:leads").emit("pcs:validation:done", { jobId, status, error: error ?? null });
 }
+
+export type CampaignProgressPayload = {
+  campaignId: string;
+  status: string;
+  sentCount: number;
+  failedCount: number;
+  responseCount: number;
+  optOutCount: number;
+  excludedCount: number;
+  totalContacts: number;
+};
+
+/** Progreso en vivo del envío de una campaña — misma room que PCS (admin/supervisor). */
+export function emitCampaignProgress(payload: CampaignProgressPayload) {
+  const io = getIo();
+  if (!io) return;
+  io.to("admin:leads").emit("campaign:progress", payload);
+}
+
+export type CampaignEventPayload = {
+  campaignId: string;
+  eventType: string;
+  metadata?: Record<string, unknown>;
+};
+
+/** Eventos discretos (auto-pausa, completada, etc.) — para banners/toasts. */
+export function emitCampaignEvent(payload: CampaignEventPayload) {
+  const io = getIo();
+  if (!io) return;
+  io.to("admin:leads").emit("campaign:event", payload);
+}

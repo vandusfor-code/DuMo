@@ -6,6 +6,8 @@ export async function register() {
     ensureSlaWorker();
     const { ensurePcsValidationWorker } = await import("@/server/queue/pcs-validation-worker");
     ensurePcsValidationWorker();
+    const { ensureCampaignWorker } = await import("@/server/queue/campaign-worker");
+    ensureCampaignWorker();
 
     /**
      * Dispara la migración de esquema al arrancar el proceso, no cuando la
@@ -21,9 +23,16 @@ export async function register() {
      * seguridad de siempre.
      */
     const { ensureSchema } = await import("@/server/db/client");
-    ensureSchema().catch((err) => {
-      console.error("[instrumentation] ensureSchema al arrancar falló", err);
-    });
+    ensureSchema()
+      .then(async () => {
+        // Recuperación de campañas tras reinicio del server (sección 33) —
+        // reprograma un tick para toda campaña que quedó EJECUTANDO.
+        const { resumeActiveCampaignsOnBoot } = await import("@/server/queue/campaign-worker");
+        await resumeActiveCampaignsOnBoot();
+      })
+      .catch((err) => {
+        console.error("[instrumentation] ensureSchema al arrancar falló", err);
+      });
 
     /**
      * Barrido periódico de presencia: si a una asesora se le "olvida"
