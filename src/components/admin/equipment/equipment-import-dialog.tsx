@@ -16,9 +16,11 @@ type Step = "select" | "preview" | "result";
 
 export function EquipmentImportDialog({
   open,
+  defaultCarrier,
   onClose,
 }: {
   open: boolean;
+  defaultCarrier: string;
   onClose: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -58,7 +60,7 @@ export function EquipmentImportDialog({
     setFileName(file.name);
     try {
       const buffer = await file.arrayBuffer();
-      const parsed = parseEquipmentWorkbook(buffer);
+      const parsed = parseEquipmentWorkbook(buffer, defaultCarrier);
       if (parsed.length === 0) {
         setParseError("El archivo no contiene filas de datos para importar.");
         setRows([]);

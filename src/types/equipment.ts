@@ -11,6 +11,8 @@ export interface EquipmentCatalogItem {
   installmentsCount: number;
   installmentValue: number;
   commercialText: string;
+  /** Operador (WOM/Claro) al que pertenece este equipo. */
+  carrier: string;
   /** Campaña comercial Pie Cero (independiente del valor económico del pie). */
   isPieCero: boolean;
   color?: string;

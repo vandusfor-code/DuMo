@@ -41,6 +41,12 @@ type StoredCommercialPlan = Omit<Partial<CommercialPlan>, "offer"> & {
   };
 };
 
+/** Normaliza operator a 'wom'|'claro' — datos previos a multi-operador traían texto libre (ej. "WOM"). */
+function normalizeCarrierOperator(operator: string | undefined): string {
+  const value = (operator ?? "").trim().toLowerCase();
+  return value === "claro" ? "claro" : "wom";
+}
+
 export function normalizeCommercialPlan(raw: StoredCommercialPlan): CommercialPlan {
   const legacy = raw.operatorPayment;
   const womValue = raw.womValue ?? legacy ?? 0;
@@ -52,7 +58,7 @@ export function normalizeCommercialPlan(raw: StoredCommercialPlan): CommercialPl
   return {
     id: raw.id,
     name: raw.name,
-    operator: raw.operator,
+    operator: normalizeCarrierOperator(raw.operator),
     saleType: raw.saleType,
     womValue,
     promotionalPrice: raw.promotionalPrice ?? null,

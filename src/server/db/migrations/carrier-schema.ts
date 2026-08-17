@@ -10,6 +10,8 @@ export const CARRIER_REQUIRED_COLUMNS = [
   "sales.carrier",
   "connected_numbers.carrier",
   "whatsapp_channels.carrier",
+  "quick_reply_templates.carrier",
+  "teleprompter_script_overrides.carrier",
 ] as const;
 
 /**
@@ -62,4 +64,41 @@ export async function runCarrierMigrations(tx: MigrationSql): Promise<void> {
       WHEN duplicate_object THEN NULL;
     END $$;
   `);
+
+  await runCarrierMigrationsPart2(tx);
+}
+
+/**
+ * Fase 2 — extiende `carrier` al contenido comercial editable por admin
+ * (equipos vive en un blob JSON, sin ALTER TABLE; plantillas de WhatsApp y
+ * overrides de script sí son tablas reales).
+ */
+async function runCarrierMigrationsPart2(tx: MigrationSql): Promise<void> {
+  await tx`ALTER TABLE quick_reply_templates ADD COLUMN IF NOT EXISTS carrier text NOT NULL DEFAULT 'wom'`;
+  await tx.unsafe(`
+    DO $$ BEGIN
+      ALTER TABLE quick_reply_templates ADD CONSTRAINT quick_reply_templates_carrier_check
+        CHECK (carrier IN ('wom', 'claro'));
+    EXCEPTION
+      WHEN duplicate_object THEN NULL;
+    END $$;
+  `);
+
+  await tx`ALTER TABLE teleprompter_script_overrides ADD COLUMN IF NOT EXISTS carrier text NOT NULL DEFAULT 'wom'`;
+  await tx.unsafe(`
+    DO $$ BEGIN
+      ALTER TABLE teleprompter_script_overrides ADD CONSTRAINT teleprompter_script_overrides_carrier_check
+        CHECK (carrier IN ('wom', 'claro'));
+    EXCEPTION
+      WHEN duplicate_object THEN NULL;
+    END $$;
+  `);
+  // El índice único original no incluía carrier — un override de Claro
+  // pisaría el de WOM para el mismo bloque/campo. Se reemplaza por uno que
+  // agrega carrier a la clave.
+  await tx`DROP INDEX IF EXISTS uq_teleprompter_script_overrides_key`;
+  await tx`
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_teleprompter_script_overrides_key
+    ON teleprompter_script_overrides (company_id, flow_key, block_id, field_key, carrier)
+  `;
 }

@@ -51,6 +51,7 @@ function parseStatus(value: unknown): { value: EquipmentStatus | null; error?: s
 export function mapEquipmentImportRow(
   row: unknown[],
   rowNumber: number,
+  carrier: string = "wom",
 ): EquipmentImportPreviewRow {
   const errors: string[] = [];
 
@@ -92,6 +93,7 @@ export function mapEquipmentImportRow(
     installmentsCount: installments.value ?? 0,
     installmentValue: installmentValue.value ?? 0,
     commercialText,
+    carrier,
     color,
     memory,
     promotions,
@@ -119,7 +121,10 @@ export function mapEquipmentImportRow(
   };
 }
 
-export function parseEquipmentWorkbook(buffer: ArrayBuffer): EquipmentImportPreviewRow[] {
+export function parseEquipmentWorkbook(
+  buffer: ArrayBuffer,
+  carrier: string = "wom",
+): EquipmentImportPreviewRow[] {
   const workbook = XLSX.read(buffer, { type: "array" });
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) return [];
@@ -131,7 +136,7 @@ export function parseEquipmentWorkbook(buffer: ArrayBuffer): EquipmentImportPrev
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i] as unknown[];
     if (!Array.isArray(row)) continue;
-    const mapped = mapEquipmentImportRow(row, i + 1);
+    const mapped = mapEquipmentImportRow(row, i + 1, carrier);
     if (mapped.errors.length === 0 && !mapped.input) continue;
     if (mapped.input || mapped.errors.length > 0) results.push(mapped);
   }

@@ -6,14 +6,16 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 15;
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await requireAdminSession();
   if (!session) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
 
   try {
-    const data = await equipmentService.listAll();
+    const carrierParam = request.nextUrl.searchParams.get("carrier");
+    const carrier = carrierParam === "wom" || carrierParam === "claro" ? carrierParam : undefined;
+    const data = await equipmentService.listAll(carrier);
     return NextResponse.json(data);
   } catch (error) {
     console.error("[GET /api/admin/equipment]", error);

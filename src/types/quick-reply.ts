@@ -57,6 +57,8 @@ export interface QuickReplyTemplate {
   categoryId: string;
   name: string;
   shortcut: string;
+  /** Operador (WOM/Claro) al que pertenece esta plantilla. */
+  carrier: string;
   status: QuickReplyTemplateStatus;
   favorite: boolean;
   timesUsed: number;
@@ -112,6 +114,7 @@ export interface CreateQuickReplyTemplateInput {
   categoryId: string;
   name: string;
   shortcut: string;
+  carrier?: string;
   status?: QuickReplyTemplateStatus;
   favorite?: boolean;
   tagIds?: string[];

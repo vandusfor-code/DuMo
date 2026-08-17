@@ -15,6 +15,7 @@ import {
   type TemplateViewMode,
 } from "@/components/admin/plantillas/template-cards";
 import { TemplateFormDialog } from "@/components/admin/plantillas/template-form-dialog";
+import { CarrierToggle } from "@/components/admin/shared/carrier-toggle";
 import { ErrorState } from "@/components/shared/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -113,6 +114,7 @@ export default function AdminPlantillasPage() {
 function PlantillasTabContent() {
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [carrierFilter, setCarrierFilter] = useState("wom");
   const [viewMode, setViewMode] = useState<TemplateViewMode>("grid");
   const [sortMode, setSortMode] = useState<TemplateSortMode>("recent");
   const [categoriesModalOpen, setCategoriesModalOpen] = useState(false);
@@ -122,6 +124,7 @@ function PlantillasTabContent() {
   const { data: categories = [], isLoading: loadingCats } = useQuickReplyCategories();
   const { data: templates = [], isLoading, isError, refetch } = useQuickReplyTemplates({
     q: search,
+    carrier: carrierFilter,
   });
   const createCategory = useCreateQuickReplyCategory();
   const createTemplate = useCreateQuickReplyTemplate();
@@ -205,6 +208,7 @@ function PlantillasTabContent() {
               </option>
             ))}
           </select>
+          <CarrierToggle value={carrierFilter} onChange={setCarrierFilter} />
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="size-4" />
             Crear plantilla
@@ -286,6 +290,7 @@ function PlantillasTabContent() {
         <TemplateFormDialog
           categories={categories}
           pinnedCount={pinnedCount}
+          defaultCarrier={carrierFilter}
           onClose={() => setCreateOpen(false)}
           onSave={async (input) => {
             await createTemplate.mutateAsync(input);
@@ -299,6 +304,7 @@ function PlantillasTabContent() {
           template={editing}
           categories={categories}
           pinnedCount={pinnedCount}
+          defaultCarrier={carrierFilter}
           onClose={() => setEditing(null)}
           onSave={async (input) => {
             await updateTemplate.mutateAsync({

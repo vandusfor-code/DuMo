@@ -34,6 +34,8 @@ export interface QuickReplyTemplateFilters {
   tagId?: string;
   status?: QuickReplyTemplateStatus;
   includeDeleted?: boolean;
+  /** Omitido = todas las plantillas, sin filtrar por operador. */
+  carrier?: string;
 }
 
 export interface QuickReplyRepository {
@@ -189,6 +191,7 @@ function mapTemplateRow(r: Record<string, unknown>): QuickReplyTemplate {
     categoryId: String(r.category_id),
     name: String(r.name),
     shortcut: String(r.shortcut),
+    carrier: String(r.carrier ?? "wom"),
     status: (String(r.status) === "inactive" ? "inactive" : "active") as QuickReplyTemplateStatus,
     favorite: Boolean(r.favorite),
     timesUsed: Number(r.times_used) || 0,
@@ -270,6 +273,7 @@ function mockFilterTemplates(companyId: string, filters?: QuickReplyTemplateFilt
     if (!filters?.includeDeleted && t.deletedAt) return false;
     if (filters?.categoryId && t.categoryId !== filters.categoryId) return false;
     if (filters?.status && t.status !== filters.status) return false;
+    if (filters?.carrier && (t.carrier ?? "wom") !== filters.carrier) return false;
     if (filters?.tagId) {
       const hasTag = mockStore.tagLinks.some(
         (l) => l.companyId === companyId && l.templateId === t.id && l.tagId === filters.tagId,
@@ -469,6 +473,7 @@ class MockQuickReplyRepository implements QuickReplyRepository {
       categoryId: input.categoryId,
       name: input.name.trim(),
       shortcut,
+      carrier: input.carrier ?? "wom",
       status: input.status ?? "active",
       favorite: input.favorite ?? false,
       timesUsed: 0,
@@ -522,6 +527,7 @@ class MockQuickReplyRepository implements QuickReplyRepository {
     template.categoryId = input.categoryId;
     template.name = input.name.trim();
     template.shortcut = normalizeShortcut(input.shortcut);
+    template.carrier = input.carrier ?? template.carrier;
     template.status = input.status ?? template.status;
     template.favorite = nextFavorite;
     template.updatedAt = now;
@@ -1016,6 +1022,7 @@ class PostgresQuickReplyRepository implements QuickReplyRepository {
         ${filters?.includeDeleted ? sql`` : sql`AND t.deleted_at IS NULL`}
         ${filters?.categoryId ? sql`AND t.category_id = ${filters.categoryId}` : sql``}
         ${filters?.status ? sql`AND t.status = ${filters.status}` : sql``}
+        ${filters?.carrier ? sql`AND t.carrier = ${filters.carrier}` : sql``}
         ${filters?.tagId ? sql`
           AND EXISTS (
             SELECT 1 FROM quick_reply_template_tag_links tl
@@ -1077,11 +1084,11 @@ class PostgresQuickReplyRepository implements QuickReplyRepository {
       sql.begin(async (tx) => {
         await tx`
           INSERT INTO quick_reply_templates (
-            id, company_id, category_id, name, shortcut, status, favorite,
+            id, company_id, category_id, name, shortcut, carrier, status, favorite,
             times_used, active_version_id, created_at, updated_at, created_by
           ) VALUES (
             ${templateId}, ${companyId}, ${input.categoryId}, ${input.name.trim()},
-            ${shortcut}, ${input.status ?? "active"}, ${input.favorite ?? false},
+            ${shortcut}, ${input.carrier ?? "wom"}, ${input.status ?? "active"}, ${input.favorite ?? false},
             ${0}, ${versionId}, ${now}, ${now}, ${createdBy}
           )
         `;
@@ -1144,6 +1151,7 @@ class PostgresQuickReplyRepository implements QuickReplyRepository {
             category_id = ${input.categoryId},
             name = ${input.name.trim()},
             shortcut = ${shortcut},
+            carrier = ${input.carrier ?? existing.carrier},
             status = ${input.status ?? existing.status},
             favorite = ${input.favorite ?? existing.favorite},
             active_version_id = ${versionId},

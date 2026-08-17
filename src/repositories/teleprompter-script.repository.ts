@@ -23,6 +23,7 @@ function mapOverrideRow(row: Record<string, unknown>): ScriptTemplateOverride {
     flowKey: String(row.flow_key) as ScriptFlowKey,
     blockId: String(row.block_id),
     fieldKey: String(row.field_key),
+    carrier: String(row.carrier ?? "wom"),
     templateText: String(row.template_text),
     requiredTokens: Array.isArray(row.required_tokens)
       ? (row.required_tokens as string[])
@@ -50,7 +51,11 @@ function mapVersionRow(row: Record<string, unknown>): ScriptTemplateVersion {
 }
 
 export const teleprompterScriptRepository = {
-  async listOverridesForFlow(companyId: string, flowKey: ScriptFlowKey): Promise<ScriptTemplateOverride[]> {
+  async listOverridesForFlow(
+    companyId: string,
+    flowKey: ScriptFlowKey,
+    carrier: string = "wom",
+  ): Promise<ScriptTemplateOverride[]> {
     await ensureSchema();
     return withDbRetry(async () => {
       const sql = requireSql();
@@ -59,6 +64,7 @@ export const teleprompterScriptRepository = {
         FROM teleprompter_script_overrides
         WHERE company_id = ${companyId}
           AND flow_key = ${flowKey}
+          AND carrier = ${carrier}
           AND is_custom = true
         ORDER BY block_id ASC, field_key ASC
       `;
@@ -71,6 +77,7 @@ export const teleprompterScriptRepository = {
     flowKey: ScriptFlowKey,
     blockId: string,
     fieldKey: string,
+    carrier: string = "wom",
   ): Promise<ScriptTemplateOverride | null> {
     await ensureSchema();
     return withDbRetry(async () => {
@@ -82,6 +89,7 @@ export const teleprompterScriptRepository = {
           AND flow_key = ${flowKey}
           AND block_id = ${blockId}
           AND field_key = ${fieldKey}
+          AND carrier = ${carrier}
         LIMIT 1
       `;
       const row = rows[0];
@@ -94,12 +102,14 @@ export const teleprompterScriptRepository = {
     flowKey: ScriptFlowKey;
     blockId: string;
     fieldKey: string;
+    carrier?: string;
     templateText: string;
     requiredTokens: string[];
     userId: string;
     changeNote?: string;
   }): Promise<ScriptTemplateOverride> {
     await ensureSchema();
+    const carrier = input.carrier ?? "wom";
     return withDbRetry(async () => {
       const sql = requireSql();
       const existing = await teleprompterScriptRepository.getOverride(
@@ -107,6 +117,7 @@ export const teleprompterScriptRepository = {
         input.flowKey,
         input.blockId,
         input.fieldKey,
+        carrier,
       );
 
       const nextVersion = (existing?.versionNumber ?? 0) + 1;
@@ -114,7 +125,7 @@ export const teleprompterScriptRepository = {
 
       await sql`
         INSERT INTO teleprompter_script_overrides (
-          id, company_id, flow_key, block_id, field_key,
+          id, company_id, flow_key, block_id, field_key, carrier,
           template_text, required_tokens, is_custom, version_number, updated_at, updated_by
         )
         VALUES (
@@ -123,6 +134,7 @@ export const teleprompterScriptRepository = {
           ${input.flowKey},
           ${input.blockId},
           ${input.fieldKey},
+          ${carrier},
           ${input.templateText},
           ${sql.json(input.requiredTokens)},
           true,
@@ -130,7 +142,7 @@ export const teleprompterScriptRepository = {
           now(),
           ${input.userId}
         )
-        ON CONFLICT (company_id, flow_key, block_id, field_key)
+        ON CONFLICT (company_id, flow_key, block_id, field_key, carrier)
         DO UPDATE SET
           template_text = EXCLUDED.template_text,
           required_tokens = EXCLUDED.required_tokens,
@@ -164,6 +176,7 @@ export const teleprompterScriptRepository = {
         input.flowKey,
         input.blockId,
         input.fieldKey,
+        carrier,
       );
       if (!saved) throw new Error("No se pudo persistir la plantilla.");
       return saved;
@@ -175,6 +188,7 @@ export const teleprompterScriptRepository = {
     flowKey: ScriptFlowKey;
     blockId: string;
     fieldKey: string;
+    carrier?: string;
     userId: string;
   }): Promise<void> {
     await ensureSchema();
@@ -185,6 +199,7 @@ export const teleprompterScriptRepository = {
         input.flowKey,
         input.blockId,
         input.fieldKey,
+        input.carrier ?? "wom",
       );
       if (!existing) return;
 

@@ -32,12 +32,14 @@ export function useQuickReplyTemplates(filters?: {
   categoryId?: string;
   tagId?: string;
   includeDeleted?: boolean;
+  carrier?: string;
 }) {
   const params = new URLSearchParams();
   if (filters?.q) params.set("q", filters.q);
   if (filters?.categoryId) params.set("categoryId", filters.categoryId);
   if (filters?.tagId) params.set("tagId", filters.tagId);
   if (filters?.includeDeleted) params.set("includeDeleted", "1");
+  if (filters?.carrier) params.set("carrier", filters.carrier);
   const qs = params.toString();
 
   return useQuery({

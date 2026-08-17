@@ -58,6 +58,7 @@ const EMPTY: UpsertEquipmentInput = {
   installmentsCount: 18,
   installmentValue: 0,
   commercialText: "",
+  carrier: "wom",
   isPieCero: false,
   color: "",
   memory: "",
@@ -495,11 +496,13 @@ function StatusBadge({ status }: { status: EquipmentStatus }) {
 export function EquipmentDialog({
   open,
   initial,
+  defaultCarrier,
   onClose,
   onSave,
 }: {
   open: boolean;
   initial: EquipmentCatalogItem | null;
+  defaultCarrier: string;
   onClose: () => void;
   onSave: (values: UpsertEquipmentInput) => void;
 }) {
@@ -520,6 +523,7 @@ export function EquipmentDialog({
               installmentsCount: initial.installmentsCount,
               installmentValue: initial.installmentValue,
               commercialText: initial.commercialText,
+              carrier: initial.carrier ?? "wom",
               isPieCero: initial.isPieCero,
               color: initial.color ?? "",
               memory: initial.memory ?? "",
@@ -527,10 +531,10 @@ export function EquipmentDialog({
               observations: initial.observations ?? "",
               status: initial.status,
             }
-          : { ...EMPTY },
+          : { ...EMPTY, carrier: defaultCarrier },
       );
     }
-  }, [open, initial]);
+  }, [open, initial, defaultCarrier]);
 
   if (!open) return null;
 
@@ -571,6 +575,17 @@ export function EquipmentDialog({
         </h3>
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           {field("Nombre comercial", "commercialName")}
+          <label className="block">
+            <span className="text-[13px] text-muted">Operador</span>
+            <select
+              value={values.carrier}
+              onChange={(e) => setValues({ ...values, carrier: e.target.value })}
+              className="mt-1.5 h-11 w-full rounded-xl border border-line bg-card px-4 text-[14px] outline-none focus:border-brand/40"
+            >
+              <option value="wom">WOM</option>
+              <option value="claro">Claro</option>
+            </select>
+          </label>
           {field("Marca", "brand")}
           {field("Modelo", "model")}
           {field("Valor total ($)", "totalValue", "number")}

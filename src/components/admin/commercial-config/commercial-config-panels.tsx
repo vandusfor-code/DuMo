@@ -42,6 +42,7 @@ import {
   adminTableHeaderCellClass,
   adminTableHeaderRowClass,
 } from "@/lib/admin-table-header-styles";
+import { CarrierToggle } from "@/components/admin/shared/carrier-toggle";
 
 const money = new Intl.NumberFormat("es-CL", {
   style: "currency",
@@ -51,12 +52,16 @@ const money = new Intl.NumberFormat("es-CL", {
 
 export function CommercialPlansTable({
   plans,
+  carrierFilter,
+  onCarrierFilterChange,
   onEdit,
   onDuplicate,
   onDelete,
   onCreate,
 }: {
   plans: CommercialPlan[];
+  carrierFilter: string;
+  onCarrierFilterChange: (carrier: string) => void;
   onEdit: (plan: CommercialPlan) => void;
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
@@ -66,10 +71,13 @@ export function CommercialPlansTable({
     <Card className="overflow-hidden">
       <div className="flex items-center justify-between border-b border-line px-5 py-4">
         <h3 className="text-[15px] font-semibold text-ink">Planes comerciales</h3>
-        <Button size="sm" onClick={onCreate}>
-          <Plus className="size-4" />
-          Crear plan
-        </Button>
+        <div className="flex items-center gap-2">
+          <CarrierToggle value={carrierFilter} onChange={onCarrierFilterChange} />
+          <Button size="sm" onClick={onCreate}>
+            <Plus className="size-4" />
+            Crear plan
+          </Button>
+        </div>
       </div>
       <Table>
         <TableHeader>
@@ -89,7 +97,7 @@ export function CommercialPlansTable({
           {plans.map((p) => (
             <TableRow key={p.id}>
               <TableCell className="font-semibold text-ink">{p.name}</TableCell>
-              <TableCell>{p.operator}</TableCell>
+              <TableCell>{p.operator === "claro" ? "Claro" : "WOM"}</TableCell>
               <TableCell>{COMMERCIAL_SALE_TYPE_LABELS[p.saleType]}</TableCell>
               <TableCell className="text-muted">{p.offer.dataAllowance || "—"}</TableCell>
               <TableCell>{money.format(p.womValue)}</TableCell>
@@ -386,16 +394,18 @@ function OfferFieldsEditor({
 export function CommercialPlanDialog({
   open,
   initial,
+  defaultCarrier,
   onClose,
   onSave,
 }: {
   open: boolean;
   initial?: CommercialPlan | null;
+  defaultCarrier: string;
   onClose: () => void;
   onSave: (values: Omit<CommercialPlan, "id">) => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
-  const [operator, setOperator] = useState(initial?.operator ?? "");
+  const [operator, setOperator] = useState(initial?.operator ?? defaultCarrier);
   const [saleType, setSaleType] = useState(initial?.saleType ?? "portabilidad");
   const [womValue, setWomValue] = useState(initial?.womValue ?? 0);
   const [dumoValue, setDumoValue] = useState(initial?.dumoValue ?? 0);
@@ -419,7 +429,10 @@ export function CommercialPlanDialog({
         </h3>
         <div className="mt-4 space-y-3">
           <input placeholder="Nombre plan" value={name} onChange={(e) => setName(e.target.value)} className="h-11 w-full rounded-xl border border-line px-4 text-[14px]" />
-          <input placeholder="Operador" value={operator} onChange={(e) => setOperator(e.target.value)} className="h-11 w-full rounded-xl border border-line px-4 text-[14px]" />
+          <select value={operator} onChange={(e) => setOperator(e.target.value)} className="h-11 w-full rounded-xl border border-line px-4 text-[14px]">
+            <option value="wom">WOM</option>
+            <option value="claro">Claro</option>
+          </select>
           <select value={saleType} onChange={(e) => setSaleType(e.target.value as CommercialPlan["saleType"])} className="h-11 w-full rounded-xl border border-line px-4 text-[14px]">
             {Object.entries(COMMERCIAL_SALE_TYPE_LABELS).map(([k, v]) => (
               <option key={k} value={k}>{v}</option>

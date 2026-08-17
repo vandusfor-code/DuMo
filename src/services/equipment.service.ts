@@ -33,11 +33,11 @@ async function bulkCreateEquipment(
 }
 
 export const equipmentService = {
-  listAll() {
-    return getEquipmentRepository().listAll();
+  listAll(carrier?: string) {
+    return getEquipmentRepository().listAll(carrier);
   },
-  listActive() {
-    return getEquipmentRepository().listActive();
+  listActive(carrier?: string) {
+    return getEquipmentRepository().listActive(carrier);
   },
   create(input: UpsertEquipmentInput) {
     const error = validateEquipmentCatalogInput(input);

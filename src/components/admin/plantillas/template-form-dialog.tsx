@@ -17,12 +17,14 @@ export function TemplateFormDialog({
   template,
   categories,
   pinnedCount,
+  defaultCarrier,
   onClose,
   onSave,
 }: {
   template?: QuickReplyTemplate;
   categories: { id: string; name: string }[];
   pinnedCount: number;
+  defaultCarrier: string;
   onClose: () => void;
   onSave: (input: CreateQuickReplyTemplateInput) => Promise<void>;
 }) {
@@ -35,6 +37,7 @@ export function TemplateFormDialog({
   const [name, setName] = useState(template?.name ?? "");
   const [shortcut, setShortcut] = useState(template?.shortcut ?? "");
   const [categoryId, setCategoryId] = useState(template?.categoryId ?? categories[0]?.id ?? "");
+  const [carrier, setCarrier] = useState(template?.carrier ?? defaultCarrier);
   const [contentKind, setContentKind] = useState<TemplateContentKind>(
     firstMediaItem ? "image" : "text",
   );
@@ -130,6 +133,14 @@ export function TemplateFormDialog({
                 {c.name}
               </option>
             ))}
+          </select>
+          <select
+            value={carrier}
+            onChange={(e) => setCarrier(e.target.value)}
+            className="h-11 w-full rounded-xl border border-line px-4 text-[14px]"
+          >
+            <option value="wom">WOM</option>
+            <option value="claro">Claro</option>
           </select>
 
           {contentKind === "text" ? (
@@ -261,6 +272,7 @@ export function TemplateFormDialog({
                   name: name.trim(),
                   shortcut,
                   categoryId,
+                  carrier,
                   favorite: pinInChat,
                   items,
                 });

@@ -17,6 +17,7 @@ import {
 } from "@/lib/tipification-colors";
 import { cn } from "@/lib/utils";
 import { isProtectedTipificationSlug } from "@/lib/tipification-system";
+import { CarrierToggle } from "@/components/admin/shared/carrier-toggle";
 import type { TipificationWithUsage } from "@/types/tipification";
 
 function TipificationBadge({
@@ -47,6 +48,9 @@ export function TipificationsPanel() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<TipificationWithUsage | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TipificationWithUsage | null>(null);
+  const [carrierFilter, setCarrierFilter] = useState("wom");
+
+  const filtered = data.filter((item) => (item.carrier ?? "wom") === carrierFilter);
 
   if (isLoading) {
     return <Card className="h-64 animate-pulse bg-canvas/60" />;
@@ -72,15 +76,18 @@ export function TipificationsPanel() {
             Clasificación de gestiones en Leads y Clientes — nombre y color visibles en toda la app.
           </p>
         </div>
-        <Button
-          onClick={() => {
-            setEditing(null);
-            setDialogOpen(true);
-          }}
-        >
-          <Plus className="size-4" />
-          Crear tipificación
-        </Button>
+        <div className="flex items-center gap-2">
+          <CarrierToggle value={carrierFilter} onChange={setCarrierFilter} />
+          <Button
+            onClick={() => {
+              setEditing(null);
+              setDialogOpen(true);
+            }}
+          >
+            <Plus className="size-4" />
+            Crear tipificación
+          </Button>
+        </div>
       </div>
 
       <Card className="overflow-hidden">
@@ -97,7 +104,7 @@ export function TipificationsPanel() {
               </tr>
             </thead>
             <tbody>
-              {data.map((item) => {
+              {filtered.map((item) => {
                 const isProtected = isProtectedTipificationSlug(item.slug);
                 return (
                 <tr key={item.id} className="border-b border-line last:border-0">
@@ -161,14 +168,17 @@ export function TipificationsPanel() {
             </tbody>
           </table>
         </div>
-        {data.length === 0 ? (
-          <p className="p-8 text-center text-[14px] text-muted">No hay tipificaciones configuradas.</p>
+        {filtered.length === 0 ? (
+          <p className="p-8 text-center text-[14px] text-muted">
+            No hay tipificaciones de {carrierFilter === "claro" ? "Claro" : "WOM"} configuradas.
+          </p>
         ) : null}
       </Card>
 
       {dialogOpen ? (
         <TipificationFormDialog
           item={editing}
+          defaultCarrier={carrierFilter}
           saving={create.isPending || update.isPending}
           onClose={() => {
             setDialogOpen(false);
@@ -189,7 +199,7 @@ export function TipificationsPanel() {
       {deleteTarget ? (
         <DeleteTipificationDialog
           item={deleteTarget}
-          alternatives={data.filter((t) => t.id !== deleteTarget.id)}
+          alternatives={filtered.filter((t) => t.id !== deleteTarget.id)}
           deleting={remove.isPending}
           onClose={() => setDeleteTarget(null)}
           onConfirm={async (reassignToId) => {
@@ -207,11 +217,13 @@ export function TipificationsPanel() {
 
 function TipificationFormDialog({
   item,
+  defaultCarrier,
   saving,
   onClose,
   onSave,
 }: {
   item: TipificationWithUsage | null;
+  defaultCarrier: string;
   saving: boolean;
   onClose: () => void;
   onSave: (values: {
@@ -228,7 +240,7 @@ function TipificationFormDialog({
 
   const [name, setName] = useState(item?.name ?? "");
   const [presetId, setPresetId] = useState(initialPreset.id);
-  const [carrier, setCarrier] = useState(item?.carrier ?? "wom");
+  const [carrier, setCarrier] = useState(item?.carrier ?? defaultCarrier);
   const [triggersSaleFlow, setTriggersSaleFlow] = useState(item?.triggersSaleFlow ?? false);
   const [error, setError] = useState<string | null>(null);
 

@@ -34,6 +34,7 @@ export const teleprompterScriptService = {
     flowKey: ScriptFlowKey;
     blockId: string;
     fieldKey: string;
+    carrier?: string;
   }): Promise<ScriptBlockFieldState> {
     const catalog = buildFlowCatalog(input.flowKey);
     const block = catalog.blocks.find((item) => item.blockId === input.blockId);
@@ -52,6 +53,7 @@ export const teleprompterScriptService = {
           input.flowKey,
           input.blockId,
           input.fieldKey,
+          input.carrier ?? "wom",
         );
       } catch (error) {
         console.error("[teleprompterScriptService.getFieldState] DB read failed", error);
@@ -80,6 +82,7 @@ export const teleprompterScriptService = {
     flowKey: ScriptFlowKey;
     blockId: string;
     fieldKey: string;
+    carrier?: string;
     templateText: string;
   }) {
     const defaults = buildDefaultTemplateForField(input);
@@ -100,6 +103,7 @@ export const teleprompterScriptService = {
       flowKey: input.flowKey,
       blockId: input.blockId,
       fieldKey: input.fieldKey,
+      carrier: input.carrier ?? "wom",
       templateText: input.templateText.trim(),
       requiredTokens: extractTokensFromTemplate(defaults.defaultTemplate),
       userId: input.userId,
@@ -114,6 +118,7 @@ export const teleprompterScriptService = {
     flowKey: ScriptFlowKey;
     blockId: string;
     fieldKey: string;
+    carrier?: string;
   }) {
     if (!hasTeleprompterScriptDatabase()) {
       throw new Error("Base de datos no configurada para restaurar scripts.");

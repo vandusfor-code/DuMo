@@ -17,8 +17,9 @@ import {
 import { hasDatabase } from "@/server/db/client";
 
 export interface EquipmentRepository {
-  listAll(): Promise<EquipmentCatalogItem[]>;
-  listActive(): Promise<AdvisorEquipmentOption[]>;
+  /** carrier omitido = todos los operadores. */
+  listAll(carrier?: string): Promise<EquipmentCatalogItem[]>;
+  listActive(carrier?: string): Promise<AdvisorEquipmentOption[]>;
   create(input: UpsertEquipmentInput): Promise<EquipmentCatalogItem>;
   update(id: string, input: UpsertEquipmentInput): Promise<EquipmentCatalogItem>;
   setStatus(id: string, status: EquipmentStatus): Promise<EquipmentCatalogItem>;
@@ -33,6 +34,7 @@ function normalizeItem(raw: EquipmentCatalogItem): EquipmentCatalogItem {
     downPayment: Number(raw.downPayment) || 0,
     installmentsCount: Number(raw.installmentsCount) || 0,
     installmentValue: Number(raw.installmentValue) || 0,
+    carrier: raw.carrier ?? "wom",
     isPieCero: resolveEquipmentIsPieCero(raw),
     status: raw.status === "inactive" ? "inactive" : "active",
   };
@@ -49,14 +51,16 @@ function shouldSeedDevMockOnFirstRun(): boolean {
 class MockEquipmentRepository implements EquipmentRepository {
   private items: EquipmentCatalogItem[] = [...EQUIPMENT_CATALOG_MOCK];
 
-  listAll() {
-    return Promise.resolve([...this.items]);
+  listAll(carrier?: string) {
+    return Promise.resolve(
+      [...this.items].filter((i) => !carrier || (i.carrier ?? "wom") === carrier),
+    );
   }
 
-  listActive() {
+  listActive(carrier?: string) {
     return Promise.resolve(
       this.items
-        .filter((i) => i.status === "active")
+        .filter((i) => i.status === "active" && (!carrier || (i.carrier ?? "wom") === carrier))
         .map(({ id, commercialName, brand, model, totalValue, downPayment, installmentsCount, installmentValue, commercialText }) => ({
           id,
           commercialName,
@@ -143,14 +147,15 @@ class PostgresEquipmentRepository implements EquipmentRepository {
     return this.cache!;
   }
 
-  async listAll() {
-    return [...(await this.load())];
+  async listAll(carrier?: string) {
+    const items = await this.load();
+    return items.filter((i) => !carrier || (i.carrier ?? "wom") === carrier);
   }
 
-  async listActive() {
+  async listActive(carrier?: string) {
     const items = await this.load();
     return items
-      .filter((i) => i.status === "active")
+      .filter((i) => i.status === "active" && (!carrier || (i.carrier ?? "wom") === carrier))
       .map(({ id, commercialName, brand, model, totalValue, downPayment, installmentsCount, installmentValue, commercialText }) => ({
         id,
         commercialName,

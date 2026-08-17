@@ -27,6 +27,8 @@ export type ScriptTemplateOverride = {
   flowKey: ScriptFlowKey;
   blockId: string;
   fieldKey: string;
+  /** Operador (WOM/Claro) al que pertenece este texto override. */
+  carrier: string;
   templateText: string;
   requiredTokens: string[];
   isCustom: boolean;
