@@ -89,6 +89,7 @@ export function TipificationsPanel() {
             <thead>
               <tr className="border-b border-line bg-canvas/40 text-[12px] uppercase tracking-wide text-muted">
                 <th className="px-5 py-3 font-medium">Nombre</th>
+                <th className="px-5 py-3 font-medium">Operador</th>
                 <th className="px-5 py-3 font-medium">Color</th>
                 <th className="px-5 py-3 font-medium">Flujo venta</th>
                 <th className="px-5 py-3 font-medium">En uso</th>
@@ -110,6 +111,9 @@ export function TipificationsPanel() {
                         </span>
                       ) : null}
                     </span>
+                  </td>
+                  <td className="px-5 py-4 text-muted">
+                    {item.carrier === "claro" ? "Claro" : "WOM"}
                   </td>
                   <td className="px-5 py-4">
                     <TipificationBadge
@@ -214,6 +218,7 @@ function TipificationFormDialog({
     name: string;
     badgeBg: string;
     badgeText: string;
+    carrier: string;
     triggersSaleFlow: boolean;
   }) => Promise<void>;
 }) {
@@ -223,6 +228,7 @@ function TipificationFormDialog({
 
   const [name, setName] = useState(item?.name ?? "");
   const [presetId, setPresetId] = useState(initialPreset.id);
+  const [carrier, setCarrier] = useState(item?.carrier ?? "wom");
   const [triggersSaleFlow, setTriggersSaleFlow] = useState(item?.triggersSaleFlow ?? false);
   const [error, setError] = useState<string | null>(null);
 
@@ -243,6 +249,18 @@ function TipificationFormDialog({
               className="mt-1.5 h-11 w-full rounded-xl border border-line px-4 text-[14px]"
               placeholder="Ej. Seguimiento"
             />
+          </label>
+
+          <label className="block">
+            <span className="text-[13px] text-muted">Operador</span>
+            <select
+              value={carrier}
+              onChange={(e) => setCarrier(e.target.value)}
+              className="mt-1.5 h-11 w-full rounded-xl border border-line px-4 text-[14px]"
+            >
+              <option value="wom">WOM</option>
+              <option value="claro">Claro</option>
+            </select>
           </label>
 
           <div>
@@ -297,6 +315,7 @@ function TipificationFormDialog({
                   name: name.trim(),
                   badgeBg: preset.badgeBg,
                   badgeText: preset.badgeText,
+                  carrier,
                   triggersSaleFlow,
                 });
               } catch (err) {

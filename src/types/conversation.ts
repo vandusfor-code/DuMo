@@ -43,6 +43,8 @@ export interface Conversation {
   inboxState?: InboxState;
   /** Última tipificación guardada (lead_gestiones más reciente). */
   latestTipification?: ConversationTipification | null;
+  /** Operador (WOM/Claro) — detectado por el número de entrada, editable en la gestión. */
+  carrier?: string;
   /** RESP-2 — aviso de tiempo de respuesta activo (min 1/2 o 4 de los escenarios A/B). */
   activeSlaWarning?: {
     scenario: "first_contact" | "follow_up";

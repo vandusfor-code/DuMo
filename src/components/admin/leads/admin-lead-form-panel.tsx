@@ -19,6 +19,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { LeadTypeSelect } from "@/components/leads/lead-type-select";
+import { CarrierSelect } from "@/components/leads/carrier-select";
 import { SaleDetails } from "@/components/leads/sale-details";
 import { ObservationField } from "@/components/leads/observation-field";
 import { FollowUpDateField } from "@/components/leads/follow-up-date-field";
@@ -55,6 +56,7 @@ function defaultsFor(c: AdminConversation): LeadFormValues {
     customerName: c.customerName,
     rut: c.rut,
     phone: c.phone,
+    carrier: c.carrier ?? "wom",
     type: c.latestTipification?.slug ?? NEW_LEAD_TIPIFICATION_SLUG,
     observations: "",
     internalNotes: "",
@@ -135,6 +137,7 @@ export function AdminLeadFormPanel({
       phone: values.phone,
       customerName: values.customerName,
       rut: values.rut,
+      carrier: values.carrier,
       type: values.type,
       notes: notesParts.join("\n\n"),
       lines:
@@ -202,6 +205,7 @@ export function AdminLeadFormPanel({
               <TabsContent value="gestion" className="space-y-4 outline-none">
                 <ClientCard />
                 <FolioNumberField required={isSaleFlow} />
+                <CarrierSelect />
                 <LeadTypeSelect conversationId={conversation.id} />
                 {!isSaleFlow ? <FollowUpDateField /> : null}
                 {isSaleFlow && <SaleDetails />}

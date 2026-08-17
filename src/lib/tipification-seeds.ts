@@ -2,7 +2,7 @@ import { TIPIFICATION_BADGE_COLORS, type Tipification } from "@/types/tipificati
 
 type TipificationSeed = Omit<
   Tipification,
-  "companyId" | "createdAt" | "updatedAt" | "createdBy"
+  "companyId" | "createdAt" | "updatedAt" | "createdBy" | "carrier"
 >;
 
 /** Catálogo inicial — matriz P0.3 (8 slugs legacy; nuevos slugs en P1.6). */

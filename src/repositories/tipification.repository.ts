@@ -11,7 +11,8 @@ import type {
 } from "@/types/tipification";
 
 export interface TipificationRepository {
-  listActive(companyId: string): Promise<Tipification[]>;
+  /** carrier omitido = todas las tipificaciones activas, sin filtrar por operador. */
+  listActive(companyId: string, carrier?: string): Promise<Tipification[]>;
   listAll(companyId: string): Promise<Tipification[]>;
   getById(companyId: string, id: string): Promise<Tipification | null>;
   getBySlug(companyId: string, slug: string): Promise<Tipification | null>;
@@ -31,6 +32,7 @@ function mapRow(r: Record<string, unknown>): Tipification {
     name: String(r.name),
     badgeBg: String(r.badge_bg),
     badgeText: String(r.badge_text),
+    carrier: String(r.carrier ?? "wom"),
     sortOrder: Number(r.sort_order) || 0,
     triggersSaleFlow: Boolean(r.triggers_sale_flow),
     closesInbox:
@@ -64,6 +66,7 @@ function newTipificationId() {
 const mockStore: Tipification[] = DEFAULT_TIPIFICATION_SEEDS.map((seed) => ({
   ...seed,
   companyId: DEFAULT_COMPANY_ID,
+  carrier: "wom",
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   createdBy: "system",
@@ -74,9 +77,11 @@ function mockForCompany(companyId: string): Tipification[] {
 }
 
 class MockTipificationRepository implements TipificationRepository {
-  listActive(companyId: string) {
+  listActive(companyId: string, carrier?: string) {
     return Promise.resolve(
-      mockForCompany(companyId).filter((t) => t.status === "active"),
+      mockForCompany(companyId).filter(
+        (t) => t.status === "active" && (!carrier || t.carrier === carrier),
+      ),
     );
   }
 
@@ -109,6 +114,7 @@ class MockTipificationRepository implements TipificationRepository {
       name: input.name.trim(),
       badgeBg: input.badgeBg,
       badgeText: input.badgeText,
+      carrier: input.carrier ?? "wom",
       sortOrder: input.sortOrder ?? mockStore.length + 1,
       triggersSaleFlow: input.triggersSaleFlow ?? false,
       closesInbox: input.closesInbox ?? TIPIFICATION_BEHAVIOR_DEFAULTS.closesInbox,
@@ -136,6 +142,7 @@ class MockTipificationRepository implements TipificationRepository {
       name: input.name?.trim() ?? current.name,
       badgeBg: input.badgeBg ?? current.badgeBg,
       badgeText: input.badgeText ?? current.badgeText,
+      carrier: input.carrier ?? current.carrier,
       sortOrder: input.sortOrder ?? current.sortOrder,
       triggersSaleFlow: input.triggersSaleFlow ?? current.triggersSaleFlow,
       closesInbox: input.closesInbox ?? current.closesInbox,
@@ -171,10 +178,11 @@ class PostgresTipificationRepository implements TipificationRepository {
     return client;
   }
 
-  async listActive(companyId: string) {
+  async listActive(companyId: string, carrier?: string) {
     const rows = await this.sql<Record<string, unknown>[]>`
       SELECT * FROM tipifications
       WHERE company_id = ${companyId} AND status = 'active'
+        ${carrier ? this.sql`AND carrier = ${carrier}` : this.sql``}
       ORDER BY sort_order ASC, name ASC
     `;
     return rows.map(mapRow);
@@ -235,13 +243,14 @@ class PostgresTipificationRepository implements TipificationRepository {
 
     const rows = await this.sql<Record<string, unknown>[]>`
       INSERT INTO tipifications (
-        id, company_id, slug, name, badge_bg, badge_text,
+        id, company_id, slug, name, badge_bg, badge_text, carrier,
         sort_order, triggers_sale_flow,
         closes_inbox, creates_follow_up, opens_custom_form, follow_up_mode, follow_up_default_days,
         status, created_by
       )
       VALUES (
         ${id}, ${companyId}, ${slug}, ${input.name.trim()}, ${input.badgeBg}, ${input.badgeText},
+        ${input.carrier ?? "wom"},
         ${sortOrder}, ${input.triggersSaleFlow ?? false},
         ${input.closesInbox ?? TIPIFICATION_BEHAVIOR_DEFAULTS.closesInbox},
         ${input.createsFollowUp ?? TIPIFICATION_BEHAVIOR_DEFAULTS.createsFollowUp},
@@ -265,6 +274,7 @@ class PostgresTipificationRepository implements TipificationRepository {
         name = ${input.name?.trim() ?? current.name},
         badge_bg = ${input.badgeBg ?? current.badgeBg},
         badge_text = ${input.badgeText ?? current.badgeText},
+        carrier = ${input.carrier ?? current.carrier},
         sort_order = ${input.sortOrder ?? current.sortOrder},
         triggers_sale_flow = ${input.triggersSaleFlow ?? current.triggersSaleFlow},
         closes_inbox = ${input.closesInbox ?? current.closesInbox},

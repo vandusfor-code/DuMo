@@ -74,6 +74,7 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
       phone: values.phone,
       customerName: values.customerName,
       rut: values.rut,
+      carrier: values.carrier,
       type: values.type,
       notes: notesParts.join("\n\n"),
       lines:

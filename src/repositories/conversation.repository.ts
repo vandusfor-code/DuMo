@@ -140,6 +140,7 @@ type ConvRow = {
   sla_scenario?: string | null;
   sla_status?: string | null;
   sla_armed_at?: string | Date | null;
+  carrier?: string | null;
 };
 
 type MsgRow = {
@@ -202,6 +203,7 @@ function mapConvRow(r: ConvRow): Conversation {
     inboxState: parseInboxState(r.inbox_state),
     latestTipification: mapConversationTipification(r),
     activeSlaWarning: mapSlaWarning(r),
+    carrier: r.carrier ?? "wom",
   };
 }
 
@@ -314,13 +316,27 @@ class PostgresConversationRepository implements ConversationRepository {
     const sql = getSql()!;
     const incUnread = msg.direction === "in" ? 1 : 0;
 
+    // Operador (WOM/Claro) detectado por el número/canal de entrada — solo
+    // importa al CREAR la conversación (no está en el ON CONFLICT DO UPDATE
+    // de abajo), así una conversación ya existente nunca se pisa por esto.
+    let carrier = "wom";
+    if (msg.dumoPhoneId) {
+      const carrierRows = await sql<{ carrier: string }[]>`
+        SELECT carrier FROM connected_numbers WHERE phone_number_id = ${msg.dumoPhoneId}
+        UNION ALL
+        SELECT carrier FROM whatsapp_channels WHERE id = ${msg.dumoPhoneId}
+        LIMIT 1
+      `;
+      if (carrierRows[0]?.carrier) carrier = carrierRows[0].carrier;
+    }
+
     await sql`
       INSERT INTO lead_conversations
-        (id, phone, customer_name, last_message, last_message_at, unread, status, online, dumo_phone_id, last_message_direction, wa_chat_jid)
+        (id, phone, customer_name, last_message, last_message_at, unread, status, online, dumo_phone_id, last_message_direction, wa_chat_jid, carrier)
       VALUES (
         ${msg.conversationId}, ${msg.phone}, ${msg.customerName},
         ${msg.body}, ${msg.createdAt}, ${incUnread}, 'new', ${msg.direction === "in"},
-        ${msg.dumoPhoneId ?? null}, ${msg.direction}, ${msg.waChatJid ?? null}
+        ${msg.dumoPhoneId ?? null}, ${msg.direction}, ${msg.waChatJid ?? null}, ${carrier}
       )
       ON CONFLICT (id) DO UPDATE SET
         last_message = EXCLUDED.last_message,

@@ -54,11 +54,12 @@ export function mapStoredLinesToForm(
 }
 
 export function draftToFormValues(input: {
-  conversation: { customerName: string; rut: string; phone: string };
+  conversation: { customerName: string; rut: string; phone: string; carrier?: string };
   draft?: {
     gestionId: string;
     customerName: string;
     rut: string;
+    carrier?: string;
     type: string;
     notes: string;
     lines: SaveLeadInput["lines"];
@@ -70,6 +71,7 @@ export function draftToFormValues(input: {
     customerName: input.draft?.customerName || input.conversation.customerName,
     rut: input.draft?.rut || input.conversation.rut,
     phone: input.conversation.phone,
+    carrier: input.draft?.carrier || input.conversation.carrier || "wom",
     type: input.draft?.type ?? NEW_LEAD_TIPIFICATION_SLUG,
     observations,
     internalNotes,
@@ -169,6 +171,7 @@ export function leadGestionToNewSaleInput(
     email: input.lines.find((l) => l.email?.trim())?.email || undefined,
     notes: input.notes || undefined,
     folioNumber: input.folioNumber?.trim() || undefined,
+    carrier: input.carrier,
     lines: input.lines.map((line) => ({
       phoneNumber: line.phone,
       saleType: mapLeadLineToSaleType(line.saleType, line.equipmentMode ?? "none"),

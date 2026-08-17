@@ -16,6 +16,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { LeadTypeSelect } from "./lead-type-select";
+import { CarrierSelect } from "./carrier-select";
 import { SaleDetails } from "./sale-details";
 import { DuoSaleForm } from "./duo-sale-form";
 import { ObservationField } from "./observation-field";
@@ -159,6 +160,7 @@ export function LeadPanel({
                   <StatusBadge variant="in_progress">En gestión</StatusBadge>
                   {type ? <DynamicTipificationBadge slug={type} /> : null}
                 </div>
+                <CarrierSelect />
                 <LeadTypeSelect conversationId={conversation.id} />
                 {!isSaleFlow ? <FollowUpDateField /> : null}
               </SectionCardBody>

@@ -27,8 +27,8 @@ async function listAllWithUsage(companyId: string): Promise<TipificationWithUsag
 }
 
 export const tipificationService = {
-  listActive(scope: TenantScope) {
-    return getTipificationRepository().listActive(scope.companyId);
+  listActive(scope: TenantScope, carrier?: string) {
+    return getTipificationRepository().listActive(scope.companyId, carrier);
   },
 
   listAllWithUsage(scope: TenantScope): Promise<TipificationWithUsage[]> {

@@ -34,6 +34,7 @@ import {
   useDeleteWebQrChannel,
   useDisconnectWebQrSession,
   useStartWebQrSession,
+  useUpdateWebQrChannelCarrier,
   useWebQrChannels,
   useWebQrSession,
   webQrKeys,
@@ -96,6 +97,27 @@ function resolveLiveStatus(
 function formatPhone(phone: string | null | undefined) {
   if (!phone || phone === "pending") return "Sin número vinculado";
   return phone.startsWith("+") ? phone : `+${phone}`;
+}
+
+function CarrierBadgeSelect({ channel }: { channel: WhatsAppChannel }) {
+  const updateCarrier = useUpdateWebQrChannelCarrier();
+  return (
+    <Select
+      value={channel.carrier}
+      onValueChange={(carrier) => updateCarrier.mutate({ channelId: channel.id, carrier })}
+    >
+      <SelectTrigger
+        className="h-7 w-[92px] shrink-0 px-2 text-[12px]"
+        aria-label="Operador de esta línea"
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="wom">WOM</SelectItem>
+        <SelectItem value="claro">Claro</SelectItem>
+      </SelectContent>
+    </Select>
+  );
 }
 
 function ChannelRow({ channel }: { channel: WhatsAppChannel }) {
@@ -212,6 +234,7 @@ function ChannelRow({ channel }: { channel: WhatsAppChannel }) {
           </div>
 
           <StatusBadge status={liveStatus} />
+          <CarrierBadgeSelect channel={channel} />
 
           <p className="min-w-0 flex-1 truncate text-[12px] text-muted lg:text-[13px]">{statusText}</p>
 
@@ -362,9 +385,10 @@ function ChannelRow({ channel }: { channel: WhatsAppChannel }) {
 export function WebQrConnectPanel() {
   const { data, isLoading, isError } = useWebQrChannels();
   const create = useCreateWebQrChannel();
+  const [newLineCarrier, setNewLineCarrier] = useState("wom");
 
   const handleAddLine = () => {
-    create.mutate(DEFAULT_LINE_LABEL);
+    create.mutate({ label: DEFAULT_LINE_LABEL, carrier: newLineCarrier });
   };
 
   if (isLoading) {
@@ -415,6 +439,15 @@ export function WebQrConnectPanel() {
             <QrCode className="size-[18px] shrink-0 text-brand" />
             <span className="truncate">Conectar nueva línea por QR</span>
           </button>
+          <Select value={newLineCarrier} onValueChange={setNewLineCarrier}>
+            <SelectTrigger className="h-11 w-full sm:w-[140px]" aria-label="Operador de la nueva línea">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="wom">WOM</SelectItem>
+              <SelectItem value="claro">Claro</SelectItem>
+            </SelectContent>
+          </Select>
           <Button
             type="button"
             onClick={handleAddLine}

@@ -19,8 +19,9 @@ import {
 import type { LeadFormValues } from "@/types/lead-form";
 
 export function LeadTypeSelect({ conversationId }: { conversationId: string }) {
-  const { control } = useFormContext<LeadFormValues>();
-  const { options, isLoading, usingFallback, catalog } = useTipificationCatalog();
+  const { control, watch } = useFormContext<LeadFormValues>();
+  const carrier = watch("carrier");
+  const { options, isLoading, usingFallback, catalog } = useTipificationCatalog(carrier);
   const queryClient = useQueryClient();
 
   return (

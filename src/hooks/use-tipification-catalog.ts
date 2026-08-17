@@ -13,12 +13,15 @@ import {
 } from "@/lib/tipification-utils";
 import type { Tipification } from "@/types/tipification";
 
-export function useTipificationCatalog() {
+export function useTipificationCatalog(carrier?: string) {
   const fallbackCatalog = useMemo(() => buildFallbackTipificationCatalog(), []);
 
   const query = useQuery({
-    queryKey: ["tipifications", "active"],
-    queryFn: () => apiGet<Tipification[]>("/api/tipifications"),
+    queryKey: ["tipifications", "active", carrier ?? "all"],
+    queryFn: () =>
+      apiGet<Tipification[]>(
+        carrier ? `/api/tipifications?carrier=${encodeURIComponent(carrier)}` : "/api/tipifications",
+      ),
     staleTime: 5 * 60 * 1000,
     placeholderData: fallbackCatalog,
     retry: 1,

@@ -89,6 +89,8 @@ export interface NewSaleInput {
   notes?: string;
   /** Radicado escrito por la asesora — obligatorio y único, validado antes de llegar aquí. */
   folioNumber?: string;
+  /** Operador (WOM/Claro) elegido en la gestión — decide comisión/reportes. */
+  carrier?: string;
   lines: {
     phoneNumber: string;
     saleType: SaleType;

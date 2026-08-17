@@ -7,14 +7,17 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** Tipificaciones activas para asesoras y admin (Gestión del cliente). */
-export async function GET() {
+export async function GET(request: Request) {
   const scope = await getTenantScope();
   if (!scope) {
     return NextResponse.json({ error: "No autenticado." }, { status: 401 });
   }
 
+  const carrierParam = new URL(request.url).searchParams.get("carrier");
+  const carrier = carrierParam === "wom" || carrierParam === "claro" ? carrierParam : undefined;
+
   try {
-    const data = await tipificationService.listActive(scope);
+    const data = await tipificationService.listActive(scope, carrier);
     return NextResponse.json(data, {
       headers: { "Cache-Control": "no-store" },
     });

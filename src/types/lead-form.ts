@@ -40,6 +40,8 @@ export interface LeadFormValues {
   customerName: string;
   rut: string;
   phone: string;
+  /** Operador (WOM/Claro) — decide qué catálogo de tipificaciones se muestra. */
+  carrier: string;
   type: string;
   observations: string;
   internalNotes: string;

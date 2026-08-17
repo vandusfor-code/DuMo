@@ -20,6 +20,8 @@ export interface Tipification {
   name: string;
   badgeBg: string;
   badgeText: string;
+  /** Operador (WOM/Claro) al que pertenece esta tipificación. */
+  carrier: string;
   sortOrder: number;
   triggersSaleFlow: boolean;
   /** Si true, la gestión puede sacar el chat de la bandeja activa (P1). */
@@ -46,6 +48,8 @@ export type CreateTipificationInput = {
   slug?: string;
   badgeBg: string;
   badgeText: string;
+  /** Operador (WOM/Claro) al que pertenece esta tipificación. Default 'wom'. */
+  carrier?: string;
   sortOrder?: number;
   triggersSaleFlow?: boolean;
   closesInbox?: boolean;

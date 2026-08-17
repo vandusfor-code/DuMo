@@ -68,6 +68,7 @@ type ConvRow = {
   assigned_advisor_id: string | null;
   assigned_advisor_name: string | null;
   admin_status: string;
+  carrier?: string | null;
   latest_tipification_slug?: string | null;
   latest_tipification_name?: string | null;
   badge_bg?: string | null;
@@ -112,6 +113,7 @@ function mapConversation(r: ConvRow): AdminConversation {
         }
       : null,
     latestTipification: mapConversationTipification(r),
+    carrier: r.carrier ?? "wom",
   };
 }
 
@@ -131,7 +133,7 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
           ? sql<ConvRow[]>`
               SELECT
                 c.id, c.phone, c.customer_name, c.rut, c.last_message, c.last_message_at, c.last_message_direction,
-                c.unread, c.online, c.assigned_advisor_id, c.assigned_advisor_name, c.admin_status,
+                c.unread, c.online, c.assigned_advisor_id, c.assigned_advisor_name, c.admin_status, c.carrier,
                 COALESCE(NULLIF(c.current_tipification_slug, ''), lg.gestion_type) AS latest_tipification_slug,
                 t.name AS latest_tipification_name,
                 t.badge_bg,
@@ -153,7 +155,7 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
           : sql<ConvRow[]>`
               SELECT
                 c.id, c.phone, c.customer_name, c.rut, c.last_message, c.last_message_at, c.last_message_direction,
-                c.unread, c.online, c.assigned_advisor_id, c.assigned_advisor_name, c.admin_status,
+                c.unread, c.online, c.assigned_advisor_id, c.assigned_advisor_name, c.admin_status, c.carrier,
                 COALESCE(NULLIF(c.current_tipification_slug, ''), lg.gestion_type) AS latest_tipification_slug,
                 t.name AS latest_tipification_name,
                 t.badge_bg,

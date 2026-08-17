@@ -12,6 +12,7 @@ type ChannelRow = {
   label: string;
   channel_type: string;
   status: string;
+  carrier: string | null;
   created_at: string | Date;
   updated_at: string | Date;
 };
@@ -35,6 +36,7 @@ function mapChannel(row: ChannelRow): WhatsAppChannel {
     label: row.label,
     channelType: row.channel_type as WhatsAppChannel["channelType"],
     status: row.status as WhatsAppChannel["status"],
+    carrier: row.carrier ?? "wom",
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
   };
@@ -59,7 +61,7 @@ export const webQrRepository = {
     const sql = getSql()!;
     const rows = await withQueryTimeout(
       withDbRetry(() => sql`
-        SELECT id, company_id, phone_number, label, channel_type, status, created_at, updated_at
+        SELECT id, company_id, phone_number, label, channel_type, status, carrier, created_at, updated_at
         FROM whatsapp_channels
         WHERE company_id = ${companyId} AND channel_type = 'WEB_QR'
         ORDER BY created_at DESC
@@ -73,7 +75,7 @@ export const webQrRepository = {
     await ensureSchema();
     const sql = getSql()!;
     const rows = (await sql`
-      SELECT id, company_id, phone_number, label, channel_type, status, created_at, updated_at
+      SELECT id, company_id, phone_number, label, channel_type, status, carrier, created_at, updated_at
       FROM whatsapp_channels WHERE id = ${id} LIMIT 1
     `) as unknown as ChannelRow[];
     return rows[0] ? mapChannel(rows[0]) : null;
@@ -84,6 +86,7 @@ export const webQrRepository = {
     label: string;
     phoneNumber?: string;
     companyId?: string;
+    carrier?: string;
   }): Promise<WhatsAppChannel> {
     await ensureSchema();
     const sql = getSql()!;
@@ -91,8 +94,8 @@ export const webQrRepository = {
     const phone = (input.phoneNumber ?? "").replace(/\D/g, "") || "pending";
 
     await sql`
-      INSERT INTO whatsapp_channels (id, company_id, phone_number, label, channel_type, status)
-      VALUES (${input.id}, ${companyId}, ${phone}, ${input.label}, 'WEB_QR', 'INITIALIZING')
+      INSERT INTO whatsapp_channels (id, company_id, phone_number, label, channel_type, status, carrier)
+      VALUES (${input.id}, ${companyId}, ${phone}, ${input.label}, 'WEB_QR', 'INITIALIZING', ${input.carrier ?? "wom"})
     `;
 
     await sql`
@@ -103,6 +106,14 @@ export const webQrRepository = {
     const channel = await this.getChannel(input.id);
     if (!channel) throw new Error("No se pudo crear el canal QR.");
     return channel;
+  },
+
+  async updateChannelCarrier(id: string, carrier: string): Promise<void> {
+    await ensureSchema();
+    const sql = getSql()!;
+    await sql`
+      UPDATE whatsapp_channels SET carrier = ${carrier}, updated_at = now() WHERE id = ${id}
+    `;
   },
 
   async updateChannelStatus(id: string, status: WhatsAppChannel["status"], phoneNumber?: string): Promise<void> {

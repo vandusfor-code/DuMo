@@ -9,6 +9,8 @@ export type WhatsAppChannel = {
   label: string;
   channelType: WhatsAppChannelType;
   status: WhatsAppChannelStatus;
+  /** Operador (WOM/Claro) al que pertenece este número. */
+  carrier: string;
   createdAt: string;
   updatedAt: string;
 };

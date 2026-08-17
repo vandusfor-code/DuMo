@@ -125,6 +125,8 @@ export type LatestGestionDraft = {
   gestionId: string;
   customerName: string;
   rut: string;
+  /** Operador (WOM/Claro) elegido en esa gestión — puede diferir del carrier de la conversación. */
+  carrier: string;
   type: string;
   notes: string;
   lines: SaveLeadInput["lines"];
@@ -138,6 +140,8 @@ export interface SaveLeadInput {
   phone: string;
   customerName: string;
   rut: string;
+  /** Operador (WOM/Claro) elegido al tipificar — puede diferir del carrier de la conversación. */
+  carrier: string;
   /** Slug de tipificación (ej. "venta", "seguimiento"). */
   type: string;
   notes: string;

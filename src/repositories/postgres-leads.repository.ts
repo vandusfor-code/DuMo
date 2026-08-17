@@ -57,11 +57,12 @@ export class PostgresLeadRepository {
       sql`
         INSERT INTO lead_gestiones (
           id, conversation_id, phone, customer_name, rut, gestion_type,
-          notes, advisor_id, advisor_name, lines, created_at, folio_number
+          notes, advisor_id, advisor_name, lines, created_at, folio_number, carrier
         ) VALUES (
           ${id}, ${input.conversationId}, ${input.phone}, ${input.customerName},
           ${input.rut}, ${input.type}, ${input.notes}, ${advisorId || null},
-          ${advisorName}, ${JSON.stringify(input.lines)}, ${now}, ${input.folioNumber?.trim() ?? ""}
+          ${advisorName}, ${JSON.stringify(input.lines)}, ${now}, ${input.folioNumber?.trim() ?? ""},
+          ${input.carrier ?? "wom"}
         )
       `,
     );
@@ -147,6 +148,7 @@ export class PostgresLeadRepository {
           id: string;
           customer_name: string;
           rut: string;
+          carrier: string | null;
           gestion_type: string;
           notes: string;
           lines: SaveLeadInput["lines"] | null;
@@ -154,7 +156,7 @@ export class PostgresLeadRepository {
           folio_number: string | null;
         }[]
       >`
-        SELECT id, customer_name, rut, gestion_type, notes, lines, sales_script, folio_number
+        SELECT id, customer_name, rut, carrier, gestion_type, notes, lines, sales_script, folio_number
         FROM lead_gestiones
         WHERE conversation_id = ${conversationId}
         ORDER BY created_at DESC
@@ -167,6 +169,7 @@ export class PostgresLeadRepository {
       gestionId: row.id,
       customerName: row.customer_name ?? "",
       rut: row.rut ?? "",
+      carrier: row.carrier ?? "wom",
       type: row.gestion_type as LeadType,
       notes: row.notes ?? "",
       lines: Array.isArray(row.lines) ? row.lines : [],

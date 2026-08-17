@@ -92,6 +92,7 @@ export const saveLeadSchema = z.object({
   phone: z.string().trim().min(1),
   customerName: z.string().trim().min(1, "El nombre es obligatorio."),
   rut: z.string().trim().min(1, "El RUT es obligatorio."),
+  carrier: z.enum(["wom", "claro"]).optional().default("wom"),
   type: z.string().trim().min(1, "Selecciona una tipificación."),
   notes: z.string().trim().max(4000, "Máximo 4000 caracteres.").optional().default(""),
   lines: z.array(leadLineSchema).optional().default([]),

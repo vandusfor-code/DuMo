@@ -373,12 +373,12 @@ export class PostgresSalesStore {
       await tx`
         INSERT INTO sales (
           id, customer_name, rut, phone, email, advisor_id, advisor_name,
-          status, sale_type, plan, operator_value, dumo_value, sale_date, notes, created_at, folio_number
+          status, sale_type, plan, operator_value, dumo_value, sale_date, notes, created_at, folio_number, carrier
         ) VALUES (
           ${id}, ${input.customerName}, ${input.rut}, ${input.phone},
           ${input.email ?? ""}, ${advisorId}, ${advisorName}, ${"registrada"},
           ${adminType}, ${planName}, ${operatorValue}, ${dumoValue}, ${today},
-          ${input.notes ?? ""}, ${now.toISOString()}, ${folioNumber}
+          ${input.notes ?? ""}, ${now.toISOString()}, ${folioNumber}, ${input.carrier ?? "wom"}
         )
       `;
       for (let i = 0; i < input.lines.length; i++) {

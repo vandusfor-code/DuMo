@@ -41,6 +41,8 @@ export interface AdminConversation {
   assignedAdvisor: AdminAdvisor | null;
   /** Última tipificación guardada (lead_gestiones más reciente). */
   latestTipification?: import("./conversation").ConversationTipification | null;
+  /** Operador (WOM/Claro) — detectado por el número de entrada, editable en la gestión. */
+  carrier?: string;
 }
 
 export interface LeadNote {
