@@ -2,7 +2,7 @@ import "server-only";
 import { Worker } from "bullmq";
 import { getRedisConnection, isQueueEnabled } from "@/server/queue/redis";
 import { CAMPAIGN_QUEUE_NAME, type CampaignJobData } from "@/server/queue/campaign-jobs";
-import { enqueueCampaignTick } from "@/server/queue/campaign-queue";
+import { campaignTickJobExists, enqueueCampaignTick } from "@/server/queue/campaign-queue";
 import { getCampaignRepository } from "@/repositories/campaign.repository";
 import { getConversationRepository } from "@/repositories/conversation.repository";
 import { getMessageProvider } from "@/server/campaigns/message-provider";
@@ -42,8 +42,14 @@ async function processCampaignTick(campaignId: string, jobId: string): Promise<v
   const campaign = await repo.getCampaignById(campaignId);
   if (!campaign) return;
 
-  // Guard contra doble tick activo: solo el job registrado como "actual" puede actuar.
-  if (campaign.currentJobId && campaign.currentJobId !== jobId) return;
+  // CAS atómico: confirma que este tick sigue siendo el único autorizado
+  // para esta campaña (ver confirmTickOwnership). Toda transición que saca
+  // la campaña de EJECUTANDO también limpia current_job_id, así que pasar
+  // esta confirmación implica que la campaña sigue en EJECUTANDO — es la
+  // única fuente de verdad, no una lectura-y-decide que pueda perder una
+  // carrera entre dos ticks casi simultáneos.
+  const owns = await repo.confirmTickOwnership(campaignId, jobId);
+  if (!owns) return;
 
   if (await isCampaignsKillSwitchActive()) {
     if (campaign.status === "EJECUTANDO") {
@@ -218,18 +224,32 @@ export async function closeCampaignWorker(): Promise<void> {
   started = false;
 }
 
-/** Recuperación tras reinicio del server (sección 33): reprograma un tick para toda campaña que quedó EJECUTANDO. */
+/**
+ * Recuperación tras reinicio del server (sección 33): reprograma un tick
+ * para toda campaña que quedó EJECUTANDO. BullMQ persiste los jobs en
+ * Redis, no en memoria del proceso — un reinicio del server NO borra un
+ * tick con delay que ya estaba esperando. Por eso primero se comprueba si
+ * `current_job_id` sigue vivo en la cola antes de crear uno nuevo: crearlo
+ * a ciegas duplicaría el tick (dos activos para la misma campaña).
+ */
 export async function resumeActiveCampaignsOnBoot(): Promise<void> {
   if (!isQueueEnabled()) return;
   try {
     const repo = getCampaignRepository();
-    const ids = await repo.listActiveCampaignIds();
-    for (const id of ids) {
-      const jobId = await enqueueCampaignTick(id, 0);
-      if (jobId) await repo.setCurrentJobId(id, jobId);
+    const campaigns = await repo.listActiveCampaigns();
+    let resumed = 0;
+    for (const c of campaigns) {
+      if (c.currentJobId && (await campaignTickJobExists(c.currentJobId))) {
+        continue; // ya hay un tick vivo en Redis, no duplicar
+      }
+      const jobId = await enqueueCampaignTick(c.id, 0);
+      if (jobId) {
+        await repo.setCurrentJobId(c.id, jobId);
+        resumed++;
+      }
     }
-    if (ids.length > 0) {
-      console.log(`[campaign-worker] ${ids.length} campaña(s) reanudada(s) tras reinicio`);
+    if (resumed > 0) {
+      console.log(`[campaign-worker] ${resumed} campaña(s) reanudada(s) tras reinicio`);
     }
   } catch (err) {
     console.error("[campaign-worker] resumeActiveCampaignsOnBoot", err);

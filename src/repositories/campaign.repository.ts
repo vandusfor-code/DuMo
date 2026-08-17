@@ -154,13 +154,16 @@ class PostgresCampaignRepository {
     return rows.map(mapCampaignRow);
   }
 
-  async listActiveCampaignIds(): Promise<string[]> {
+  /** Usado en la recuperación tras reinicio del server — incluye current_job_id para no duplicar un tick que ya sigue vivo en Redis. */
+  async listActiveCampaigns(): Promise<{ id: string; currentJobId: string | null }[]> {
     await ensureSchema();
     const sql = requireSql();
     const rows = await withDbRetry(() =>
-      sql<{ id: string }[]>`SELECT id FROM campaigns WHERE status = 'EJECUTANDO'`,
+      sql<{ id: string; current_job_id: string | null }[]>`
+        SELECT id, current_job_id FROM campaigns WHERE status = 'EJECUTANDO'
+      `,
     );
-    return rows.map((r) => r.id);
+    return rows.map((r) => ({ id: r.id, currentJobId: r.current_job_id }));
   }
 
   async updateMessageTemplate(companyId: string, id: string, messageTemplate: string): Promise<void> {
@@ -259,6 +262,47 @@ class PostgresCampaignRepository {
       `,
     );
     return rows.map(mapContactRow);
+  }
+
+  /**
+   * CAS atómico: transiciona a EJECUTANDO solo si el estado actual sigue
+   * siendo uno de los permitidos. Si dos llamadas a start()/resume() llegan
+   * casi simultáneas (doble clic, reintento de red), la condición WHERE
+   * hace que como mucho UNA afecte una fila — la otra no encuentra nada que
+   * actualizar y no debe encolar un segundo tick.
+   */
+  async tryTransitionToRunning(id: string, fromStatuses: CampaignStatus[]): Promise<Campaign | null> {
+    const sql = requireSql();
+    const rows = await withDbRetry(() =>
+      sql<Record<string, unknown>[]>`
+        UPDATE campaigns SET status = 'EJECUTANDO', updated_at = now()
+        WHERE id = ${id} AND status = ANY(${fromStatuses})
+        RETURNING *
+      `,
+    );
+    return rows[0] ? mapCampaignRow(rows[0]) : null;
+  }
+
+  /**
+   * CAS atómico: confirma que este tick (jobId) sigue siendo el único
+   * autorizado a actuar para esta campaña — `current_job_id` sigue
+   * apuntando exactamente a él. Toda transición que saca a la campaña de
+   * EJECUTANDO (pausar, cancelar, auto-pausa, completar) también limpia
+   * `current_job_id`, así que si esta confirmación pasa, la campaña sigue
+   * en EJECUTANDO por construcción. Si dos ticks llegaran a coexistir por
+   * cualquier motivo, como mucho UNO pasa esto — garantiza que nunca hay
+   * más de un contacto de la misma campaña en PROCESSING a la vez.
+   */
+  async confirmTickOwnership(id: string, jobId: string): Promise<boolean> {
+    const sql = requireSql();
+    const rows = await withDbRetry(() =>
+      sql<{ id: string }[]>`
+        UPDATE campaigns SET updated_at = now()
+        WHERE id = ${id} AND current_job_id = ${jobId}
+        RETURNING id
+      `,
+    );
+    return rows.length > 0;
   }
 
   async setStatus(

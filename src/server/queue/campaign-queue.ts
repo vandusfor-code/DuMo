@@ -21,8 +21,10 @@ function getCampaignQueue(): Queue<CampaignJobData> | null {
  * contacto y, si corresponde, se reprograma a sí mismo. `delayMs` es el
  * intervalo configurado entre envíos (0 para el primer tick, inmediato).
  * jobId único por llamada (no deduplicado por BullMQ): la protección contra
- * doble tick activo por campaña vive en `campaigns.current_job_id` — cada
- * tick solo actúa si su propio job.id coincide con el guardado ahí.
+ * doble tick activo por campaña vive en `campaigns.current_job_id`, confirmado
+ * con un CAS atómico (`confirmTickOwnership`) al arrancar cada tick — cada
+ * tick solo actúa si sigue siendo el único cuyo job.id coincide con el
+ * guardado en la base en ese instante.
  */
 export async function enqueueCampaignTick(campaignId: string, delayMs = 0): Promise<string | null> {
   const q = getCampaignQueue();
@@ -38,6 +40,16 @@ export async function enqueueCampaignTick(campaignId: string, delayMs = 0): Prom
     },
   );
   return job.id ?? null;
+}
+
+/** ¿Sigue vivo este job en la cola? Evita duplicar un tick que ya está esperando tras un reinicio del server (BullMQ persiste en Redis, no en memoria del proceso). */
+export async function campaignTickJobExists(jobId: string): Promise<boolean> {
+  const q = getCampaignQueue();
+  if (!q) return false;
+  const job = await q.getJob(jobId);
+  if (!job) return false;
+  const state = await job.getState();
+  return state === "waiting" || state === "delayed" || state === "active" || state === "waiting-children";
 }
 
 export function isCampaignQueueEnabled(): boolean {

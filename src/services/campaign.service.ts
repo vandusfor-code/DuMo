@@ -144,11 +144,14 @@ export const campaignService = {
     if (!(await repo.hasPendingContacts(campaignId))) {
       throw new Error("No hay contactos elegibles para enviar.");
     }
-    if (campaign.status !== "BORRADOR" && campaign.status !== "VALIDANDO" && campaign.status !== "PROGRAMADA") {
-      throw new Error(`No se puede iniciar una campaña en estado ${campaign.status}.`);
-    }
 
-    await repo.setStatus(campaignId, "EJECUTANDO");
+    // CAS atómico — si dos llamadas a start() llegan casi simultáneas
+    // (doble clic, reintento de red), como mucho una gana la carrera; la
+    // otra recibe null y nunca llega a encolar un segundo tick.
+    const started = await repo.tryTransitionToRunning(campaignId, ["BORRADOR", "VALIDANDO", "PROGRAMADA"]);
+    if (!started) {
+      throw new Error("La campaña ya se está iniciando o ya está en curso.");
+    }
     const jobId = await enqueueCampaignTick(campaignId, 0);
     if (jobId) await repo.setCurrentJobId(campaignId, jobId);
     await repo.logEvent(campaignId, "CAMPAIGN_STARTED");
@@ -174,11 +177,13 @@ export const campaignService = {
       throw new Error("El interruptor de emergencia global está activo — no se pueden reanudar campañas.");
     }
     const repo = getCampaignRepository();
-    const campaign = assertActiveCampaign(await repo.getCampaign(actor.companyId, campaignId), campaignId);
-    if (campaign.status !== "PAUSADA" && campaign.status !== "AUTO_PAUSADA") {
-      throw new Error(`No se puede reanudar una campaña en estado ${campaign.status}.`);
+    assertActiveCampaign(await repo.getCampaign(actor.companyId, campaignId), campaignId);
+
+    // Mismo CAS atómico que start() — evita un segundo tick ante doble clic/reintento.
+    const resumed = await repo.tryTransitionToRunning(campaignId, ["PAUSADA", "AUTO_PAUSADA"]);
+    if (!resumed) {
+      throw new Error("La campaña ya se está reanudando o no está pausada.");
     }
-    await repo.setStatus(campaignId, "EJECUTANDO");
     const jobId = await enqueueCampaignTick(campaignId, 0);
     if (jobId) await repo.setCurrentJobId(campaignId, jobId);
     await repo.logEvent(campaignId, "CAMPAIGN_RESUMED");
