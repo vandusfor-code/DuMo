@@ -33,9 +33,17 @@ export async function runWebQrMigrations(tx: MigrationSql): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_whatsapp_channels_company
     ON whatsapp_channels (company_id, channel_type)
   `;
+  // El índice único original trataba 'pending' (placeholder de un canal
+  // creado pero aún sin número vinculado) como un valor real — así que con
+  // un canal ya en 'pending' (p. ej. recién creado, o desvinculado), crear
+  // CUALQUIER otro canal QR fallaba con "duplicate key" antes de siquiera
+  // llegar al bridge. Se excluye 'pending' de la unicidad: solo los números
+  // reales deben ser únicos por compañía/tipo.
+  await tx`DROP INDEX IF EXISTS idx_whatsapp_channels_phone_type`;
   await tx`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_whatsapp_channels_phone_type
     ON whatsapp_channels (company_id, phone_number, channel_type)
+    WHERE phone_number <> 'pending'
   `;
 
   await tx`

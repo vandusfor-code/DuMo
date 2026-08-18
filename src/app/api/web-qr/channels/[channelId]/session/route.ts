@@ -131,13 +131,16 @@ export async function GET(_request: Request, { params }: RouteCtx) {
   }
 
   let status = await bridgeGetSessionStatusOrNull(bridgeSessionId);
-  if (!status && !dbSession) {
-    // Canal nunca conectado (sin fila en web_qr_sessions todavía) — no
-    // arrancar una sesión Baileys automáticamente desde un poll de solo
-    // lectura (esta ruta se consulta cada 5s mientras la pantalla admin está
-    // abierta). El primer intento de conexión debe venir de una acción
-    // explícita (botón "Generar código QR"), nunca de solo tener la pestaña
-    // abierta o refrescarla.
+  if (!status && !dbSession?.bridgeSessionId) {
+    // Canal nunca registrado en el bridge (createWebQrChannel ya inserta una
+    // fila en web_qr_sessions al crear el canal, con bridge_session_id en
+    // NULL — así que "existe fila" NO sirve para distinguir un canal nuevo;
+    // bridge_session_id solo se llena tras un registro real vía
+    // registerWebQrBridgeSession/ensureBridgeSession). No arrancar una
+    // sesión Baileys automáticamente desde un poll de solo lectura (esta
+    // ruta se consulta cada 5s mientras la pantalla admin está abierta). El
+    // primer intento de conexión debe venir de una acción explícita (botón
+    // "Generar código QR"), nunca de solo tener la pestaña abierta.
     return NextResponse.json({
       channelId,
       status: "DISCONNECTED",
