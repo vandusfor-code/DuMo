@@ -47,6 +47,17 @@ const PORT = Number(process.env.PORT ?? 8787);
 const BRIDGE_SECRET = process.env.BRIDGE_SECRET ?? "";
 const SESSIONS_DIR = process.env.SESSIONS_DIR ?? "./data/sessions";
 
+/**
+ * Backoff para el reintento automático genérico (cortes que no son logout ni
+ * connectionReplaced — esos dos ya tienen su propio manejo). Sin esto, un
+ * problema persistente (de red, de WhatsApp, o de una restricción de cuenta)
+ * reintentaría cada 3s para siempre — ese patrón por sí solo puede parecer
+ * actividad automatizada sospechosa ante WhatsApp, independiente de la
+ * carrera de sockets ya corregida.
+ */
+const RECONNECT_BACKOFF_MS = [3000, 8000, 20000, 45000, 90000, 120000];
+const RECONNECT_MAX_ATTEMPTS = 10;
+
 if (!BRIDGE_SECRET) {
   console.error("Falta BRIDGE_SECRET");
   process.exit(1);
@@ -408,6 +419,12 @@ function createSessionRuntime(channelId, overrides = {}) {
     // bucle infinito).
     connecting: false,
     connectAttempt: 0,
+    // Cuenta cortes consecutivos (se resetea a 0 al llegar a "open"). Maneja
+    // el backoff/tope del reintento genérico — ver RECONNECT_BACKOFF_MS más
+    // abajo. Sin esto, un problema persistente (no solo la carrera ya
+    // corregida) reintentaría cada 3s para siempre, lo cual por sí solo
+    // puede parecer actividad automatizada sospechosa ante WhatsApp.
+    consecutiveCloses: 0,
     lastError: null,
     lastWebhookStatus: null,
     lastWebhookError: null,
@@ -758,6 +775,7 @@ async function startBaileys(session) {
 
     if (connection === "open") {
       session.connecting = false;
+      session.consecutiveCloses = 0;
       if (!session.webhookUrl && process.env.DUMO_WEBHOOK_URL) {
         session.webhookUrl = process.env.DUMO_WEBHOOK_URL.trim();
       }
@@ -821,7 +839,24 @@ async function startBaileys(session) {
         return;
       }
 
-      log.info({ channelId: session.channelId, code }, "reconectando Baileys…");
+      session.consecutiveCloses += 1;
+
+      if (session.consecutiveCloses > RECONNECT_MAX_ATTEMPTS) {
+        // Cortes repetidos sin lograr abrir una sola vez — seguir
+        // reintentando en bucle es justo el patrón que puede leerse como
+        // actividad automatizada sospechosa. Se detiene solo: el próximo
+        // trigger legítimo (envío saliente o reconecte manual desde el
+        // admin) vuelve a arrancar desde cero, con consecutiveCloses en 0.
+        log.error(
+          { channelId: session.channelId, code, attempts: session.consecutiveCloses },
+          "demasiados cortes seguidos — se detiene el reintento automático, requiere reconexión manual",
+        );
+        return;
+      }
+
+      const delayMs =
+        RECONNECT_BACKOFF_MS[Math.min(session.consecutiveCloses - 1, RECONNECT_BACKOFF_MS.length - 1)];
+      log.info({ channelId: session.channelId, code, delayMs, attempt: session.consecutiveCloses }, "reconectando Baileys…");
       // Si para cuando dispare este timer ya hay un intento más nuevo en
       // curso o conectado (disparado por otra vía, p. ej. un POST /sessions
       // que llegó mientras tanto), no pisarlo — este reintento programado ya
@@ -830,7 +865,7 @@ async function startBaileys(session) {
       setTimeout(() => {
         if (session.connectAttempt !== scheduledForAttempt) return;
         startBaileys(session).catch((e) => log.error(e));
-      }, 3000);
+      }, delayMs);
     }
   });
 

@@ -156,7 +156,15 @@ function ChannelRow({ channel }: { channel: WhatsAppChannel }) {
   useEffect(() => {
     if (autoRestoreAttempted || start.isPending || session.isFetching) return;
     const bridgeStatus = session.data?.status;
-    const staleDbSession = channel.status === "CONNECTED" || channel.status === "INITIALIZING";
+    // phoneNumber === "pending" significa que este canal nunca llegó a
+    // conectarse (o se desvinculó por completo) — en ese caso no hay una
+    // sesión real que "restaurar" tras un reinicio del bridge, así que no
+    // debe arrancar un intento de conexión solo porque la pantalla admin
+    // está abierta. El primer intento de un número nuevo debe venir de
+    // pulsar "Generar código QR", nunca de un efecto automático.
+    const staleDbSession =
+      (channel.status === "CONNECTED" || channel.status === "INITIALIZING") &&
+      channel.phoneNumber !== "pending";
     const needsRestore =
       staleDbSession &&
       (bridgeStatus === "DISCONNECTED" ||

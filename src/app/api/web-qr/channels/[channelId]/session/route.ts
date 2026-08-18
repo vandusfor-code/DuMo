@@ -131,6 +131,19 @@ export async function GET(_request: Request, { params }: RouteCtx) {
   }
 
   let status = await bridgeGetSessionStatusOrNull(bridgeSessionId);
+  if (!status && !dbSession) {
+    // Canal nunca conectado (sin fila en web_qr_sessions todavía) — no
+    // arrancar una sesión Baileys automáticamente desde un poll de solo
+    // lectura (esta ruta se consulta cada 5s mientras la pantalla admin está
+    // abierta). El primer intento de conexión debe venir de una acción
+    // explícita (botón "Generar código QR"), nunca de solo tener la pestaña
+    // abierta o refrescarla.
+    return NextResponse.json({
+      channelId,
+      status: "DISCONNECTED",
+      qrDataUrl: null,
+    });
+  }
   if (!status) {
     const webhookSecret = webQrWebhookSecret()!;
     const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://du-mo.vercel.app";
