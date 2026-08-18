@@ -66,8 +66,20 @@ export async function ensureWebQrBridgeReady(channelId: string): Promise<void> {
     throw new Error("WEB_QR_WEBHOOK_SECRET no configurado en Vercel.");
   }
 
-  // Siempre registrar en bridge (actualiza webhook tras reinicios de Railway).
-  await registerWebQrBridgeSession(resolvedId);
+  let live = await bridgeGetSessionStatusOrNull(sessionId);
+
+  // Registrar en el bridge SOLO cuando no hay confirmación fresca de que ya
+  // está CONNECTED — llamar esto en cada envío (incluso ya conectado) hacía
+  // que el bridge recibiera un POST /sessions constante; si ese POST caía
+  // justo en la ventana de un reintento automático tras un corte transitorio
+  // (código != loggedOut), el bridge terminaba abriendo un segundo socket
+  // Baileys con las mismas credenciales — eso producía el bucle de
+  // "connectionReplaced" que tumbó la sesión. El registro sigue existiendo
+  // para el caso real que lo necesita: tras un reinicio de Railway, cuando
+  // el bridge perdió el registro en memoria y no está conectado.
+  if (live?.status !== "CONNECTED") {
+    await registerWebQrBridgeSession(resolvedId);
+  }
 
   const webhookCheck = await verifyWebQrWebhookReachable();
   if (!webhookCheck.ok) {
@@ -76,7 +88,6 @@ export async function ensureWebQrBridgeReady(channelId: string): Promise<void> {
     );
   }
 
-  let live = await bridgeGetSessionStatusOrNull(sessionId);
   if (live?.status === "CONNECTED") {
     await webQrRepository.updateChannelStatus(
       resolvedId,

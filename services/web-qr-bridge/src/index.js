@@ -398,6 +398,16 @@ function createSessionRuntime(channelId, overrides = {}) {
     qrDataUrl: null,
     phoneNumber: null,
     sock: null,
+    // true desde que arranca un intento de conexión hasta que llega a un
+    // estado terminal (open o close) — a diferencia de `starting`, cubre
+    // TODO el handshake con WhatsApp, no solo el setup síncrono. Es lo que
+    // evita que un POST /sessions (disparado por cada envío saliente de
+    // DuMo) abra un SEGUNDO socket mientras el reintento automático tras un
+    // corte todavía está en curso — eso era lo que producía dos sockets
+    // vivos con las mismas credenciales peleándose (connectionReplaced en
+    // bucle infinito).
+    connecting: false,
+    connectAttempt: 0,
     lastError: null,
     lastWebhookStatus: null,
     lastWebhookError: null,
@@ -666,8 +676,13 @@ function mapOutboundSessionError(err, res) {
 }
 
 async function startBaileys(session) {
-  if (session.starting) return;
-  session.starting = true;
+  // Cubre TODO el intento de conexión (hasta open/close), no solo el setup
+  // síncrono — ver comentario en createSessionRuntime(). Si ya hay un
+  // intento en curso, no arrancar uno segundo (eso era lo que producía dos
+  // sockets vivos con las mismas credenciales).
+  if (session.connecting) return;
+  session.connecting = true;
+  const myAttempt = ++session.connectAttempt;
 
   try {
     if (session.sock) {
@@ -730,6 +745,10 @@ async function startBaileys(session) {
   sock.ev.on("connection.update", async (update) => {
     const { connection, lastDisconnect, qr } = update;
 
+    // Evento tardío de un socket ya reemplazado por un intento más nuevo —
+    // ignorar por completo, no tocar el estado de la sesión actual.
+    if (myAttempt !== session.connectAttempt) return;
+
     if (qr) {
       session.status = "QR_PENDING";
       session.qrDataUrl = await QRCode.toDataURL(qr, { margin: 1, width: 280 });
@@ -738,6 +757,7 @@ async function startBaileys(session) {
     }
 
     if (connection === "open") {
+      session.connecting = false;
       if (!session.webhookUrl && process.env.DUMO_WEBHOOK_URL) {
         session.webhookUrl = process.env.DUMO_WEBHOOK_URL.trim();
       }
@@ -766,6 +786,7 @@ async function startBaileys(session) {
 
     if (connection === "close") {
       const code = lastDisconnect?.error?.output?.statusCode;
+      session.connecting = false;
       session.status = "DISCONNECTED";
       session.sock = null;
       session.qrDataUrl = null;
@@ -785,8 +806,31 @@ async function startBaileys(session) {
 
       await notifyDuMo(session, { type: "session.disconnected", channelId: session.channelId });
 
+      if (code === DisconnectReason.connectionReplaced) {
+        // Otra conexión con las mismas credenciales ya tomó esta sesión —
+        // reintentar de inmediato es exactamente lo que producía el bucle
+        // infinito (cada lado se reemplaza al otro sin parar). No reintentar
+        // acá: la sesión "ganadora" (la que sí sigue conectada) se queda
+        // tranquila, y el próximo trigger legítimo (un envío saliente vía
+        // ensureWebQrBridgeReady, o un reconecte manual desde el admin)
+        // arranca UN solo intento limpio, protegido por `connecting`.
+        log.warn(
+          { channelId: session.channelId },
+          "conexión reemplazada por otra sesión con las mismas credenciales — no se reintenta automáticamente",
+        );
+        return;
+      }
+
       log.info({ channelId: session.channelId, code }, "reconectando Baileys…");
-      setTimeout(() => startBaileys(session).catch((e) => log.error(e)), 3000);
+      // Si para cuando dispare este timer ya hay un intento más nuevo en
+      // curso o conectado (disparado por otra vía, p. ej. un POST /sessions
+      // que llegó mientras tanto), no pisarlo — este reintento programado ya
+      // quedó obsoleto.
+      const scheduledForAttempt = session.connectAttempt;
+      setTimeout(() => {
+        if (session.connectAttempt !== scheduledForAttempt) return;
+        startBaileys(session).catch((e) => log.error(e));
+      }, 3000);
     }
   });
 
@@ -811,8 +855,13 @@ async function startBaileys(session) {
       await forwardInboundToDuMo(session, msg, "update");
     }
   });
-  } finally {
-    session.starting = false;
+  } catch (err) {
+    // Falló el setup síncrono (auth state, fetchLatestBaileysVersion, etc.)
+    // antes de siquiera abrir el socket — nunca llegará un evento open/close
+    // que libere `connecting`, así que hay que liberarlo acá o la sesión
+    // quedaría bloqueada para siempre sin poder reintentar.
+    session.connecting = false;
+    throw err;
   }
 }
 
@@ -844,7 +893,7 @@ app.post("/sessions", auth, async (req, res) => {
     if (label) session.label = label;
     if (trimmedWebhookUrl) session.webhookUrl = trimmedWebhookUrl;
     if (trimmedWebhookSecret) session.webhookSecret = trimmedWebhookSecret;
-    if (!session.sock && session.status !== "QR_PENDING") {
+    if (!session.sock && !session.connecting && session.status !== "QR_PENDING") {
       log.info({ channelId }, "reiniciando sesión Baileys en memoria");
       startBaileys(session).catch((err) => {
         session.lastError = err instanceof Error ? err.message : String(err);
