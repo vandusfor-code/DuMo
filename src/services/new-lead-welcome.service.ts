@@ -1,21 +1,22 @@
 import "server-only";
-import { isMessengerConversation } from "@/lib/messenger/conversation-id";
 import { buildNewLeadWelcomeMessages } from "@/lib/new-lead-welcome";
-import { isWebQrConversation } from "@/lib/web-qr/conversation-id";
 import { ensureSchema, getSql } from "@/server/db/client";
 import { leadsService } from "@/services/leads.service";
 
 const WELCOME_LOCK_NS = 8_814_201;
 
+/** Pausa entre las dos burbujas — que no salgan pegadas, como si alguien las tipeara. */
+const WELCOME_BUBBLE_DELAY_MS = 2_500;
+
 /**
- * Primer contacto WhatsApp (orgánico o DuLabs): dos burbujas, en orden,
- * con el nombre de la asesora ya asignada. No corre en Messenger/QR,
+ * Primer contacto (cualquier canal — WhatsApp oficial, WhatsApp Web/QR o
+ * Messenger; leadsService.sendTextMessage() enruta cada uno a su proveedor):
+ * dos burbujas, en orden, con el nombre de la asesora ya asignada. Nunca en
  * reaperturas, chats que ya tenían asesora, ni si ya hubo un saliente.
  * Errores de envío se registran y no se relanzan.
  */
 export async function maybeSendNewLeadWelcome(conversationId: string): Promise<void> {
   if (!conversationId) return;
-  if (isMessengerConversation(conversationId) || isWebQrConversation(conversationId)) return;
 
   await ensureSchema();
   const sql = getSql();
@@ -51,6 +52,7 @@ export async function maybeSendNewLeadWelcome(conversationId: string): Promise<v
       const to = row.phone?.trim() || conversationId;
 
       await leadsService.sendTextMessage({ conversationId, to, text: first });
+      await new Promise((resolve) => setTimeout(resolve, WELCOME_BUBBLE_DELAY_MS));
       await leadsService.sendTextMessage({ conversationId, to, text: second });
     });
   } catch (err) {
