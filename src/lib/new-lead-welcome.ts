@@ -3,13 +3,19 @@
 export function buildNewLeadWelcomeMessages(advisorName: string): [string, string] {
   const name = advisorName.trim();
   const first = (name.split(/\s+/)[0] || name).trim();
-  const greeting = `Hola 👋 ¡Un gusto saludarte! Te saluda *${first}*, ejecutiva de *WOM* 💜📱.
+  const greeting = `¡Hola! 👋 Gracias por comunicarte con WOM 💜
+Te saluda *${first}*, mucho gusto.
 
-Estoy aquí para ayudarte y contarte sobre nuestras opciones disponibles.`;
-  const dataRequest = `Para validar la oferta disponible para ti 💜, por favor confírmame los siguientes datos:
+Tenemos 2 opciones para ti:`;
+  const dataRequest = `📱 *PORTABILIDAD*:
+RUT:
+Número que deseas portar:
+Compañía actual:
 
-Nombre:
-Número de teléfono:
-Compañía actual:`;
+🔄 *RECAMBIO*:
+RUT:
+Número WOM:
+
+Una vez recibamos tus datos, revisaremos tu evaluación y stock disponible para enviarte las opciones disponibles. 😊`;
   return [greeting, dataRequest];
 }
