@@ -1,8 +1,7 @@
 "use client";
 
 import { AlertTriangle } from "lucide-react";
-import { InitialsAvatar } from "@/components/ui/avatar";
-import { getInitials } from "@/lib/format";
+import { ChannelAvatar } from "@/components/leads/channel-avatar";
 import { cn } from "@/lib/utils";
 import type { Conversation } from "@/types/conversation";
 import { ConversationTipificationBadge } from "./conversation-tipification-badge";
@@ -42,10 +41,7 @@ export function ConversationItem({
       )}
     >
       <div className="relative shrink-0">
-        <InitialsAvatar
-          initials={getInitials(conversation.customerName)}
-          className="size-10 text-[13px]"
-        />
+        <ChannelAvatar channel={conversation.channel ?? "whatsapp"} className="size-10" />
         {conversation.online && (
           <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-white bg-online" />
         )}
