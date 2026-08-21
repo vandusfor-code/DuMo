@@ -145,3 +145,17 @@ export function emitCampaignEvent(payload: CampaignEventPayload) {
   if (!io) return;
   io.to("admin:leads").emit("campaign:event", payload);
 }
+
+/**
+ * Cualquier cambio de presencia (toggle propio, admin forzado, barrido por
+ * inactividad, beacon de cierre de pestaña) — Live solo necesita saber que
+ * algo cambió para refrescar su snapshot ya, en vez de esperar hasta 30s del
+ * poll. No manda el estado en el payload a propósito: el cliente siempre
+ * vuelve a pedir el snapshot completo (gestiones/ventas del día incluidas),
+ * así nunca queda desincronizado por confiar en un payload parcial.
+ */
+export function emitPresenceChanged(advisorId: string) {
+  const io = getIo();
+  if (!io) return;
+  io.to("admin:leads").emit("presence:changed", { advisorId });
+}

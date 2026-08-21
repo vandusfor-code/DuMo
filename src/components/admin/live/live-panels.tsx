@@ -324,7 +324,7 @@ export function LiveAdvisorsTable({ advisors }: { advisors: LiveAdvisorRow[] }) 
       </Table>
 
       <p className="border-t border-line px-5 py-3 text-center text-[12px] text-muted">
-        Los datos se actualizan en tiempo real cada 30 segundos.
+        Se actualiza al instante ante cualquier cambio de estado, y como red de respaldo cada 30 segundos.
       </p>
     </Card>
   );

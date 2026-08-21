@@ -41,6 +41,9 @@ export const adminLiveService = {
       emitSessionRevoked(advisorId, "presence:desconectado");
     }
 
+    const { emitPresenceChanged } = await import("@/server/realtime/emit");
+    emitPresenceChanged(advisorId);
+
     // Notifica a Monica/Duvan por WhatsApp cada cambio de estado — incluye
     // los que dispara el propio sistema (barrido por inactividad, cierre de
     // pestaña) para que se note cuando alguien "quedó pegada" sin marcarse.

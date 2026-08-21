@@ -184,6 +184,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       queryClient.invalidateQueries({ queryKey: ["admin", "campaigns", "list"] });
     });
 
+    socket.on("presence:changed", () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "live", "snapshot"] });
+    });
+
     socket.on("connect", () => {
       invalidateBandeja(queryClient);
     });
