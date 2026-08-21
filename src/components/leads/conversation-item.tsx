@@ -65,13 +65,6 @@ export function ConversationItem({
           <div className="min-w-0 flex-1">
             <p className="truncate text-[14px] font-semibold leading-tight text-ink">
               {conversation.customerName}
-              {conversation.channel === "messenger" ? (
-                <span className="ml-1.5 text-[10px] font-medium text-brand">Messenger</span>
-              ) : conversation.channel === "instagram" ? (
-                <span className="ml-1.5 text-[10px] font-medium text-brand">Instagram</span>
-              ) : conversation.channel === "web_qr" ? (
-                <span className="ml-1.5 text-[10px] font-medium text-warning-ink">Web</span>
-              ) : null}
             </p>
             {displayTipification ? (
               <div className="mt-1">

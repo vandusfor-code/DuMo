@@ -7,8 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { InitialsAvatar } from "@/components/ui/avatar";
-import { getInitials } from "@/lib/format";
+import { ChannelAvatar } from "@/components/leads/channel-avatar";
 import { cn } from "@/lib/utils";
 import type { AdminAdvisor, AdminConversation } from "@/types/admin-lead";
 import { AdminLeadStatusBadge } from "./admin-conversation-filters";
@@ -38,7 +37,7 @@ export function AdminConversationItem({
     >
       <button type="button" onClick={onSelect} className="flex w-full items-start gap-3 text-left">
         <div className="relative shrink-0">
-          <InitialsAvatar initials={getInitials(conversation.customerName)} />
+          <ChannelAvatar channel={conversation.channel ?? "whatsapp"} className="size-10" />
           {conversation.online && (
             <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-white bg-online" />
           )}
@@ -47,9 +46,6 @@ export function AdminConversationItem({
           <div className="flex items-center justify-between gap-2">
             <p className="truncate text-[14px] font-semibold text-ink">
               {conversation.customerName}
-              {conversation.channel === "messenger" ? (
-                <span className="ml-1.5 text-[10px] font-medium text-brand">Messenger</span>
-              ) : null}
             </p>
             <span className="shrink-0 text-[11px] text-muted">{conversation.lastMessageTime}</span>
           </div>

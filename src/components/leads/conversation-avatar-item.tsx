@@ -1,7 +1,6 @@
 "use client";
 
-import { InitialsAvatar } from "@/components/ui/avatar";
-import { getInitials } from "@/lib/format";
+import { ChannelAvatar } from "@/components/leads/channel-avatar";
 import { cn } from "@/lib/utils";
 import type { Conversation } from "@/types/conversation";
 
@@ -33,13 +32,7 @@ export function ConversationAvatarItem({
         )}
       >
         <div className="relative size-11 shrink-0">
-          <InitialsAvatar
-            initials={getInitials(conversation.customerName)}
-            className={cn(
-              "size-11 text-[13px]",
-              active ? "bg-white text-brand" : "bg-brand-soft text-brand",
-            )}
-          />
+          <ChannelAvatar channel={conversation.channel ?? "whatsapp"} className="size-11" />
           {unread > 0 ? (
             <span className="absolute -right-0.5 -top-0.5 z-10 grid min-w-[18px] place-items-center rounded-full bg-brand px-1 py-0.5 text-[10px] font-bold leading-none text-white shadow-sm">
               {unread > 99 ? "99" : unread}
