@@ -71,6 +71,8 @@ export function ConversationItem({
               {conversation.customerName}
               {conversation.channel === "messenger" ? (
                 <span className="ml-1.5 text-[10px] font-medium text-brand">Messenger</span>
+              ) : conversation.channel === "instagram" ? (
+                <span className="ml-1.5 text-[10px] font-medium text-brand">Instagram</span>
               ) : conversation.channel === "web_qr" ? (
                 <span className="ml-1.5 text-[10px] font-medium text-warning-ink">Web</span>
               ) : null}

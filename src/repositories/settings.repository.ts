@@ -3,6 +3,7 @@ import type {
   SettingsSnapshot,
   UpdateCompanyInput,
   UpdateGoogleSheetsInput,
+  UpdateInstagramInput,
   UpdateMessengerInput,
   UpdateWhatsAppInput,
 } from "@/types/settings";
@@ -15,19 +16,28 @@ import {
   messengerVerifyToken,
   saveMessengerIntegrationConfig,
 } from "@/server/messenger/config";
+import {
+  getInstagramIntegrationConfig,
+  instagramVerifyToken,
+  saveInstagramIntegrationConfig,
+} from "@/server/instagram/config";
 
 export interface SettingsRepository {
   getSnapshot(): Promise<SettingsSnapshot>;
   updateCompany(input: UpdateCompanyInput): Promise<SettingsSnapshot["company"]>;
   updateWhatsApp(input: UpdateWhatsAppInput): Promise<SettingsSnapshot["whatsapp"]>;
   updateMessenger(input: UpdateMessengerInput): Promise<SettingsSnapshot["messenger"]>;
+  updateInstagram(input: UpdateInstagramInput): Promise<SettingsSnapshot["instagram"]>;
   updateGoogleSheets(input: UpdateGoogleSheetsInput): Promise<SettingsSnapshot["googleSheets"]>;
   testGoogleSheetsConnection(): Promise<{ ok: boolean; message: string }>;
 }
 
 const SETTINGS_KEY = "settings_snapshot";
 
-type StoredSettings = Pick<SettingsSnapshot, "company" | "whatsapp" | "messenger" | "googleSheets">;
+type StoredSettings = Pick<
+  SettingsSnapshot,
+  "company" | "whatsapp" | "messenger" | "instagram" | "googleSheets"
+>;
 
 function baseSnapshot(): SettingsSnapshot {
   return structuredClone(SETTINGS_DEFAULT);
@@ -54,6 +64,13 @@ function mergeSnapshot(stored: Partial<StoredSettings> | null): SettingsSnapshot
         ? "••••••••••••••••"
         : base.messenger.pageAccessToken,
     },
+    instagram: {
+      ...base.instagram,
+      ...(stored.instagram ?? {}),
+      accessToken: stored.instagram?.accessToken
+        ? "••••••••••••••••"
+        : base.instagram.accessToken,
+    },
     googleSheets: { ...base.googleSheets, ...stored.googleSheets },
   };
 }
@@ -69,6 +86,22 @@ async function messengerStatusFromConfig(): Promise<SettingsSnapshot["messenger"
     pageAccessToken: "••••••••••••••••",
     pageName: integration.pageName ?? "",
     verifyToken: messengerVerifyToken(),
+    connectionStatus: "connected",
+    lastSync: integration.updatedAt ?? null,
+  };
+}
+
+async function instagramStatusFromConfig(): Promise<SettingsSnapshot["instagram"]> {
+  const base = baseSnapshot().instagram;
+  const integration = await getInstagramIntegrationConfig();
+  if (!integration) {
+    return { ...base, verifyToken: instagramVerifyToken() };
+  }
+  return {
+    igUserId: integration.igUserId,
+    accessToken: "••••••••••••••••",
+    username: integration.username ?? "",
+    verifyToken: instagramVerifyToken(),
     connectionStatus: "connected",
     lastSync: integration.updatedAt ?? null,
   };
@@ -90,6 +123,10 @@ class PostgresSettingsRepository implements SettingsRepository {
         ...snapshot.messenger,
         pageAccessToken: snapshot.messenger.pageAccessToken ? "stored" : "",
       },
+      instagram: {
+        ...snapshot.instagram,
+        accessToken: snapshot.instagram.accessToken ? "stored" : "",
+      },
       googleSheets: snapshot.googleSheets,
     };
     await setConfig(SETTINGS_KEY, toStore);
@@ -99,7 +136,9 @@ class PostgresSettingsRepository implements SettingsRepository {
     const stored = await this.loadStored();
     const snapshot = mergeSnapshot(stored);
     snapshot.messenger = await messengerStatusFromConfig();
+    snapshot.instagram = await instagramStatusFromConfig();
     snapshot.system.messengerStatus = snapshot.messenger.connectionStatus;
+    snapshot.system.instagramStatus = snapshot.instagram.connectionStatus;
     snapshot.system.googleSheetsStatus = "disconnected";
     return snapshot;
   }
@@ -156,6 +195,37 @@ class PostgresSettingsRepository implements SettingsRepository {
     return { ...snapshot.messenger };
   }
 
+  async updateInstagram(input: UpdateInstagramInput) {
+    const current = await getInstagramIntegrationConfig();
+    const token =
+      input.accessToken && !input.accessToken.includes("••")
+        ? input.accessToken
+        : current?.accessToken ?? "";
+
+    if (!input.igUserId.trim() || !token) {
+      throw new Error("IG User ID y Access Token son obligatorios.");
+    }
+
+    await saveInstagramIntegrationConfig({
+      igUserId: input.igUserId,
+      accessToken: token,
+      username: input.username,
+    });
+
+    const snapshot = await this.getSnapshot();
+    snapshot.instagram = {
+      igUserId: input.igUserId,
+      accessToken: "••••••••••••••••",
+      username: input.username,
+      verifyToken: instagramVerifyToken(),
+      connectionStatus: "connected",
+      lastSync: new Date().toISOString(),
+    };
+    snapshot.system.instagramStatus = "connected";
+    await this.saveStored(snapshot);
+    return { ...snapshot.instagram };
+  }
+
   async updateGoogleSheets(input: UpdateGoogleSheetsInput) {
     const snapshot = await this.getSnapshot();
     snapshot.googleSheets = { ...snapshot.googleSheets, ...input };
@@ -207,6 +277,18 @@ class MockSettingsRepository implements SettingsRepository {
     };
     this.snapshot.system.messengerStatus = this.snapshot.messenger.connectionStatus;
     return Promise.resolve({ ...this.snapshot.messenger });
+  }
+
+  updateInstagram(input: UpdateInstagramInput) {
+    this.snapshot.instagram = {
+      ...this.snapshot.instagram,
+      ...input,
+      accessToken: input.accessToken ? "••••••••••••••••" : "",
+      connectionStatus: input.accessToken ? "connected" : "disconnected",
+      lastSync: new Date().toISOString(),
+    };
+    this.snapshot.system.instagramStatus = this.snapshot.instagram.connectionStatus;
+    return Promise.resolve({ ...this.snapshot.instagram });
   }
 
   updateGoogleSheets(input: UpdateGoogleSheetsInput) {

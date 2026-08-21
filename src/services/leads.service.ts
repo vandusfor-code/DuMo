@@ -26,8 +26,11 @@ import {
   parseMessengerPsid,
 } from "@/lib/messenger/conversation-id";
 import { isWebQrConversation } from "@/lib/web-qr/conversation-id";
+import { isInstagramConversation, parseInstagramIgsid } from "@/lib/instagram/conversation-id";
 import { sendWebQrAudio, sendWebQrMedia, sendWebQrText, resolveWebQrChannelId } from "@/server/web-qr/send";
 import { sendMessengerAttachment, sendMessengerText } from "@/server/messenger/send";
+import { sendInstagramAttachment, sendInstagramText } from "@/server/instagram/send";
+import { getInstagramIntegrationConfig } from "@/server/instagram/config";
 import { getMessengerIntegrationConfig } from "@/server/messenger/config";
 
 const GRAPH = "https://graph.facebook.com";
@@ -386,6 +389,27 @@ export const leadsService = {
       return sent;
     }
 
+    if (isInstagramConversation(input.conversationId)) {
+      const igsid = parseInstagramIgsid(input.conversationId);
+      if (!igsid) throw new Error("Conversación de Instagram inválida.");
+      const sent = await sendInstagramText({ igsid, text: input.text });
+      const instagramConfig = await getInstagramIntegrationConfig();
+      const repo = getConversationRepository();
+      await repo.saveMessage({
+        waMessageId: sent.id,
+        conversationId: input.conversationId,
+        phone: igsid,
+        customerName: "",
+        body: input.text,
+        direction: "out",
+        createdAt: new Date().toISOString(),
+        dumoPhoneId: instagramConfig?.igUserId,
+        messageType: "text",
+        companyId: input.companyId,
+      });
+      return sent;
+    }
+
     if (isWebQrConversation(input.conversationId)) {
       const channelId = await resolveWebQrChannelId(input.conversationId);
       return sendWebQrText({
@@ -559,6 +583,32 @@ export const leadsService = {
       });
       return sent;
     }
+    if (isInstagramConversation(input.conversationId)) {
+      const igsid = parseInstagramIgsid(input.conversationId);
+      if (!igsid) throw new Error("Conversación de Instagram inválida.");
+      assertSupportedImageMime(input.mimeType);
+      const sent = await sendInstagramAttachment({
+        igsid,
+        type: "image",
+        url: input.mediaUrl,
+      });
+      const preview = input.caption?.trim() || "Imagen";
+      await getConversationRepository().saveMessage({
+        waMessageId: sent.id,
+        conversationId: input.conversationId,
+        phone: igsid,
+        customerName: "",
+        body: preview,
+        direction: "out",
+        createdAt: new Date().toISOString(),
+        messageType: "image",
+        mediaAssetId: input.mediaAssetId,
+        mediaUrl: input.mediaUrl,
+        caption: input.caption,
+        companyId: input.companyId,
+      });
+      return sent;
+    }
     if (isWebQrConversation(input.conversationId)) {
       const channelId = await resolveWebQrChannelId(input.conversationId);
       assertSupportedImageMime(input.mimeType);
@@ -640,6 +690,31 @@ export const leadsService = {
         waMessageId: sent.id,
         conversationId: input.conversationId,
         phone: psid,
+        customerName: "",
+        body: preview,
+        direction: "out",
+        createdAt: new Date().toISOString(),
+        messageType: "audio",
+        mediaAssetId: input.mediaAssetId,
+        mediaUrl: input.mediaUrl,
+        companyId: input.companyId,
+      });
+      return sent;
+    }
+
+    if (isInstagramConversation(input.conversationId)) {
+      const igsid = parseInstagramIgsid(input.conversationId);
+      if (!igsid) throw new Error("Conversación de Instagram inválida.");
+      const sent = await sendInstagramAttachment({
+        igsid,
+        type: "audio",
+        url: input.mediaUrl,
+      });
+      const preview = input.ptt === false ? "🔊 Audio" : "🎤 Nota de voz";
+      await getConversationRepository().saveMessage({
+        waMessageId: sent.id,
+        conversationId: input.conversationId,
+        phone: igsid,
         customerName: "",
         body: preview,
         direction: "out",

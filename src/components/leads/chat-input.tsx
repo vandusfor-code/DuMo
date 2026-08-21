@@ -20,6 +20,7 @@ import { PinnedQuickReplies } from "@/components/leads/premium/pinned-quick-repl
 import type { ChatUiTheme } from "@/components/leads/premium/chat-theme";
 import { cn } from "@/lib/utils";
 import { isMessengerConversation } from "@/lib/messenger/conversation-id";
+import { isInstagramConversation } from "@/lib/instagram/conversation-id";
 
 /**
  * Composer del chat. Envía texto, imágenes y audios; el mensaje
@@ -40,6 +41,7 @@ export function ChatInput({
 }) {
   const premium = uiTheme === "premium";
   const isMessenger = isMessengerConversation(conversationId);
+  const isInstagram = isInstagramConversation(conversationId);
   const canRecord = true;
   const [value, setValue] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -280,7 +282,9 @@ export function ChatInput({
                 ? sendMedia.error.message
                 : isMessenger
                   ? "No se pudo enviar. Revisa la configuración de Messenger."
-                  : "No se pudo enviar. Revisa la configuración de WhatsApp."}
+                  : isInstagram
+                    ? "No se pudo enviar. Revisa la configuración de Instagram."
+                    : "No se pudo enviar. Revisa la configuración de WhatsApp."}
         </p>
       )}
     </div>

@@ -65,6 +65,7 @@ export const SLA_ADMIN_ALERT_PHONES = ["573148127388", "573212549656"] as const;
 const CHANNEL_LABELS: Record<string, string> = {
   web_qr: "WhatsApp Web",
   messenger: "Messenger",
+  instagram: "Instagram",
   whatsapp: "WABA",
 };
 

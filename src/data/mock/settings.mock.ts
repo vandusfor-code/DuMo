@@ -1,6 +1,7 @@
 import "server-only";
 import type { SettingsSnapshot } from "@/types/settings";
 import { messengerVerifyToken } from "@/server/messenger/config";
+import { instagramVerifyToken } from "@/server/instagram/config";
 
 function envStatus(ok: boolean): "connected" | "disconnected" {
   return ok ? "connected" : "disconnected";
@@ -32,6 +33,14 @@ export const SETTINGS_DEFAULT: SettingsSnapshot = {
     connectionStatus: envStatus(!!process.env.MESSENGER_PAGE_ACCESS_TOKEN),
     lastSync: null,
   },
+  instagram: {
+    igUserId: process.env.INSTAGRAM_USER_ID ?? "",
+    accessToken: process.env.INSTAGRAM_ACCESS_TOKEN ? "••••••••••••••••" : "",
+    username: "",
+    verifyToken: instagramVerifyToken(),
+    connectionStatus: envStatus(!!process.env.INSTAGRAM_ACCESS_TOKEN),
+    lastSync: null,
+  },
   googleSheets: {
     spreadsheetId: process.env.GOOGLE_SHEET_ID ?? "",
     sheetName: process.env.GOOGLE_SHEET_NAME ?? "DuMo_Data",
@@ -43,6 +52,7 @@ export const SETTINGS_DEFAULT: SettingsSnapshot = {
     googleSheetsStatus: envStatus(!!process.env.GOOGLE_SHEET_ID),
     whatsappStatus: envStatus(!!process.env.WHATSAPP_TOKEN),
     messengerStatus: envStatus(!!process.env.MESSENGER_PAGE_ACCESS_TOKEN),
+    instagramStatus: envStatus(!!process.env.INSTAGRAM_ACCESS_TOKEN),
     apisStatus: envStatus(!!(process.env.DATABASE_URL1 || process.env.DATABASE_URL)),
     lastBackup: null,
   },
