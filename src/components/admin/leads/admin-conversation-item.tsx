@@ -37,7 +37,11 @@ export function AdminConversationItem({
     >
       <button type="button" onClick={onSelect} className="flex w-full items-start gap-3 text-left">
         <div className="relative shrink-0">
-          <ChannelAvatar channel={conversation.channel ?? "whatsapp"} className="size-10" />
+          <ChannelAvatar
+            channel={conversation.channel ?? "whatsapp"}
+            isManualOrigin={conversation.isManualOrigin}
+            className="size-10"
+          />
           {conversation.online && (
             <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-white bg-online" />
           )}

@@ -31,6 +31,8 @@ export interface Conversation {
   rut: string;
   avatarUrl?: string;
   channel?: ConversationChannel;
+  /** true si la asesora la inició a mano (número + mensaje) en vez de llegar por un canal. */
+  isManualOrigin?: boolean;
   lastMessage: string;
   /** Hora legible del último mensaje, ej. "3:25 p. m.". */
   lastMessageTime: string;

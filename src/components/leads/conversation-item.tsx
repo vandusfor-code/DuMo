@@ -41,7 +41,11 @@ export function ConversationItem({
       )}
     >
       <div className="relative shrink-0">
-        <ChannelAvatar channel={conversation.channel ?? "whatsapp"} className="size-10" />
+        <ChannelAvatar
+          channel={conversation.channel ?? "whatsapp"}
+          isManualOrigin={conversation.isManualOrigin}
+          className="size-10"
+        />
         {conversation.online && (
           <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-white bg-online" />
         )}

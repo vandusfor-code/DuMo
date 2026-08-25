@@ -32,7 +32,11 @@ export function ConversationAvatarItem({
         )}
       >
         <div className="relative size-11 shrink-0">
-          <ChannelAvatar channel={conversation.channel ?? "whatsapp"} className="size-11" />
+          <ChannelAvatar
+            channel={conversation.channel ?? "whatsapp"}
+            isManualOrigin={conversation.isManualOrigin}
+            className="size-11"
+          />
           {unread > 0 ? (
             <span className="absolute -right-0.5 -top-0.5 z-10 grid min-w-[18px] place-items-center rounded-full bg-brand px-1 py-0.5 text-[10px] font-bold leading-none text-white shadow-sm">
               {unread > 99 ? "99" : unread}

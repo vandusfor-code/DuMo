@@ -32,6 +32,8 @@ export interface AdminConversation {
   rut: string;
   avatarUrl?: string;
   channel?: ConversationChannel;
+  /** true si la asesora la inició a mano (número + mensaje) en vez de llegar por un canal. */
+  isManualOrigin?: boolean;
   lastMessage: string;
   lastMessageTime: string;
   lastMessageDirection?: "in" | "out";

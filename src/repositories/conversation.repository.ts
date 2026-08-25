@@ -58,6 +58,8 @@ export interface ConversationRepository {
   /** Mueve mensajes de un hilo duplicado al canónico. */
   mergeWebQrConversations(targetId: string, duplicateId: string): Promise<void>;
   updateDumoPhoneId(conversationId: string, dumoPhoneId: string): Promise<void>;
+  /** Marca la conversación como iniciada a mano por una asesora (bandeja: logo DuMo en vez del canal). */
+  setManualOrigin(conversationId: string, customerName?: string): Promise<void>;
   /** Token de envío registrado para un phone_number_id conectado. */
   getAccessTokenForPhoneId(phoneNumberId: string): Promise<string | null>;
   /** phone_number_id registrados como conectados a DuMo (números activos). */
@@ -105,6 +107,9 @@ class MockConversationRepository implements ConversationRepository {
   updateDumoPhoneId() {
     return Promise.resolve();
   }
+  setManualOrigin() {
+    return Promise.resolve();
+  }
   getAccessTokenForPhoneId() {
     return Promise.resolve(null);
   }
@@ -141,6 +146,7 @@ type ConvRow = {
   sla_status?: string | null;
   sla_armed_at?: string | Date | null;
   carrier?: string | null;
+  source?: string | null;
 };
 
 type MsgRow = {
@@ -194,6 +200,7 @@ function mapConvRow(r: ConvRow): Conversation {
     phone: formattedPhone || r.phone,
     rut: r.rut ?? "",
     channel: resolveConversationChannel(r.id),
+    isManualOrigin: r.source === "manual_advisor",
     lastMessage: r.last_message,
     lastMessageTime: formatChatTime(r.last_message_at),
     lastMessageDirection: r.last_message_direction === "out" ? "out" : "in",
@@ -595,6 +602,29 @@ class PostgresConversationRepository implements ConversationRepository {
     const sql = getSql()!;
     await sql`
       UPDATE lead_conversations SET dumo_phone_id = ${dumoPhoneId} WHERE id = ${conversationId}
+    `;
+  }
+
+  /**
+   * Marca una conversación como iniciada a mano por una asesora (número +
+   * mensaje, sin venir de ningún canal entrante) — así la bandeja muestra el
+   * logo de DuMo en vez del logo del canal. Se llama justo después de crear
+   * la conversación con el primer envío; `customerName` solo se aplica si
+   * todavía no tiene uno (mismo criterio que ya usa saveMessage al crear).
+   */
+  async setManualOrigin(conversationId: string, customerName?: string): Promise<void> {
+    await ensureSchema();
+    const sql = getSql()!;
+    await sql`
+      UPDATE lead_conversations SET
+        source = 'manual_advisor',
+        customer_name = CASE
+          WHEN ${customerName?.trim() || null}::text IS NOT NULL
+            AND (customer_name = '' OR customer_name IS NULL)
+            THEN ${customerName?.trim() || null}
+          ELSE customer_name
+        END
+      WHERE id = ${conversationId}
     `;
   }
 

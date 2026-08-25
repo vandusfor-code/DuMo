@@ -1,4 +1,5 @@
 import type { ComponentType } from "react";
+import Image from "next/image";
 import { Facebook, Instagram } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ConversationChannel } from "@/types/conversation";
@@ -18,14 +19,30 @@ const CHANNEL_STYLES: Record<ConversationChannel, { bg: string; Icon: ComponentT
   instagram: { bg: "bg-gradient-to-br from-[#f9ce34] via-[#dd2a7b] to-[#8134af]", Icon: Instagram },
 };
 
-/** Círculo con el logo del canal (WhatsApp/Messenger/Instagram) — reemplaza el avatar de iniciales en las listas de chat. */
+/**
+ * Círculo con el logo del canal (WhatsApp/Messenger/Instagram) — reemplaza
+ * el avatar de iniciales en las listas de chat. Si la conversación la inició
+ * la asesora a mano (número + mensaje, sin venir de ningún canal entrante),
+ * muestra el logo de DuMo en vez del logo del canal — `isManualOrigin` manda
+ * sobre `channel`.
+ */
 export function ChannelAvatar({
   channel,
+  isManualOrigin,
   className,
 }: {
   channel: ConversationChannel;
+  isManualOrigin?: boolean;
   className?: string;
 }) {
+  if (isManualOrigin) {
+    return (
+      <span className={cn("relative grid shrink-0 place-items-center overflow-hidden rounded-full bg-ink", className)}>
+        <Image src="/logo-dumo.jpg" alt="DuMo" fill sizes="48px" className="object-cover" />
+      </span>
+    );
+  }
+
   const { bg, Icon } = CHANNEL_STYLES[channel] ?? CHANNEL_STYLES.whatsapp;
   return (
     <span className={cn("grid shrink-0 place-items-center rounded-full text-white", bg, className)}>

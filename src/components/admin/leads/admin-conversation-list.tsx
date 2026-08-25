@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { ConversationSearch } from "@/components/leads/conversation-search";
 import { ConversationAvatarItem } from "@/components/leads/conversation-avatar-item";
+import { ManualMessageModal } from "@/components/leads/manual-message-modal";
 import type { AdminAdvisor, AdminConversation, AdminLeadFilter } from "@/types/admin-lead";
 import type { Conversation } from "@/types/conversation";
 import { AdminConversationFilters } from "./admin-conversation-filters";
@@ -49,6 +50,8 @@ function toConversation(c: AdminConversation): Conversation {
     customerName: c.customerName,
     phone: c.phone,
     rut: c.rut,
+    channel: c.channel,
+    isManualOrigin: c.isManualOrigin,
     lastMessage: c.lastMessage,
     lastMessageTime: c.lastMessageTime,
     unread: c.unread,
@@ -93,6 +96,7 @@ export function AdminConversationList({
   const [advisorFilter, setAdvisorFilter] = useState<string>("all");
   const [tipificationFilter, setTipificationFilter] = useState<string>("all");
   const [exportOpen, setExportOpen] = useState(false);
+  const [manualMessageOpen, setManualMessageOpen] = useState(false);
 
   const tipificationOptions = useMemo(() => {
     const bySlug = new Map<string, string>();
@@ -212,6 +216,8 @@ export function AdminConversationList({
               <button
                 type="button"
                 aria-label="Nueva conversación"
+                title="Nueva conversación"
+                onClick={() => setManualMessageOpen(true)}
                 className="grid size-9 place-items-center rounded-btn bg-brand text-white transition-colors hover:bg-brand-hover"
               >
                 <SquarePen className="size-[18px]" />
@@ -361,6 +367,11 @@ export function AdminConversationList({
       ) : null}
 
       {exportOpen ? <LeadsExportDialog onClose={() => setExportOpen(false)} /> : null}
+      <ManualMessageModal
+        open={manualMessageOpen}
+        onClose={() => setManualMessageOpen(false)}
+        onSent={(conversationId) => onSelect(conversationId)}
+      />
     </div>
   );
 }

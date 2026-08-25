@@ -69,6 +69,7 @@ type ConvRow = {
   assigned_advisor_name: string | null;
   admin_status: string;
   carrier?: string | null;
+  source?: string | null;
   latest_tipification_slug?: string | null;
   latest_tipification_name?: string | null;
   badge_bg?: string | null;
@@ -100,6 +101,7 @@ function mapConversation(r: ConvRow): AdminConversation {
     phone: formattedPhone || r.phone,
     rut: r.rut ?? "",
     channel: resolveConversationChannel(r.id),
+    isManualOrigin: r.source === "manual_advisor",
     lastMessage: r.last_message,
     lastMessageTime: formatChatTime(r.last_message_at),
     lastMessageDirection: r.last_message_direction === "out" ? "out" : "in",
@@ -133,7 +135,7 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
           ? sql<ConvRow[]>`
               SELECT
                 c.id, c.phone, c.customer_name, c.rut, c.last_message, c.last_message_at, c.last_message_direction,
-                c.unread, c.online, c.assigned_advisor_id, c.assigned_advisor_name, c.admin_status, c.carrier,
+                c.unread, c.online, c.assigned_advisor_id, c.assigned_advisor_name, c.admin_status, c.carrier, c.source,
                 COALESCE(NULLIF(c.current_tipification_slug, ''), lg.gestion_type) AS latest_tipification_slug,
                 t.name AS latest_tipification_name,
                 t.badge_bg,
@@ -155,7 +157,7 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
           : sql<ConvRow[]>`
               SELECT
                 c.id, c.phone, c.customer_name, c.rut, c.last_message, c.last_message_at, c.last_message_direction,
-                c.unread, c.online, c.assigned_advisor_id, c.assigned_advisor_name, c.admin_status, c.carrier,
+                c.unread, c.online, c.assigned_advisor_id, c.assigned_advisor_name, c.admin_status, c.carrier, c.source,
                 COALESCE(NULLIF(c.current_tipification_slug, ''), lg.gestion_type) AS latest_tipification_slug,
                 t.name AS latest_tipification_name,
                 t.badge_bg,
