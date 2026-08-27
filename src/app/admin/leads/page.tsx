@@ -73,14 +73,21 @@ function AdminLeadsPageContent() {
     }
   };
 
-  const selected = useMemo(
-    () => conversations?.find((c) => c.id === selectedId) ?? null,
-    [conversations, selectedId],
-  );
-
   const detail = useAdminLeadDetail(selectedId);
   const messages = useAdminMessages(selectedId);
   const list = conversations ?? [];
+
+  // Desde Clientes (?conversationId=...) la conversación puede no estar aún
+  // en la bandeja cacheada; el detalle por ID permite abrir el chat igual.
+  const activeConversation = useMemo(
+    () => list.find((c) => c.id === selectedId) ?? detail.data?.conversation ?? null,
+    [list, selectedId, detail.data?.conversation],
+  );
+
+  const openingFromLink =
+    Boolean(selectedId) &&
+    !activeConversation &&
+    (detail.isLoading || (isLoading && list.length === 0));
 
   if (shouldShowFatalQueryError(convQuery)) {
     return (
@@ -138,20 +145,20 @@ function AdminLeadsPageContent() {
           ) : null}
         </SectionCard>
 
-        {selected ? (
+        {activeConversation ? (
           <>
             <SectionCard className="relative flex min-h-0 flex-col overflow-hidden p-0">
               <button
                 type="button"
                 aria-label="Eliminar chat"
                 title="Eliminar este chat y su historial"
-                onClick={() => setConfirmDeleteOne(selected.id)}
+                onClick={() => setConfirmDeleteOne(activeConversation.id)}
                 className="absolute right-3 top-3 z-10 grid size-9 place-items-center rounded-lg bg-card/90 text-muted shadow-sm backdrop-blur transition-colors hover:bg-danger-soft hover:text-danger-ink"
               >
                 <Trash2 className="size-[18px]" />
               </button>
               <AdminChatPanel
-                conversation={selected}
+                conversation={activeConversation}
                 messages={messages.data ?? []}
                 isLoading={messages.isLoading}
                 isError={messages.isError && !(messages.data?.length)}
@@ -170,7 +177,7 @@ function AdminLeadsPageContent() {
                 </div>
               ) : detail.data ? (
                 <AdminLeadFormPanel
-                  key={selected.id}
+                  key={activeConversation.id}
                   conversation={detail.data.conversation}
                   client={detail.data.client}
                   notes={detail.data.notes}
@@ -179,6 +186,13 @@ function AdminLeadsPageContent() {
               ) : null}
             </SectionCard>
           </>
+        ) : openingFromLink ? (
+          <SectionCard className="flex min-h-0 flex-col overflow-hidden lg:col-span-2">
+            <div className="flex flex-1 flex-col gap-3 p-6">
+              <Skeleton className="h-8 w-1/3" />
+              <Skeleton className="h-full min-h-[240px] rounded-card" />
+            </div>
+          </SectionCard>
         ) : (
           <SectionCard className="flex min-h-0 flex-col overflow-hidden lg:col-span-2">
             <EmptyConversation />
