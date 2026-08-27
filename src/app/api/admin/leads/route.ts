@@ -3,6 +3,12 @@ import { withAdminFallback } from "@/lib/admin-api-fallbacks";
 import { requireAdminSession } from "@/lib/require-admin";
 import { authService } from "@/services/auth.service";
 import { adminLeadsService } from "@/services/admin-leads.service";
+import { getSlaAutoReassignSettings, setSlaAutoReassignEnabled } from "@/lib/sla-settings";
+import { saveLeadSchema } from "@/lib/schemas/save-lead.schema";
+import { resolveFollowUpDateForSave, validateFollowUpDateForCloseAction } from "@/lib/tipification-follow-up";
+import { tipificationService } from "@/services/tipification.service";
+import { FolioNumberValidationError } from "@/lib/folio-number";
+import { DEFAULT_COMPANY_ID } from "@/types/tenant";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +24,7 @@ export async function GET(request: NextRequest) {
   const conversationId = p.get("conversationId");
   const advisors = p.get("advisors");
   const settings = p.get("settings");
+  const slaSettings = p.get("slaSettings");
 
   try {
     if (settings === "1") {
@@ -25,6 +32,14 @@ export async function GET(request: NextRequest) {
         () => adminLeadsService.getAutoAssignSettings(),
         { enabled: true, lastAdvisorIndex: 0 },
         "GET /api/admin/leads settings",
+      );
+      return NextResponse.json(data);
+    }
+    if (slaSettings === "1") {
+      const data = await withAdminFallback(
+        () => getSlaAutoReassignSettings(),
+        { enabled: true },
+        "GET /api/admin/leads slaSettings",
       );
       return NextResponse.json(data);
     }
@@ -45,6 +60,13 @@ export async function GET(request: NextRequest) {
             setTimeout(() => reject(new Error("GET /api/admin/leads messages timeout")), 12_000),
           ),
         ]);
+        // Igual que en /api/leads/conversations/[id]/messages: abrir el chat
+        // marca los mensajes como leídos. El admin nunca disparaba esto, así
+        // que el contador de no leídos se quedaba pegado aunque ya se hubiera
+        // respondido.
+        void adminLeadsService.markRead(conversationId).catch((err) => {
+          console.error("[GET /api/admin/leads messages] markRead", err);
+        });
         return NextResponse.json(data, {
           headers: { "Cache-Control": "no-store" },
         });
@@ -73,6 +95,30 @@ export async function GET(request: NextRequest) {
         await adminLeadsService.ensurePendingAssigned();
       } catch (err) {
         console.error("[ensurePendingAssigned]", err);
+      }
+    });
+
+    // RESP-1 — misma red de seguridad del timer SLA que en /api/leads/conversations.
+    after(async () => {
+      try {
+        const { reconcileDueTimersThrottled } = await import(
+          "@/services/response-sla-sweep"
+        );
+        await reconcileDueTimersThrottled();
+      } catch (err) {
+        console.error("[reconcileDueTimersThrottled]", err);
+      }
+    });
+
+    // Red de seguridad del barrido de presencia — mismo patrón que arriba.
+    after(async () => {
+      try {
+        const { reconcileStalePresenceThrottled } = await import(
+          "@/services/advisor-presence-sweep"
+        );
+        await reconcileStalePresenceThrottled();
+      } catch (err) {
+        console.error("[reconcileStalePresenceThrottled]", err);
       }
     });
 
@@ -112,9 +158,56 @@ export async function POST(request: NextRequest) {
       const settings = await adminLeadsService.setAutoAssignEnabled(Boolean(body.enabled));
       return NextResponse.json(settings);
     }
-    const lead = await adminLeadsService.saveLead(body);
+    if (body.action === "setSlaAutoReassign") {
+      const settings = await setSlaAutoReassignEnabled(Boolean(body.enabled));
+      return NextResponse.json(settings);
+    }
+
+    // Guardar gestión: misma validación que ya usa la ruta de asesora
+    // (/api/leads) — antes esta ruta pasaba el body crudo directo al
+    // servicio, sin Zod ni la validación/resolución de fecha de seguimiento
+    // para "Guardar y cerrar", así que un dato mal formado o una fecha de
+    // seguimiento pendiente podían bloquear el guardado en el cliente sin
+    // mostrar ningún error visible (el submit simplemente no hacía nada).
+    const parsed = saveLeadSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Datos inválidos.", issues: parsed.error.flatten() },
+        { status: 422 },
+      );
+    }
+
+    const catalog = await tipificationService.listActive({
+      companyId: DEFAULT_COMPANY_ID,
+      userId: "",
+      role: "administrador",
+      userName: "",
+    });
+    const followUpValidationError = validateFollowUpDateForCloseAction({
+      slug: parsed.data.type,
+      catalog,
+      followUpDate: parsed.data.followUpDate,
+      saveAction: parsed.data.saveAction,
+    });
+    if (followUpValidationError) {
+      return NextResponse.json({ error: followUpValidationError }, { status: 422 });
+    }
+
+    const resolvedFollowUp = resolveFollowUpDateForSave({
+      slug: parsed.data.type,
+      catalog,
+      followUpDate: parsed.data.followUpDate,
+    });
+
+    const lead = await adminLeadsService.saveLead({
+      ...parsed.data,
+      followUpDate: resolvedFollowUp.followUpDate,
+    });
     return NextResponse.json(lead);
   } catch (error) {
+    if (error instanceof FolioNumberValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 422 });
+    }
     console.error("[POST /api/admin/leads]", error);
     const message = error instanceof Error ? error.message : "No se pudo guardar.";
     return NextResponse.json({ error: message }, { status: 400 });

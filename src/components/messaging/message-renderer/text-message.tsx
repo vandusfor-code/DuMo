@@ -1,7 +1,38 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import type { ChatMessage } from "@/types/conversation";
+
+/** *negrita*, _cursiva_, ~tachado~ — la sintaxis que WhatsApp interpreta en el teléfono del cliente. */
+const WHATSAPP_FORMAT_RE = /\*([^*\n]+)\*|_([^_\n]+)_|~([^~\n]+)~/g;
+
+/**
+ * DuMo guarda y envía el texto tal cual (con los asteriscos/guiones bajos
+ * literales) — es WhatsApp quien los interpreta como negrita/cursiva en el
+ * teléfono del cliente. Sin esto, la vista de DuMo mostraba los símbolos
+ * sueltos en vez del texto formateado, aunque el cliente sí lo veía bien.
+ */
+function renderWhatsAppFormatting(text: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  let lastIndex = 0;
+  let key = 0;
+
+  for (const match of text.matchAll(WHATSAPP_FORMAT_RE)) {
+    const start = match.index ?? 0;
+    if (start > lastIndex) nodes.push(text.slice(lastIndex, start));
+    if (match[1] !== undefined) {
+      nodes.push(<strong key={key++}>{match[1]}</strong>);
+    } else if (match[2] !== undefined) {
+      nodes.push(<em key={key++}>{match[2]}</em>);
+    } else if (match[3] !== undefined) {
+      nodes.push(<del key={key++}>{match[3]}</del>);
+    }
+    lastIndex = start + match[0].length;
+  }
+  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
+  return nodes;
+}
 
 export function TextMessage({ message }: { message: ChatMessage }) {
   if (message.link) {
@@ -29,5 +60,5 @@ export function TextMessage({ message }: { message: ChatMessage }) {
     );
   }
 
-  return <p className="whitespace-pre-line">{message.text}</p>;
+  return <p className="whitespace-pre-line">{renderWhatsAppFormatting(message.text)}</p>;
 }

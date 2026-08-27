@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
+import { ChevronLeft, ChevronRight, SlidersHorizontal, SquarePen } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { ConversationSearch } from "./conversation-search";
@@ -11,6 +11,7 @@ import {
 } from "./conversation-filters";
 import { ConversationItem } from "./conversation-item";
 import { ConversationAvatarItem } from "./conversation-avatar-item";
+import { ManualMessageModal } from "./manual-message-modal";
 import type { Conversation } from "@/types/conversation";
 
 export function ConversationList({
@@ -36,6 +37,7 @@ export function ConversationList({
 }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<ConversationFilter>("all");
+  const [manualMessageOpen, setManualMessageOpen] = useState(false);
 
   const counts = useMemo(() => {
     const base: Record<ConversationFilter, number> = {
@@ -135,13 +137,24 @@ export function ConversationList({
                 <span className="text-[12px] font-medium text-muted">Sincronizando…</span>
               ) : null}
             </div>
-            <button
-              type="button"
-              aria-label="Filtrar"
-              className="grid size-9 place-items-center rounded-btn text-muted transition-colors duration-200 hover:bg-hover hover:text-ink"
-            >
-              <SlidersHorizontal className="size-[18px]" />
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                aria-label="Filtrar"
+                className="grid size-9 place-items-center rounded-btn text-muted transition-colors duration-200 hover:bg-hover hover:text-ink"
+              >
+                <SlidersHorizontal className="size-[18px]" />
+              </button>
+              <button
+                type="button"
+                aria-label="Nueva conversación"
+                title="Nueva conversación"
+                onClick={() => setManualMessageOpen(true)}
+                className="grid size-9 place-items-center rounded-btn bg-brand text-white transition-colors hover:bg-brand-hover"
+              >
+                <SquarePen className="size-[18px]" />
+              </button>
+            </div>
           </div>
           <ConversationSearch value={search} onChange={setSearch} />
           <ConversationFilters value={filter} onChange={setFilter} counts={counts} />
@@ -172,6 +185,12 @@ export function ConversationList({
           )}
         </button>
       </div>
+
+      <ManualMessageModal
+        open={manualMessageOpen}
+        onClose={() => setManualMessageOpen(false)}
+        onSent={(conversationId) => onSelect(conversationId)}
+      />
     </div>
   );
 }

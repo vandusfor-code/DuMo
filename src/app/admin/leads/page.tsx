@@ -22,6 +22,8 @@ import {
   useDeleteAllConversations,
   useDeleteConversation,
   useSetAutoAssign,
+  useSlaAutoReassignSettings,
+  useSetSlaAutoReassign,
 } from "@/hooks/use-admin-leads";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +45,8 @@ function AdminLeadsPageContent() {
   const { data: advisors = [] } = useAdminAdvisors();
   const { data: autoAssign } = useAutoAssignSettings();
   const setAutoAssign = useSetAutoAssign();
+  const { data: slaAutoReassign } = useSlaAutoReassignSettings();
+  const setSlaAutoReassign = useSetSlaAutoReassign();
   const [selectedId, setSelectedId] = useState<string | null>(conversationFromUrl);
   const [listCollapsed, setListCollapsed] = useState(false);
   const assign = useAssignAdvisor();
@@ -103,8 +107,8 @@ function AdminLeadsPageContent() {
         className={cn(
           "grid min-h-0 flex-1 gap-4 overflow-hidden p-4 lg:p-5 transition-[grid-template-columns] duration-200 ease-out",
           listCollapsed
-            ? "lg:grid-cols-[72px_minmax(300px,540px)_minmax(440px,1fr)] xl:grid-cols-[72px_minmax(320px,560px)_minmax(480px,1fr)]"
-            : "lg:grid-cols-[minmax(280px,340px)_minmax(300px,540px)_minmax(440px,1fr)] xl:grid-cols-[360px_minmax(320px,560px)_minmax(480px,1fr)]",
+            ? "lg:grid-cols-[72px_minmax(0,1.75fr)_minmax(260px,0.95fr)] xl:grid-cols-[72px_minmax(0,1.85fr)_minmax(280px,0.9fr)]"
+            : "lg:grid-cols-[minmax(280px,340px)_minmax(0,1.75fr)_minmax(260px,0.95fr)] xl:grid-cols-[360px_minmax(0,1.85fr)_minmax(280px,0.9fr)]",
         )}
       >
         <SectionCard className="flex min-h-0 flex-col overflow-hidden">
@@ -123,11 +127,14 @@ function AdminLeadsPageContent() {
             selectedId={selectedId}
             autoAssignEnabled={autoAssign?.enabled ?? false}
             autoAssignLoading={setAutoAssign.isPending}
+            slaAutoReassignEnabled={slaAutoReassign?.enabled ?? false}
+            slaAutoReassignLoading={setSlaAutoReassign.isPending}
             onSelect={setSelectedId}
             onAssign={(conversationId, advisorId) =>
               assign.mutate({ conversationId, advisorId })
             }
             onToggleAutoAssign={(enabled) => setAutoAssign.mutate(enabled)}
+            onToggleSlaAutoReassign={(enabled) => setSlaAutoReassign.mutate(enabled)}
             collapsed={listCollapsed}
             onCollapsedChange={handleListCollapsed}
           />
@@ -182,6 +189,7 @@ function AdminLeadsPageContent() {
                   client={detail.data.client}
                   notes={detail.data.notes}
                   timeline={detail.data.timeline}
+                  onInboxClosed={() => setSelectedId(null)}
                 />
               ) : null}
             </SectionCard>

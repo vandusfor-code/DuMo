@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { getTenantScope } from "@/lib/tenant-scope";
+import {
+  assertConversationAccess,
+  ConversationAccessError,
+} from "@/lib/conversation-access";
+import { getAdvisorTenantScope } from "@/lib/tenant-scope";
 import { leadsService } from "@/services/leads.service";
 
 export const runtime = "nodejs";
@@ -13,7 +17,7 @@ const sendSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const scope = await getTenantScope();
+  const scope = await getAdvisorTenantScope();
   if (!scope) {
     return NextResponse.json({ error: "No autenticado." }, { status: 401 });
   }
@@ -31,6 +35,15 @@ export async function POST(request: NextRequest) {
       { error: "Datos inválidos.", issues: parsed.error.flatten() },
       { status: 422 },
     );
+  }
+
+  try {
+    await assertConversationAccess(parsed.data.conversationId, scope);
+  } catch (err) {
+    if (err instanceof ConversationAccessError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
   }
 
   try {

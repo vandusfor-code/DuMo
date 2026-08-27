@@ -37,6 +37,16 @@ export interface MessengerSettings {
   lastSync: string | null;
 }
 
+export interface InstagramSettings {
+  igUserId: string;
+  accessToken: string;
+  username: string;
+  /** Solo lectura — proviene de INSTAGRAM_VERIFY_TOKEN (o los de Messenger/WhatsApp) en Vercel. */
+  verifyToken: string;
+  connectionStatus: ConnectionStatus;
+  lastSync: string | null;
+}
+
 export interface GoogleSheetsSettings {
   spreadsheetId: string;
   sheetName: string;
@@ -58,6 +68,7 @@ export interface SystemStatus {
   googleSheetsStatus: ConnectionStatus;
   whatsappStatus: ConnectionStatus;
   messengerStatus: ConnectionStatus;
+  instagramStatus: ConnectionStatus;
   apisStatus: ConnectionStatus;
   lastBackup: string | null;
 }
@@ -73,6 +84,7 @@ export interface SettingsSnapshot {
   company: CompanySettings;
   whatsapp: WhatsAppSettings;
   messenger: MessengerSettings;
+  instagram: InstagramSettings;
   googleSheets: GoogleSheetsSettings;
   system: SystemStatus;
   logs: SystemLog[];
@@ -98,6 +110,12 @@ export interface UpdateMessengerInput {
   pageId: string;
   pageAccessToken: string;
   pageName: string;
+}
+
+export interface UpdateInstagramInput {
+  igUserId: string;
+  accessToken: string;
+  username: string;
 }
 
 export interface UpdateGoogleSheetsInput {

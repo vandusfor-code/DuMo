@@ -1,4 +1,9 @@
 import { NextResponse, after } from "next/server";
+import {
+  assertConversationAccess,
+  ConversationAccessError,
+} from "@/lib/conversation-access";
+import { getAdvisorTenantScope } from "@/lib/tenant-scope";
 import { leadsService } from "@/services/leads.service";
 
 export const runtime = "nodejs";
@@ -9,7 +14,21 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const scope = await getAdvisorTenantScope();
+  if (!scope) {
+    return NextResponse.json({ error: "No autenticado." }, { status: 401 });
+  }
+
   const { id } = await params;
+  try {
+    await assertConversationAccess(id, scope);
+  } catch (err) {
+    if (err instanceof ConversationAccessError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
+  }
+
   try {
     const messages = await Promise.race([
       leadsService.getMessages(id),

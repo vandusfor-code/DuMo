@@ -7,11 +7,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { InitialsAvatar } from "@/components/ui/avatar";
-import { getInitials } from "@/lib/format";
+import { ChannelAvatar } from "@/components/leads/channel-avatar";
 import { cn } from "@/lib/utils";
 import type { AdminAdvisor, AdminConversation } from "@/types/admin-lead";
 import { AdminLeadStatusBadge } from "./admin-conversation-filters";
+import { ConversationTipificationBadge } from "@/components/leads/conversation-tipification-badge";
+import { useDisplayTipification } from "@/hooks/use-pending-tipification-label";
 
 export function AdminConversationItem({
   conversation,
@@ -26,6 +27,7 @@ export function AdminConversationItem({
   onSelect: () => void;
   onAssign: (advisorId: string) => void;
 }) {
+  const displayTipification = useDisplayTipification(conversation);
   return (
     <div
       className={cn(
@@ -35,18 +37,19 @@ export function AdminConversationItem({
     >
       <button type="button" onClick={onSelect} className="flex w-full items-start gap-3 text-left">
         <div className="relative shrink-0">
-          <InitialsAvatar initials={getInitials(conversation.customerName)} />
+          <ChannelAvatar
+            channel={conversation.channel ?? "whatsapp"}
+            isManualOrigin={conversation.isManualOrigin}
+            className="size-10"
+          />
           {conversation.online && (
-            <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-card bg-success" />
+            <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-white bg-online" />
           )}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
             <p className="truncate text-[14px] font-semibold text-ink">
               {conversation.customerName}
-              {conversation.channel === "messenger" ? (
-                <span className="ml-1.5 text-[10px] font-medium text-brand">Messenger</span>
-              ) : null}
             </p>
             <span className="shrink-0 text-[11px] text-muted">{conversation.lastMessageTime}</span>
           </div>
@@ -59,6 +62,9 @@ export function AdminConversationItem({
             )}
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {displayTipification ? (
+              <ConversationTipificationBadge tipification={displayTipification} />
+            ) : null}
             <AdminLeadStatusBadge status={conversation.status} />
             {conversation.assignedAdvisor && (
               <span className="text-[11px] text-muted">{conversation.assignedAdvisor.name}</span>

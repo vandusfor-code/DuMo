@@ -2,12 +2,15 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "@/lib/api-client";
-import type { EquipmentCatalogItem, EquipmentStatus, UpsertEquipmentInput } from "@/types/equipment";
+import type { EquipmentCatalogItem, EquipmentStatus, UpsertEquipmentInput, EquipmentBulkImportResult } from "@/types/equipment";
 
-export function useEquipmentCatalog() {
+export function useEquipmentCatalog(carrier?: string) {
   return useQuery({
-    queryKey: ["admin", "equipment"],
-    queryFn: () => apiGet<EquipmentCatalogItem[]>("/api/admin/equipment"),
+    queryKey: ["admin", "equipment", carrier ?? "all"],
+    queryFn: () =>
+      apiGet<EquipmentCatalogItem[]>(
+        carrier ? `/api/admin/equipment?carrier=${encodeURIComponent(carrier)}` : "/api/admin/equipment",
+      ),
   });
 }
 
@@ -41,6 +44,23 @@ export function useDeleteEquipment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => apiDelete<{ ok: boolean }>(`/api/admin/equipment?id=${encodeURIComponent(id)}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "equipment"] }),
+  });
+}
+
+export function useDeleteAllEquipment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiDelete<{ ok: boolean }>("/api/admin/equipment?all=1"),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "equipment"] }),
+  });
+}
+
+export function useBulkImportEquipment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (items: Array<{ rowNumber: number; equipment: UpsertEquipmentInput }>) =>
+      apiPost<EquipmentBulkImportResult>("/api/admin/equipment/bulk", { items }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "equipment"] }),
   });
 }

@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     );
   }
 
-  let body: { label?: string };
+  let body: { label?: string; carrier?: string };
   try {
     body = await request.json();
   } catch {
@@ -44,8 +44,9 @@ export async function POST(request: Request) {
   }
 
   const label = body.label?.trim() || "Línea WhatsApp Web";
+  const carrier = body.carrier === "claro" ? "claro" : "wom";
   const id = `webqr-${crypto.randomUUID()}`;
 
-  const channel = await webQrRepository.createWebQrChannel({ id, label });
+  const channel = await webQrRepository.createWebQrChannel({ id, label, carrier });
   return NextResponse.json(channel, { status: 201 });
 }

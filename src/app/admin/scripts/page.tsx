@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Eye, History, RotateCcw, Save } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { TokenTemplateEditor } from "@/components/admin/scripts/token-template-editor";
+import { CarrierToggle } from "@/components/admin/shared/carrier-toggle";
 import { ErrorState } from "@/components/shared/error-state";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -22,6 +23,7 @@ import { cn } from "@/lib/utils";
 
 export default function AdminScriptsPage() {
   const { data: flows = [], isLoading: loadingFlows, isError, refetch } = useScriptFlows();
+  const [carrier, setCarrier] = useState("wom");
   const [flowKey, setFlowKey] = useState<ScriptFlowKey | null>(null);
   const [blockId, setBlockId] = useState<string | null>(null);
   const [fieldKey, setFieldKey] = useState<string | null>("content");
@@ -59,6 +61,7 @@ export default function AdminScriptsPage() {
     flowKey,
     blockId,
     fieldKey,
+    carrier,
   });
 
   useEffect(() => {
@@ -91,10 +94,13 @@ export default function AdminScriptsPage() {
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader
-        title="Scripts"
-        subtitle="Edita solo el texto hablado del teleprompter por flujo. No modifica ramas, lógica, notas internas ni las Plantillas de WhatsApp."
-      />
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <AdminPageHeader
+          title="Scripts"
+          subtitle="Edita solo el texto hablado del teleprompter por flujo. No modifica ramas, lógica, notas internas ni las Plantillas de WhatsApp."
+        />
+        <CarrierToggle value={carrier} onChange={setCarrier} />
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
         <Card className="p-3">
@@ -240,6 +246,7 @@ export default function AdminScriptsPage() {
                         flowKey,
                         blockId,
                         fieldKey,
+                        carrier,
                         templateText: draft,
                       });
                     } catch (error) {
@@ -259,7 +266,7 @@ export default function AdminScriptsPage() {
                   variant="secondary"
                   onClick={async () => {
                     if (!flowKey || !blockId || !fieldKey) return;
-                    await restoreField.mutateAsync({ flowKey, blockId, fieldKey });
+                    await restoreField.mutateAsync({ flowKey, blockId, fieldKey, carrier });
                   }}
                   disabled={restoreField.isPending || !fieldState.isCustom}
                 >

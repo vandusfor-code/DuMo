@@ -1,6 +1,6 @@
 import type { EquipmentCatalogItem } from "@/types/equipment";
 
-export const EQUIPMENT_CATALOG_MOCK: EquipmentCatalogItem[] = [
+const EQUIPMENT_CATALOG_MOCK_SEED: Omit<EquipmentCatalogItem, "carrier">[] = [
   {
     id: "eq-001",
     commercialName: "Samsung Galaxy A36 5G",
@@ -34,3 +34,7 @@ export const EQUIPMENT_CATALOG_MOCK: EquipmentCatalogItem[] = [
     status: "active",
   },
 ];
+
+export const EQUIPMENT_CATALOG_MOCK: EquipmentCatalogItem[] = EQUIPMENT_CATALOG_MOCK_SEED.map(
+  (item) => ({ ...item, carrier: "wom" }),
+);

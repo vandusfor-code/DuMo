@@ -110,6 +110,10 @@ function buildColumns(
       header: "ID Venta",
       cell: (i) => <span className="font-semibold text-ink">{i.getValue()}</span>,
     }),
+    columnHelper.accessor("folioNumber", {
+      header: "Número folio",
+      cell: (i) => <span className="text-muted">{i.getValue() || "—"}</span>,
+    }),
     columnHelper.accessor("date", {
       header: "Fecha",
       cell: (i) => (
@@ -123,7 +127,17 @@ function buildColumns(
       header: "Cliente",
       cell: (i) => (
         <div className="leading-tight">
-          <p className="font-medium text-ink">{i.getValue()}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="font-medium text-ink">{i.getValue()}</p>
+            {i.row.original.isDuo && (
+              <span
+                title="Comisión dividida entre la asesora que concretó por chat y la que cerró por llamada."
+                className="inline-flex items-center rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold text-brand"
+              >
+                Operación Duo
+              </span>
+            )}
+          </div>
           <p className="text-[12px] text-muted">RUT {i.row.original.rut}</p>
         </div>
       ),

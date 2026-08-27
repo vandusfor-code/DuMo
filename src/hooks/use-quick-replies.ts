@@ -32,12 +32,14 @@ export function useQuickReplyTemplates(filters?: {
   categoryId?: string;
   tagId?: string;
   includeDeleted?: boolean;
+  carrier?: string;
 }) {
   const params = new URLSearchParams();
   if (filters?.q) params.set("q", filters.q);
   if (filters?.categoryId) params.set("categoryId", filters.categoryId);
   if (filters?.tagId) params.set("tagId", filters.tagId);
   if (filters?.includeDeleted) params.set("includeDeleted", "1");
+  if (filters?.carrier) params.set("carrier", filters.carrier);
   const qs = params.toString();
 
   return useQuery({
@@ -70,7 +72,10 @@ export function useCreateQuickReplyTemplate() {
   return useMutation({
     mutationFn: (input: CreateQuickReplyTemplateInput) =>
       apiPost<QuickReplyTemplate>("/api/admin/plantillas", input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "plantillas"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "plantillas"] });
+      qc.invalidateQueries({ queryKey: ["leads", "plantillas"] });
+    },
   });
 }
 

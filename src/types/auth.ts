@@ -18,6 +18,10 @@ export interface AuthUser {
   companyId: string;
   /** Meta de ventas del mes asignada por el admin (null = reparto automático del equipo). */
   monthlySalesGoal?: number | null;
+  /** Contador de revocación de sesión — incrementa al forzar desconexión. */
+  tokenVersion?: number;
+  /** Estado operativo (solo asesoras): 'disponible' | 'bano' | 'almuerzo' | 'desconectado'. */
+  presenceStatus?: string | null;
 }
 
 export interface LoginResult {

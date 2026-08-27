@@ -11,11 +11,38 @@ import { useUnreadMessageCount } from "@/hooks/use-unread-messages";
  * User profile block shown at the bottom of the sidebar (avatar, name, role)
  * plus the notifications bell.
  */
-export function SidebarUser() {
+export function SidebarUser({ compact = false }: { compact?: boolean }) {
   const { data: user } = useCurrentUser();
   const unread = useUnreadMessageCount("advisor");
   const name = user?.name ?? "Asesora";
   const role = user?.role ?? "Asesora Comercial";
+
+  if (compact) {
+    return (
+      <div className="flex flex-col items-center gap-2">
+        <span title={name}>
+          {user?.avatarUrl ? (
+            <PhotoAvatar src={user.avatarUrl} alt={name} className="size-9" />
+          ) : (
+            <InitialsAvatar initials={getInitials(name)} className="size-9 text-[12px]" />
+          )}
+        </span>
+        <Link
+          href="/dashboard/notificaciones"
+          aria-label="Notificaciones"
+          title="Notificaciones"
+          className="relative grid size-9 place-items-center rounded-[14px] text-muted transition-colors hover:bg-brand-soft hover:text-brand"
+        >
+          <Bell className="size-[18px]" />
+          {unread > 0 ? (
+            <span className="absolute -right-0.5 -top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand px-1 text-[10px] font-bold leading-none text-white ring-2 ring-card">
+              {unread > 9 ? "9+" : unread}
+            </span>
+          ) : null}
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center gap-2.5 rounded-2xl border border-line bg-canvas/60 px-2.5 py-2">

@@ -28,7 +28,7 @@ function rowToClient(row: ClientRow): CrmClient {
     customerName: row.customer_name,
     rut: row.rut,
     phone: row.phone,
-    gestionType: row.gestion_type as LeadType,
+    gestionType: row.gestion_type as string,
     advisorId: row.advisor_id,
     advisorName: row.advisor_name,
     hasSale: Boolean(row.has_sale),
@@ -43,7 +43,7 @@ export interface CrmClientsRepository {
     customerName: string;
     rut: string;
     phone: string;
-    gestionType: LeadType;
+    gestionType: string;
     advisorId: string;
     advisorName: string;
     hasSale: boolean;
@@ -72,7 +72,7 @@ class PostgresCrmClientsRepository implements CrmClientsRepository {
     customerName: string;
     rut: string;
     phone: string;
-    gestionType: LeadType;
+    gestionType: string;
     advisorId: string;
     advisorName: string;
     hasSale: boolean;
@@ -126,7 +126,7 @@ class PostgresCrmClientsRepository implements CrmClientsRepository {
           g.gestion_type,
           ${scope.id},
           ${scope.name},
-          (g.gestion_type = 'venta'),
+          false,
           g.created_at,
           g.created_at
         FROM (
@@ -278,7 +278,7 @@ class MockCrmClientsRepository implements CrmClientsRepository {
     customerName: string;
     rut: string;
     phone: string;
-    gestionType: LeadType;
+    gestionType: string;
     advisorId: string;
     advisorName: string;
     hasSale: boolean;

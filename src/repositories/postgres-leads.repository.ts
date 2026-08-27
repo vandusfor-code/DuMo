@@ -57,24 +57,38 @@ export class PostgresLeadRepository {
       sql`
         INSERT INTO lead_gestiones (
           id, conversation_id, phone, customer_name, rut, gestion_type,
-          notes, advisor_id, advisor_name, lines, created_at
+          notes, advisor_id, advisor_name, lines, created_at, folio_number, carrier
         ) VALUES (
           ${id}, ${input.conversationId}, ${input.phone}, ${input.customerName},
           ${input.rut}, ${input.type}, ${input.notes}, ${advisorId || null},
-          ${advisorName}, ${JSON.stringify(input.lines)}, ${now}
+          ${advisorName}, ${JSON.stringify(input.lines)}, ${now}, ${input.folioNumber?.trim() ?? ""},
+          ${input.carrier ?? "wom"}
         )
       `,
     );
 
-    if (input.type === "venta") {
-      await withDbRetry(() =>
-        sql`
-          UPDATE lead_conversations
-          SET admin_status = ${"contactado"}
-          WHERE id = ${input.conversationId}
-        `,
-      );
-    }
+    // Cualquier gestión guardada significa que hubo contacto con el cliente —
+    // antes esto solo avanzaba admin_status en flujo de venta, así que
+    // tipificar y "Guardar y cerrar" en cualquier otro tipo (consulta,
+    // seguimiento, etc.) dejaba el lead pegado en "Nuevo" para siempre en el
+    // panel admin, aunque la conversación ya estuviera cerrada. Solo avanza
+    // desde nuevo/asignado — nunca retrocede un lead que ya iba más adelante
+    // en el embudo (negociación/convertido/perdido).
+    await withDbRetry(() =>
+      sql`
+        UPDATE lead_conversations
+        SET admin_status = ${"contactado"}
+        WHERE id = ${input.conversationId}
+          AND admin_status IN ('nuevo', 'asignado')
+      `,
+    );
+    await withDbRetry(() =>
+      sql`
+        UPDATE lead_conversations
+        SET current_tipification_slug = ${input.type}
+        WHERE id = ${input.conversationId}
+      `,
+    );
 
     return buildLead(id, input, advisorId || "unknown");
   }
@@ -134,13 +148,15 @@ export class PostgresLeadRepository {
           id: string;
           customer_name: string;
           rut: string;
+          carrier: string | null;
           gestion_type: string;
           notes: string;
           lines: SaveLeadInput["lines"] | null;
           sales_script: GeneratedSalesScript | null;
+          folio_number: string | null;
         }[]
       >`
-        SELECT id, customer_name, rut, gestion_type, notes, lines, sales_script
+        SELECT id, customer_name, rut, carrier, gestion_type, notes, lines, sales_script, folio_number
         FROM lead_gestiones
         WHERE conversation_id = ${conversationId}
         ORDER BY created_at DESC
@@ -153,10 +169,12 @@ export class PostgresLeadRepository {
       gestionId: row.id,
       customerName: row.customer_name ?? "",
       rut: row.rut ?? "",
+      carrier: row.carrier ?? "wom",
       type: row.gestion_type as LeadType,
       notes: row.notes ?? "",
       lines: Array.isArray(row.lines) ? row.lines : [],
       hasScript: row.sales_script != null,
+      folioNumber: row.folio_number ?? "",
     };
   }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useFormContext } from "react-hook-form";
-import { IdCard, Phone, User } from "lucide-react";
+import { Hash, IdCard, Phone, User } from "lucide-react";
 import { Input, InputGroup } from "@/components/ui/input";
 import { FormField } from "@/components/forms/form-field";
 import type { LeadFormValues } from "@/types/lead-form";
@@ -53,6 +53,34 @@ export function ClientPhoneField() {
           readOnly
           className="h-11 cursor-not-allowed bg-canvas pl-11 text-[14px] text-muted"
           {...register("phone")}
+        />
+      </InputGroup>
+    </FormField>
+  );
+}
+
+/** Radicado que la asesora escribe manualmente. Opcional salvo venta/Operación Duo. */
+export function FolioNumberField({ required = false }: { required?: boolean }) {
+  const {
+    register,
+    formState: { errors },
+  } = useFormContext<LeadFormValues>();
+
+  return (
+    <FormField
+      label="Número de folio"
+      htmlFor="lead-folio-number"
+      hint={required ? "(obligatorio para esta gestión)" : "(opcional)"}
+      error={errors.folioNumber?.message}
+    >
+      <InputGroup icon={<Hash />}>
+        <Input
+          id="lead-folio-number"
+          inputMode="numeric"
+          className="h-11 pl-11 text-[14px]"
+          placeholder="Ej: 123456"
+          aria-invalid={!!errors.folioNumber}
+          {...register("folioNumber")}
         />
       </InputGroup>
     </FormField>

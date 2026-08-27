@@ -12,19 +12,29 @@ export type SessionPayload = {
   role?: string;
   /** Tenant SaaS — empresa del usuario. */
   companyId?: string;
+  /** Incrementa al forzar desconexión; debe coincidir con users.token_version. */
+  tokenVersion?: number;
 };
 
 function secret(): string {
   return process.env.AUTH_SECRET ?? "dumo-dev-auth-secret-change-in-production";
 }
 
-export function createSessionToken(userId: string, role?: string, companyId?: string): string {
+export function createSessionToken(
+  userId: string,
+  role?: string,
+  companyId?: string,
+  tokenVersion?: number,
+): string {
   const payload: SessionPayload = {
     userId,
     role,
     companyId,
     exp: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SEC,
   };
+  if (tokenVersion !== undefined) {
+    payload.tokenVersion = tokenVersion;
+  }
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
   const sig = createHmac("sha256", secret()).update(body).digest("base64url");
   return `${body}.${sig}`;

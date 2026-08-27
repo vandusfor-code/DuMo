@@ -7,7 +7,7 @@ import { ChatWindow } from "@/components/leads/chat-window";
 import { LeadFormPanel } from "@/components/leads/lead-form-panel";
 import { EmptyConversation } from "@/components/leads/empty-conversation";
 import { SectionCard } from "@/components/leads/premium/section-card";
-import { useConversations, useConversationMessages } from "@/hooks/use-leads";
+import { useConversations, useConversationMessages, useMarkConversationRead } from "@/hooks/use-leads";
 import { cn } from "@/lib/utils";
 import type { Conversation } from "@/types/conversation";
 
@@ -25,14 +25,16 @@ function LeadsPageContent() {
   const searchParams = useSearchParams();
   const conversationFromUrl = searchParams.get("conversationId");
   const { data: conversations, isLoading, isError, isFetching, refetch } = useConversations();
+  const markRead = useMarkConversationRead();
   const [selectedId, setSelectedId] = useState<string | null>(conversationFromUrl);
   const [listCollapsed, setListCollapsed] = useState(false);
 
   useEffect(() => {
     if (conversationFromUrl) {
       setSelectedId(conversationFromUrl);
+      markRead.mutate(conversationFromUrl);
     }
-  }, [conversationFromUrl]);
+  }, [conversationFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     try {
@@ -59,14 +61,19 @@ function LeadsPageContent() {
   const messages = useConversationMessages(selectedId);
   const list = conversations ?? [];
 
+  const handleSelect = (id: string) => {
+    setSelectedId(id);
+    markRead.mutate(id);
+  };
+
   return (
     <div className="leads-crm flex h-full min-h-0 flex-col overflow-hidden bg-canvas p-4 lg:p-5">
       <div
         className={cn(
           "grid min-h-0 flex-1 gap-4 overflow-hidden transition-[grid-template-columns] duration-200 ease-out",
           listCollapsed
-            ? "lg:grid-cols-[72px_minmax(300px,540px)_minmax(440px,1fr)] xl:grid-cols-[72px_minmax(320px,560px)_minmax(480px,1fr)]"
-            : "lg:grid-cols-[minmax(280px,340px)_minmax(300px,540px)_minmax(440px,1fr)] xl:grid-cols-[360px_minmax(320px,560px)_minmax(480px,1fr)]",
+            ? "lg:grid-cols-[72px_minmax(0,1.75fr)_minmax(260px,0.95fr)] xl:grid-cols-[72px_minmax(0,1.85fr)_minmax(280px,0.9fr)]"
+            : "lg:grid-cols-[minmax(280px,340px)_minmax(0,1.75fr)_minmax(260px,0.95fr)] xl:grid-cols-[360px_minmax(0,1.85fr)_minmax(280px,0.9fr)]",
         )}
       >
         <SectionCard className="flex min-h-0 flex-col overflow-hidden">
@@ -85,7 +92,7 @@ function LeadsPageContent() {
             isSyncing={isFetching && list.length > 0}
             onRetry={() => refetch()}
             selectedId={selectedId}
-            onSelect={setSelectedId}
+            onSelect={handleSelect}
             collapsed={listCollapsed}
             onCollapsedChange={handleListCollapsed}
           />
@@ -107,7 +114,11 @@ function LeadsPageContent() {
               />
             </SectionCard>
             <SectionCard className="flex min-h-0 flex-col overflow-hidden">
-              <LeadFormPanel key={selected.id} conversation={selected} />
+              <LeadFormPanel
+                key={selected.id}
+                conversation={selected}
+                onInboxClosed={() => setSelectedId(null)}
+              />
             </SectionCard>
           </>
         ) : (

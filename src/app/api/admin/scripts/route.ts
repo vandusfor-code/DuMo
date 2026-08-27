@@ -13,6 +13,10 @@ function parseFlowKey(value: string | null): ScriptFlowKey | null {
   return null;
 }
 
+function parseCarrier(value: unknown): string {
+  return value === "claro" ? "claro" : "wom";
+}
+
 export async function GET(request: NextRequest) {
   if (!(await requireAdministratorSession())) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
@@ -44,6 +48,7 @@ export async function GET(request: NextRequest) {
         flowKey,
         blockId,
         fieldKey,
+        carrier: parseCarrier(p.get("carrier")),
       });
       return NextResponse.json(field);
     }
@@ -87,6 +92,7 @@ export async function PUT(request: NextRequest) {
       flowKey,
       blockId: String(body.blockId),
       fieldKey: String(body.fieldKey),
+      carrier: parseCarrier(body.carrier),
       templateText: body.templateText,
     });
 
@@ -132,6 +138,7 @@ export async function POST(request: NextRequest) {
         flowKey,
         blockId: String(body.blockId),
         fieldKey: String(body.fieldKey),
+        carrier: parseCarrier(body.carrier),
       });
       return NextResponse.json(field);
     }

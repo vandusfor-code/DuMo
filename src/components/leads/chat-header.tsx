@@ -27,25 +27,31 @@ export function ChatHeader({ conversation }: { conversation: Conversation }) {
             {conversation.customerName}
             {conversation.channel === "messenger" ? (
               <span className="ml-1.5 text-[12px] font-medium text-brand">Messenger</span>
+            ) : conversation.channel === "instagram" ? (
+              <span className="ml-1.5 text-[12px] font-medium text-brand">Instagram</span>
             ) : conversation.channel === "web_qr" ? (
               <span className="ml-1.5 text-[12px] font-medium text-warning-ink">WhatsApp Web</span>
             ) : null}
           </p>
           <p className="flex items-center gap-1.5 text-[13px] text-muted">
             {conversation.online && (
-              <span className="size-2 rounded-full bg-success" aria-hidden />
+              <span className="size-2 rounded-full border-2 border-white bg-online" aria-hidden />
             )}
             {conversation.channel === "messenger"
               ? conversation.online
                 ? "Messenger · En línea"
                 : "Messenger · Desconectado"
-              : conversation.channel === "web_qr"
+              : conversation.channel === "instagram"
                 ? conversation.online
-                  ? "WhatsApp Web · En línea"
-                  : "WhatsApp Web · Desconectado"
-                : conversation.online
-                  ? "En línea"
-                  : "Desconectado"}
+                  ? "Instagram · En línea"
+                  : "Instagram · Desconectado"
+                : conversation.channel === "web_qr"
+                  ? conversation.online
+                    ? "WhatsApp Web · En línea"
+                    : "WhatsApp Web · Desconectado"
+                  : conversation.online
+                    ? "En línea"
+                    : "Desconectado"}
           </p>
         </div>
       </div>

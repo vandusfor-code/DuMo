@@ -6,6 +6,7 @@ import type {
   SettingsSnapshot,
   UpdateCompanyInput,
   UpdateGoogleSheetsInput,
+  UpdateInstagramInput,
   UpdateMessengerInput,
   UpdateWhatsAppInput,
 } from "@/types/settings";
@@ -40,6 +41,15 @@ export function useUpdateMessenger() {
   return useMutation({
     mutationFn: (data: UpdateMessengerInput) =>
       apiPost("/api/admin/settings", { section: "messenger", data }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "settings"] }),
+  });
+}
+
+export function useUpdateInstagram() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: UpdateInstagramInput) =>
+      apiPost("/api/admin/settings", { section: "instagram", data }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "settings"] }),
   });
 }

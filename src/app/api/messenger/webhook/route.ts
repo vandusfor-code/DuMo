@@ -69,6 +69,7 @@ export async function POST(request: NextRequest) {
     );
 
     let inboundCount = 0;
+    let persistedCount = 0;
     for (const entry of payload.entry ?? []) {
       const pageId = entry.id ?? "";
       if (allowedPages.size > 0 && pageId && !allowedPages.has(pageId)) {
@@ -80,13 +81,14 @@ export async function POST(request: NextRequest) {
       }
 
       for (const event of entry.messaging ?? []) {
-        await persistMessengerInbound(event, pageId);
         inboundCount += 1;
+        const persisted = await persistMessengerInbound(event, pageId);
+        if (persisted) persistedCount += 1;
       }
     }
 
     if (inboundCount > 0) {
-      console.info("[webhook/messenger] inbound events", { inboundCount });
+      console.info("[webhook/messenger] inbound events", { inboundCount, persistedCount });
     }
   } catch (error) {
     console.error("[POST /api/messenger/webhook] parse", error);

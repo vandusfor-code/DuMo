@@ -88,6 +88,45 @@ export async function bridgeSendText(input: {
   });
 }
 
+export async function bridgeSendMedia(input: {
+  channelId: string;
+  to?: string;
+  jid?: string;
+  mediaUrl: string;
+  mimeType?: string;
+  caption?: string;
+}): Promise<{ id: string; jid?: string }> {
+  return bridgeFetch("/send-media", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function bridgeSendAudio(input: {
+  channelId: string;
+  to?: string;
+  jid?: string;
+  mediaUrl: string;
+  mimeType?: string;
+  ptt?: boolean;
+}): Promise<{ id: string; jid?: string }> {
+  return bridgeFetch("/send-audio", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+/** Validación PCS — consulta en lote (~20-30 números) si tienen WhatsApp activo. */
+export async function bridgeCheckNumbers(input: {
+  channelId: string;
+  numeros: string[];
+}): Promise<{ pcs: string; exists: boolean; jid: string | null }[]> {
+  return bridgeFetch("/check-numbers", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 /** Prueba el webhook Railway → Vercel con el secreto de la sesión activa. */
 export async function bridgeTestWebhook(channelId: string): Promise<{
   ok: boolean;

@@ -1,6 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { adminLeadsService } from "@/services/admin-leads.service";
-import { authService } from "@/services/auth.service";
+import { advisorIdForConversations } from "@/lib/conversation-access";
+import { getAdvisorTenantScope } from "@/lib/tenant-scope";
 import { leadsService } from "@/services/leads.service";
 
 export const runtime = "nodejs";
@@ -9,8 +10,15 @@ export const maxDuration = 20;
 
 export async function GET() {
   try {
-    const user = await authService.getSessionUser();
-    const advisorId = user?.role === "asesora" ? user.id : undefined;
+    const scope = await getAdvisorTenantScope();
+    if (!scope) {
+      return NextResponse.json({ error: "No autenticado." }, { status: 401 });
+    }
+
+    const advisorId = advisorIdForConversations(scope);
+    if (scope.role === "asesora" && !advisorId) {
+      return NextResponse.json({ error: "No autorizado." }, { status: 403 });
+    }
 
     // La asignación corre DESPUÉS de responder: la bandeja nunca espera por
     // ella, así un problema de asignación no puede romper la sincronización.
@@ -23,6 +31,32 @@ export async function GET() {
         }
       });
     }
+
+    // RESP-1 — red de seguridad del timer SLA: reevalúa timers activos en
+    // cada poll de la bandeja (con su propio throttle interno), sin
+    // depender de que el job diferido de BullMQ haya disparado.
+    after(async () => {
+      try {
+        const { reconcileDueTimersThrottled } = await import(
+          "@/services/response-sla-sweep"
+        );
+        await reconcileDueTimersThrottled();
+      } catch (err) {
+        console.error("[reconcileDueTimersThrottled]", err);
+      }
+    });
+
+    // Red de seguridad del barrido de presencia — mismo patrón que arriba.
+    after(async () => {
+      try {
+        const { reconcileStalePresenceThrottled } = await import(
+          "@/services/advisor-presence-sweep"
+        );
+        await reconcileStalePresenceThrottled();
+      } catch (err) {
+        console.error("[reconcileStalePresenceThrottled]", err);
+      }
+    });
 
     const conversations = await Promise.race([
       leadsService.getConversations(advisorId),

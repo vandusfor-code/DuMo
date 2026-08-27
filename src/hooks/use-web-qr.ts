@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiPost, apiDelete } from "@/lib/api-client";
+import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api-client";
 import type { WhatsAppChannel } from "@/types/web-qr";
 
 export const webQrKeys = {
@@ -42,8 +42,17 @@ export function useWebQrSession(channelId: string | null, poll = false) {
 export function useCreateWebQrChannel() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (label: string) =>
-      apiPost<WhatsAppChannel>("/api/web-qr/channels", { label }),
+    mutationFn: ({ label, carrier }: { label: string; carrier: string }) =>
+      apiPost<WhatsAppChannel>("/api/web-qr/channels", { label, carrier }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: webQrKeys.channels }),
+  });
+}
+
+export function useUpdateWebQrChannelCarrier() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ channelId, carrier }: { channelId: string; carrier: string }) =>
+      apiPatch<WhatsAppChannel>(`/api/web-qr/channels/${channelId}`, { carrier }),
     onSuccess: () => qc.invalidateQueries({ queryKey: webQrKeys.channels }),
   });
 }

@@ -28,8 +28,8 @@ export function MessageShell({
             ? cn(
                 "rounded-[12px] px-3 py-1.5",
                 out
-                  ? "border border-border-strong bg-msg-out text-msg-out-text"
-                  : "border border-line bg-card text-ink",
+                  ? "rounded-br-[4px] bg-msg-out text-msg-out-text"
+                  : "rounded-bl-[4px] border border-msg-in/60 bg-msg-in text-msg-in-text",
                 isMedia && "border-0 bg-transparent p-0",
               )
             : cn(

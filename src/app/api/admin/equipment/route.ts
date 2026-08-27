@@ -1,25 +1,32 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { withAdminFallback } from "@/lib/admin-api-fallbacks";
 import { requireAdminSession } from "@/lib/require-admin";
 import { equipmentService } from "@/services/equipment.service";
-import { EQUIPMENT_CATALOG_MOCK } from "@/data/mock/equipment.mock";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 15;
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await requireAdminSession();
   if (!session) {
     return NextResponse.json({ error: "No autorizado." }, { status: 403 });
   }
 
-  const data = await withAdminFallback(
-    () => equipmentService.listAll(),
-    [...EQUIPMENT_CATALOG_MOCK],
-    "GET /api/admin/equipment",
-  );
-  return NextResponse.json(data);
+  try {
+    const carrierParam = request.nextUrl.searchParams.get("carrier");
+    const carrier = carrierParam === "wom" || carrierParam === "claro" ? carrierParam : undefined;
+    const data = await equipmentService.listAll(carrier);
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error("[GET /api/admin/equipment]", error);
+    return NextResponse.json(
+      {
+        error:
+          "No se pudo cargar el catálogo de equipos. Verifica la conexión a la base de datos e intenta de nuevo.",
+      },
+      { status: 503 },
+    );
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -72,6 +79,11 @@ export async function DELETE(request: NextRequest) {
   try {
     if (!(await requireAdminSession())) {
       return NextResponse.json({ error: "No autorizado." }, { status: 403 });
+    }
+    const deleteAll = request.nextUrl.searchParams.get("all") === "1";
+    if (deleteAll) {
+      await equipmentService.deleteAll();
+      return NextResponse.json({ ok: true });
     }
     const id = request.nextUrl.searchParams.get("id");
     if (!id) return NextResponse.json({ error: "ID requerido." }, { status: 400 });

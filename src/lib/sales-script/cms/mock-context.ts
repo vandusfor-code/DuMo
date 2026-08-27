@@ -118,6 +118,7 @@ function portabilidadGestion(withEquipment: boolean): SaveLeadInput {
     phone: "56912345678",
     customerName: CMS_PREVIEW_VARS.nombre_cliente,
     rut: CMS_PREVIEW_VARS.rut,
+    carrier: "wom",
     type: "venta",
     notes: "",
     lines: [
@@ -144,6 +145,7 @@ function lineaNuevaGestion(withEquipment: boolean): SaveLeadInput {
     phone: "56912345678",
     customerName: CMS_PREVIEW_VARS.nombre_cliente,
     rut: CMS_PREVIEW_VARS.rut,
+    carrier: "wom",
     type: "venta",
     notes: "",
     lines: [

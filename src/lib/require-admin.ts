@@ -33,6 +33,15 @@ export function readSessionTokenFromCookieHeader(raw: string | null): string | n
  * Token de sesión: cookie (principal), header Cookie crudo o Authorization: Bearer.
  */
 export async function getSessionToken(): Promise<string | null> {
+  return getSessionTokenFromRequest(false);
+}
+
+/** Solo cookie — para APIs de asesora (ignora Bearer stale en localStorage). */
+export async function getCookieSessionToken(): Promise<string | null> {
+  return getSessionTokenFromRequest(true);
+}
+
+async function getSessionTokenFromRequest(cookieOnly: boolean): Promise<string | null> {
   const jar = await cookies();
   const cookieToken = jar.get(SESSION_COOKIE)?.value;
   if (cookieToken) return cookieToken;
@@ -40,6 +49,8 @@ export async function getSessionToken(): Promise<string | null> {
   const headerList = await headers();
   const fromCookieHeader = readSessionTokenFromCookieHeader(headerList.get("cookie"));
   if (fromCookieHeader) return fromCookieHeader;
+
+  if (cookieOnly) return null;
 
   const bearer = headerList.get("authorization");
   const headerToken = bearer?.replace(/^Bearer\s+/i, "").trim();

@@ -23,6 +23,10 @@ import {
   templatePreviewText,
 } from "@/lib/quick-reply-utils";
 import { ensureSchema, getSql, hasDatabase, withDbRetry } from "@/server/db/client";
+import {
+  MAX_PINNED_QUICK_REPLIES,
+  PINNED_LIMIT_MESSAGE,
+} from "@/lib/pinned-quick-replies.constants";
 
 export interface QuickReplyTemplateFilters {
   search?: string;
@@ -30,6 +34,8 @@ export interface QuickReplyTemplateFilters {
   tagId?: string;
   status?: QuickReplyTemplateStatus;
   includeDeleted?: boolean;
+  /** Omitido = todas las plantillas, sin filtrar por operador. */
+  carrier?: string;
 }
 
 export interface QuickReplyRepository {
@@ -86,6 +92,19 @@ export interface QuickReplyRepository {
 
 function newId(prefix: string): string {
   return `${prefix}${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function countPinnedTemplates(
+  templates: { id: string; favorite: boolean }[],
+  excludeId?: string,
+): number {
+  return templates.filter((t) => t.favorite && t.id !== excludeId).length;
+}
+
+function assertPinCapacity(pinnedCount: number): void {
+  if (pinnedCount >= MAX_PINNED_QUICK_REPLIES) {
+    throw new Error(PINNED_LIMIT_MESSAGE);
+  }
 }
 
 function requireSql() {
@@ -172,6 +191,7 @@ function mapTemplateRow(r: Record<string, unknown>): QuickReplyTemplate {
     categoryId: String(r.category_id),
     name: String(r.name),
     shortcut: String(r.shortcut),
+    carrier: String(r.carrier ?? "wom"),
     status: (String(r.status) === "inactive" ? "inactive" : "active") as QuickReplyTemplateStatus,
     favorite: Boolean(r.favorite),
     timesUsed: Number(r.times_used) || 0,
@@ -253,6 +273,7 @@ function mockFilterTemplates(companyId: string, filters?: QuickReplyTemplateFilt
     if (!filters?.includeDeleted && t.deletedAt) return false;
     if (filters?.categoryId && t.categoryId !== filters.categoryId) return false;
     if (filters?.status && t.status !== filters.status) return false;
+    if (filters?.carrier && (t.carrier ?? "wom") !== filters.carrier) return false;
     if (filters?.tagId) {
       const hasTag = mockStore.tagLinks.some(
         (l) => l.companyId === companyId && l.templateId === t.id && l.tagId === filters.tagId,
@@ -437,6 +458,9 @@ class MockQuickReplyRepository implements QuickReplyRepository {
   async createTemplate(companyId: string, input: CreateQuickReplyTemplateInput, createdBy: string) {
     const category = mockStore.categories.find((c) => c.companyId === companyId && c.id === input.categoryId);
     if (!category) throw new Error("Categoría no encontrada.");
+    if (input.favorite) {
+      assertPinCapacity(countPinnedTemplates(mockStore.templates.filter((t) => t.companyId === companyId)));
+    }
 
     const now = mockNow();
     const templateId = newId("qrtpl-");
@@ -449,6 +473,7 @@ class MockQuickReplyRepository implements QuickReplyRepository {
       categoryId: input.categoryId,
       name: input.name.trim(),
       shortcut,
+      carrier: input.carrier ?? "wom",
       status: input.status ?? "active",
       favorite: input.favorite ?? false,
       timesUsed: 0,
@@ -491,11 +516,20 @@ class MockQuickReplyRepository implements QuickReplyRepository {
     if (template.deletedAt) throw new Error("No se puede editar una plantilla eliminada.");
 
     const now = mockNow();
+    const wasFavorite = template.favorite;
+    const nextFavorite = input.favorite ?? wasFavorite;
+    if (nextFavorite && !wasFavorite) {
+      assertPinCapacity(
+        countPinnedTemplates(mockStore.templates.filter((t) => t.companyId === companyId), id),
+      );
+    }
+
     template.categoryId = input.categoryId;
     template.name = input.name.trim();
     template.shortcut = normalizeShortcut(input.shortcut);
+    template.carrier = input.carrier ?? template.carrier;
     template.status = input.status ?? template.status;
-    template.favorite = input.favorite ?? template.favorite;
+    template.favorite = nextFavorite;
     template.updatedAt = now;
 
     if (template.activeVersionId) {
@@ -631,6 +665,11 @@ class MockQuickReplyRepository implements QuickReplyRepository {
   async setFavorite(companyId: string, templateId: string, favorite: boolean) {
     const template = mockStore.templates.find((t) => t.companyId === companyId && t.id === templateId);
     if (!template) throw new Error("Plantilla no encontrada.");
+    if (favorite && !template.favorite) {
+      assertPinCapacity(
+        countPinnedTemplates(mockStore.templates.filter((t) => t.companyId === companyId), templateId),
+      );
+    }
     template.favorite = favorite;
     template.updatedAt = mockNow();
   }
@@ -983,6 +1022,7 @@ class PostgresQuickReplyRepository implements QuickReplyRepository {
         ${filters?.includeDeleted ? sql`` : sql`AND t.deleted_at IS NULL`}
         ${filters?.categoryId ? sql`AND t.category_id = ${filters.categoryId}` : sql``}
         ${filters?.status ? sql`AND t.status = ${filters.status}` : sql``}
+        ${filters?.carrier ? sql`AND t.carrier = ${filters.carrier}` : sql``}
         ${filters?.tagId ? sql`
           AND EXISTS (
             SELECT 1 FROM quick_reply_template_tag_links tl
@@ -1027,6 +1067,14 @@ class PostgresQuickReplyRepository implements QuickReplyRepository {
     `;
     if (!catRows[0]) throw new Error("Categoría no encontrada.");
 
+    if (input.favorite) {
+      const pinnedRows = await sql`
+        SELECT COUNT(*)::int AS n FROM quick_reply_templates
+        WHERE company_id = ${companyId} AND favorite = true AND deleted_at IS NULL
+      `;
+      assertPinCapacity(Number((pinnedRows[0] as { n: number })?.n) || 0);
+    }
+
     const templateId = newId("qrtpl-");
     const versionId = newId("qrv-");
     const now = new Date().toISOString();
@@ -1036,11 +1084,11 @@ class PostgresQuickReplyRepository implements QuickReplyRepository {
       sql.begin(async (tx) => {
         await tx`
           INSERT INTO quick_reply_templates (
-            id, company_id, category_id, name, shortcut, status, favorite,
+            id, company_id, category_id, name, shortcut, carrier, status, favorite,
             times_used, active_version_id, created_at, updated_at, created_by
           ) VALUES (
             ${templateId}, ${companyId}, ${input.categoryId}, ${input.name.trim()},
-            ${shortcut}, ${input.status ?? "active"}, ${input.favorite ?? false},
+            ${shortcut}, ${input.carrier ?? "wom"}, ${input.status ?? "active"}, ${input.favorite ?? false},
             ${0}, ${versionId}, ${now}, ${now}, ${createdBy}
           )
         `;
@@ -1075,6 +1123,15 @@ class PostgresQuickReplyRepository implements QuickReplyRepository {
     if (!existing) throw new Error("Plantilla no encontrada.");
     if (existing.deletedAt) throw new Error("No se puede editar una plantilla eliminada.");
 
+    const nextFavorite = input.favorite ?? existing.favorite;
+    if (nextFavorite && !existing.favorite) {
+      const pinnedRows = await sql`
+        SELECT COUNT(*)::int AS n FROM quick_reply_templates
+        WHERE company_id = ${companyId} AND favorite = true AND deleted_at IS NULL AND id <> ${id}
+      `;
+      assertPinCapacity(Number((pinnedRows[0] as { n: number })?.n) || 0);
+    }
+
     const versionId = newId("qrv-");
     const now = new Date().toISOString();
     const shortcut = normalizeShortcut(input.shortcut);
@@ -1094,6 +1151,7 @@ class PostgresQuickReplyRepository implements QuickReplyRepository {
             category_id = ${input.categoryId},
             name = ${input.name.trim()},
             shortcut = ${shortcut},
+            carrier = ${input.carrier ?? existing.carrier},
             status = ${input.status ?? existing.status},
             favorite = ${input.favorite ?? existing.favorite},
             active_version_id = ${versionId},
@@ -1293,6 +1351,24 @@ class PostgresQuickReplyRepository implements QuickReplyRepository {
   async setFavorite(companyId: string, templateId: string, favorite: boolean) {
     await ensureSchema();
     const sql = requireSql();
+
+    if (favorite) {
+      const rows = await sql`
+        SELECT favorite FROM quick_reply_templates
+        WHERE company_id = ${companyId} AND id = ${templateId}
+        LIMIT 1
+      `;
+      const current = rows[0] as { favorite: boolean } | undefined;
+      if (!current) throw new Error("Plantilla no encontrada.");
+      if (!current.favorite) {
+        const pinnedRows = await sql`
+          SELECT COUNT(*)::int AS n FROM quick_reply_templates
+          WHERE company_id = ${companyId} AND favorite = true AND deleted_at IS NULL AND id <> ${templateId}
+        `;
+        assertPinCapacity(Number((pinnedRows[0] as { n: number })?.n) || 0);
+      }
+    }
+
     const rows = await withDbRetry(() =>
       sql`
         UPDATE quick_reply_templates

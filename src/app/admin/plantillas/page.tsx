@@ -1,8 +1,21 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Pencil, Pin, Plus, Trash2 } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Plus, Search, Star } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { CategoriesModal } from "@/components/admin/plantillas/categories-modal";
+import { CategoryExplorer } from "@/components/admin/plantillas/category-explorer";
+import { TipificationsPanel } from "@/components/admin/plantillas/tipifications-panel";
+import {
+  TemplateCard,
+  TemplateListRow,
+  TemplatesSectionHeader,
+  type TemplateSortMode,
+  type TemplateViewMode,
+} from "@/components/admin/plantillas/template-cards";
+import { TemplateFormDialog } from "@/components/admin/plantillas/template-form-dialog";
+import { CarrierToggle } from "@/components/admin/shared/carrier-toggle";
 import { ErrorState } from "@/components/shared/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -16,40 +29,151 @@ import {
   useToggleQuickReplyPin,
   useUpdateQuickReplyTemplate,
 } from "@/hooks/use-quick-replies";
-import type { CreateQuickReplyTemplateInput, QuickReplyTemplate, UpdateQuickReplyTemplateInput } from "@/types/quick-reply";
+import {
+  MAX_PINNED_QUICK_REPLIES,
+  PINNED_LIMIT_MESSAGE,
+} from "@/lib/pinned-quick-replies.constants";
+import type { QuickReplyTemplate, UpdateQuickReplyTemplateInput } from "@/types/quick-reply";
 import { cn } from "@/lib/utils";
 
+type PlantillasTab = "plantillas" | "tipificaciones";
+
+function PlantillasModuleTabs({
+  active,
+  onChange,
+}: {
+  active: PlantillasTab;
+  onChange: (tab: PlantillasTab) => void;
+}) {
+  return (
+    <div className="inline-flex rounded-xl border border-line bg-card p-1">
+      {(
+        [
+          { id: "plantillas" as const, label: "Plantillas" },
+          { id: "tipificaciones" as const, label: "Tipificaciones" },
+        ] as const
+      ).map((tab) => (
+        <button
+          key={tab.id}
+          type="button"
+          onClick={() => onChange(tab.id)}
+          className={cn(
+            "rounded-lg px-4 py-2 text-[14px] font-medium transition-colors",
+            active === tab.id ? "bg-brand text-white" : "text-muted hover:text-brand",
+          )}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function sortTemplates(templates: QuickReplyTemplate[], sortMode: TemplateSortMode) {
+  const rows = [...templates];
+  if (sortMode === "recent") {
+    return rows.sort(
+      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+    );
+  }
+  if (sortMode === "name") {
+    return rows.sort((a, b) => a.name.localeCompare(b.name, "es"));
+  }
+  return rows.sort((a, b) => {
+    if (a.favorite !== b.favorite) return a.favorite ? -1 : 1;
+    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+  });
+}
+
 export default function AdminPlantillasPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeTab: PlantillasTab =
+    searchParams.get("tab") === "tipificaciones" ? "tipificaciones" : "plantillas";
+
+  const setActiveTab = (tab: PlantillasTab) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === "plantillas") params.delete("tab");
+    else params.set("tab", tab);
+    const qs = params.toString();
+    router.replace(qs ? `/admin/plantillas?${qs}` : "/admin/plantillas");
+  };
+
+  return (
+    <div className="space-y-6">
+      <AdminPageHeader
+        title="Plantillas"
+        subtitle="Respuestas rápidas reutilizables para WhatsApp — texto, imágenes y secuencias compuestas."
+      />
+      <PlantillasModuleTabs active={activeTab} onChange={setActiveTab} />
+      {activeTab === "plantillas" ? <PlantillasTabContent /> : <TipificationsPanel />}
+    </div>
+  );
+}
+
+function PlantillasTabContent() {
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [carrierFilter, setCarrierFilter] = useState("wom");
+  const [viewMode, setViewMode] = useState<TemplateViewMode>("grid");
+  const [sortMode, setSortMode] = useState<TemplateSortMode>("recent");
+  const [categoriesModalOpen, setCategoriesModalOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editing, setEditing] = useState<QuickReplyTemplate | null>(null);
+
   const { data: categories = [], isLoading: loadingCats } = useQuickReplyCategories();
   const { data: templates = [], isLoading, isError, refetch } = useQuickReplyTemplates({
     q: search,
-    categoryId: categoryId || undefined,
+    carrier: carrierFilter,
   });
   const createCategory = useCreateQuickReplyCategory();
   const createTemplate = useCreateQuickReplyTemplate();
   const updateTemplate = useUpdateQuickReplyTemplate();
   const deleteTemplate = useDeleteQuickReplyTemplate();
   const togglePin = useToggleQuickReplyPin();
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editing, setEditing] = useState<QuickReplyTemplate | null>(null);
+
+  const activeTemplates = useMemo(
+    () => templates.filter((t) => !t.deletedAt),
+    [templates],
+  );
+
+  const countsByCategoryId = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const template of activeTemplates) {
+      counts[template.categoryId] = (counts[template.categoryId] ?? 0) + 1;
+    }
+    return counts;
+  }, [activeTemplates]);
 
   const filtered = useMemo(() => {
-    return templates
-      .filter((t) => !t.deletedAt)
-      .sort((a, b) => {
-        if (a.favorite !== b.favorite) return a.favorite ? -1 : 1;
-        return a.name.localeCompare(b.name, "es");
-      });
-  }, [templates]);
+    const byCategory = categoryId
+      ? activeTemplates.filter((t) => t.categoryId === categoryId)
+      : activeTemplates;
+    return sortTemplates(byCategory, sortMode);
+  }, [activeTemplates, categoryId, sortMode]);
 
-  const pinnedCount = filtered.filter((t) => t.favorite).length;
+  const pinnedCount = activeTemplates.filter((t) => t.favorite).length;
+
+  const handleTogglePin = (template: QuickReplyTemplate) => {
+    if (!template.favorite && pinnedCount >= MAX_PINNED_QUICK_REPLIES) {
+      window.alert(PINNED_LIMIT_MESSAGE);
+      return;
+    }
+    togglePin.mutate(
+      { id: template.id, favorite: !template.favorite },
+      {
+        onError: (err) => {
+          window.alert(err instanceof Error ? err.message : PINNED_LIMIT_MESSAGE);
+        },
+      },
+    );
+  };
 
   if (isLoading || loadingCats) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-10 w-72" />
+        <Skeleton className="h-32 w-full rounded-2xl" />
+        <Skeleton className="h-40 w-full rounded-2xl" />
         <Skeleton className="h-96 w-full rounded-2xl" />
       </div>
     );
@@ -61,19 +185,17 @@ export default function AdminPlantillasPage() {
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader
-        title="Plantillas"
-        subtitle="Respuestas rápidas reutilizables para WhatsApp — texto, imágenes y secuencias compuestas."
-      />
-
       <Card className="p-4">
         <div className="flex flex-wrap items-center gap-3">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por nombre o atajo…"
-            className="h-10 min-w-[220px] flex-1 rounded-xl border border-line px-4 text-[14px]"
-          />
+          <label className="relative min-w-[220px] flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por nombre o atajo…"
+              className="h-10 w-full rounded-xl border border-line py-2 pl-10 pr-4 text-[14px]"
+            />
+          </label>
           <select
             value={categoryId}
             onChange={(e) => setCategoryId(e.target.value)}
@@ -86,50 +208,89 @@ export default function AdminPlantillasPage() {
               </option>
             ))}
           </select>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              const name = window.prompt("Nombre de la categoría");
-              if (name?.trim()) createCategory.mutate({ name: name.trim() });
-            }}
-          >
-            Nueva categoría
-          </Button>
+          <CarrierToggle value={carrierFilter} onChange={setCarrierFilter} />
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="size-4" />
             Crear plantilla
           </Button>
         </div>
-        {pinnedCount > 0 ? (
-          <p className="mt-3 text-[13px] text-muted">
-            {pinnedCount} plantilla{pinnedCount === 1 ? "" : "s"} fijada{pinnedCount === 1 ? "" : "s"} — visible{pinnedCount === 1 ? "" : "s"} arriba del chat en Leads.
-          </p>
-        ) : null}
+        <p className="mt-3 flex items-center gap-1.5 text-[13px] text-muted">
+          <Star className="size-3.5 shrink-0 text-brand" />
+          Atajos fijados en chat:{" "}
+          <span className="font-medium text-ink">
+            {pinnedCount}/{MAX_PINNED_QUICK_REPLIES}
+          </span>
+          {pinnedCount >= MAX_PINNED_QUICK_REPLIES ? " — límite alcanzado." : "."}
+        </p>
       </Card>
 
-      <div className="grid gap-3">
-        {filtered.map((t) => (
-          <TemplateRow
-            key={t.id}
-            template={t}
-            pinLoading={togglePin.isPending}
-            onTogglePin={() =>
-              togglePin.mutate({ id: t.id, favorite: !t.favorite })
-            }
-            onEdit={() => setEditing(t)}
-            onDelete={() => deleteTemplate.mutate(t.id)}
-          />
-        ))}
+      <CategoryExplorer
+        categories={categories}
+        countsByCategoryId={countsByCategoryId}
+        activeCategoryId={categoryId}
+        onSelectCategory={setCategoryId}
+        onOpenAllCategories={() => setCategoriesModalOpen(true)}
+      />
+
+      <section>
+        <TemplatesSectionHeader
+          viewMode={viewMode}
+          sortMode={sortMode}
+          onViewModeChange={setViewMode}
+          onSortModeChange={setSortMode}
+        />
+
         {filtered.length === 0 ? (
           <Card className="p-8 text-center text-[14px] text-muted">
             No hay plantillas. Crea la primera para tus asesoras.
           </Card>
-        ) : null}
-      </div>
+        ) : viewMode === "grid" ? (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {filtered.map((template) => (
+              <TemplateCard
+                key={template.id}
+                template={template}
+                pinLoading={togglePin.isPending}
+                pinAtLimit={pinnedCount >= MAX_PINNED_QUICK_REPLIES}
+                onTogglePin={() => handleTogglePin(template)}
+                onEdit={() => setEditing(template)}
+                onDelete={() => deleteTemplate.mutate(template.id)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="grid gap-3">
+            {filtered.map((template) => (
+              <TemplateListRow
+                key={template.id}
+                template={template}
+                pinLoading={togglePin.isPending}
+                pinAtLimit={pinnedCount >= MAX_PINNED_QUICK_REPLIES}
+                onTogglePin={() => handleTogglePin(template)}
+                onEdit={() => setEditing(template)}
+                onDelete={() => deleteTemplate.mutate(template.id)}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <CategoriesModal
+        open={categoriesModalOpen}
+        categories={categories}
+        countsByCategoryId={countsByCategoryId}
+        activeCategoryId={categoryId}
+        onClose={() => setCategoriesModalOpen(false)}
+        onSelectCategory={setCategoryId}
+        onCreateCategory={(name) => createCategory.mutate({ name })}
+        creating={createCategory.isPending}
+      />
 
       {createOpen ? (
         <TemplateFormDialog
           categories={categories}
+          pinnedCount={pinnedCount}
+          defaultCarrier={carrierFilter}
           onClose={() => setCreateOpen(false)}
           onSave={async (input) => {
             await createTemplate.mutateAsync(input);
@@ -142,191 +303,18 @@ export default function AdminPlantillasPage() {
         <TemplateFormDialog
           template={editing}
           categories={categories}
+          pinnedCount={pinnedCount}
+          defaultCarrier={carrierFilter}
           onClose={() => setEditing(null)}
           onSave={async (input) => {
-            await updateTemplate.mutateAsync({ id: editing.id, data: input as UpdateQuickReplyTemplateInput });
+            await updateTemplate.mutateAsync({
+              id: editing.id,
+              data: input as UpdateQuickReplyTemplateInput,
+            });
             setEditing(null);
           }}
         />
       ) : null}
-    </div>
-  );
-}
-
-function TemplateRow({
-  template,
-  pinLoading,
-  onTogglePin,
-  onEdit,
-  onDelete,
-}: {
-  template: QuickReplyTemplate;
-  pinLoading: boolean;
-  onTogglePin: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
-}) {
-  const preview =
-    template.activeVersion?.items?.find((i) => i.itemKind === "text")?.textBody?.slice(0, 120) ??
-    "";
-
-  return (
-    <Card
-      className={cn(
-        "flex items-start justify-between gap-4 p-4 transition-colors",
-        template.favorite && "border-brand/30 bg-brand-soft/20",
-      )}
-    >
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="truncate text-[15px] font-semibold text-ink">{template.name}</p>
-          <span className="rounded-full bg-canvas px-2 py-0.5 text-[11px] text-muted">
-            {template.shortcut}
-          </span>
-          {template.favorite ? (
-            <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-medium text-brand">
-              Fijada en chat
-            </span>
-          ) : null}
-        </div>
-        <p className="mt-1 text-[13px] text-muted">
-          {template.category?.name ?? "Sin categoría"} · v{template.activeVersion?.versionNumber ?? 1} ·{" "}
-          {template.activeVersion?.items?.length ?? 0} ítems
-        </p>
-        {preview ? (
-          <p className="mt-2 line-clamp-2 text-[13px] text-ink/80">{preview}</p>
-        ) : null}
-      </div>
-      <div className="flex shrink-0 items-center gap-1">
-        <button
-          type="button"
-          aria-label={template.favorite ? "Quitar del chat" : "Fijar en chat"}
-          title={template.favorite ? "Quitar del chat" : "Fijar en chat"}
-          disabled={pinLoading}
-          onClick={onTogglePin}
-          className={cn(
-            "grid size-9 place-items-center rounded-lg transition-colors",
-            template.favorite
-              ? "bg-brand text-white hover:bg-brand-hover"
-              : "text-muted hover:bg-brand-soft hover:text-brand",
-          )}
-        >
-          <Pin className={cn("size-4", template.favorite && "fill-current")} />
-        </button>
-        <button
-          type="button"
-          aria-label="Editar"
-          title="Editar plantilla"
-          onClick={onEdit}
-          className="grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-brand-soft hover:text-brand"
-        >
-          <Pencil className="size-4" />
-        </button>
-        <button
-          type="button"
-          aria-label="Eliminar"
-          onClick={onDelete}
-          className="grid size-9 place-items-center rounded-lg text-danger-ink hover:bg-danger-soft"
-        >
-          <Trash2 className="size-4" />
-        </button>
-      </div>
-    </Card>
-  );
-}
-
-function TemplateFormDialog({
-  template,
-  categories,
-  onClose,
-  onSave,
-}: {
-  template?: QuickReplyTemplate;
-  categories: { id: string; name: string }[];
-  onClose: () => void;
-  onSave: (input: CreateQuickReplyTemplateInput) => Promise<void>;
-}) {
-  const isEdit = Boolean(template);
-  const firstTextItem = template?.activeVersion?.items?.find((i) => i.itemKind === "text");
-
-  const [name, setName] = useState(template?.name ?? "");
-  const [shortcut, setShortcut] = useState(template?.shortcut ?? "");
-  const [categoryId, setCategoryId] = useState(template?.categoryId ?? categories[0]?.id ?? "");
-  const [textBody, setTextBody] = useState(firstTextItem?.textBody ?? "");
-  const [pinInChat, setPinInChat] = useState(template?.favorite ?? true);
-  const [saving, setSaving] = useState(false);
-
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
-      <Card className="w-full max-w-lg p-6">
-        <h3 className="text-[17px] font-semibold text-ink">
-          {isEdit ? "Editar plantilla" : "Nueva plantilla de texto"}
-        </h3>
-        <div className="mt-4 space-y-3">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Nombre"
-            className="h-11 w-full rounded-xl border border-line px-4 text-[14px]"
-          />
-          <input
-            value={shortcut}
-            onChange={(e) => setShortcut(e.target.value)}
-            placeholder="Atajo (/saludo)"
-            className="h-11 w-full rounded-xl border border-line px-4 text-[14px]"
-          />
-          <select
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
-            className="h-11 w-full rounded-xl border border-line px-4 text-[14px]"
-          >
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          <textarea
-            value={textBody}
-            onChange={(e) => setTextBody(e.target.value)}
-            placeholder="Contenido… Usa {{asesor}} y {{cliente}}"
-            className="min-h-[120px] w-full rounded-xl border border-line px-4 py-3 text-[14px]"
-          />
-          <label className="flex cursor-pointer items-center gap-2 text-[14px] text-ink">
-            <input
-              type="checkbox"
-              checked={pinInChat}
-              onChange={(e) => setPinInChat(e.target.checked)}
-              className="size-4 accent-brand"
-            />
-            Fijar en el chat
-          </label>
-        </div>
-        <div className="mt-5 flex justify-end gap-2">
-          <Button variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button
-            disabled={saving || !name.trim() || !shortcut.trim() || !categoryId || !textBody.trim()}
-            onClick={async () => {
-              setSaving(true);
-              try {
-                await onSave({
-                  name: name.trim(),
-                  shortcut,
-                  categoryId,
-                  favorite: pinInChat,
-                  items: [{ sortOrder: 1, itemKind: "text", textBody: textBody.trim() }],
-                });
-              } finally {
-                setSaving(false);
-              }
-            }}
-          >
-            {isEdit ? "Guardar cambios" : "Guardar"}
-          </Button>
-        </div>
-      </Card>
     </div>
   );
 }

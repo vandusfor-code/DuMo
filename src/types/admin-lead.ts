@@ -32,6 +32,8 @@ export interface AdminConversation {
   rut: string;
   avatarUrl?: string;
   channel?: ConversationChannel;
+  /** true si la asesora la inició a mano (número + mensaje) en vez de llegar por un canal. */
+  isManualOrigin?: boolean;
   lastMessage: string;
   lastMessageTime: string;
   lastMessageDirection?: "in" | "out";
@@ -39,6 +41,10 @@ export interface AdminConversation {
   status: AdminLeadStatus;
   online: boolean;
   assignedAdvisor: AdminAdvisor | null;
+  /** Última tipificación guardada (lead_gestiones más reciente). */
+  latestTipification?: import("./conversation").ConversationTipification | null;
+  /** Operador (WOM/Claro) — detectado por el número de entrada, editable en la gestión. */
+  carrier?: string;
 }
 
 export interface LeadNote {

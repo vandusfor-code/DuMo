@@ -4,9 +4,12 @@ import { CONVERSATIONS_MOCK, getMockMessages } from "@/data/mock/leads.mock";
 import { withLatency } from "@/lib/mock";
 import { formatChatTime } from "@/lib/format";
 import { resolveConversationChannel } from "@/lib/conversation-channel";
+import { parseInboxState } from "@/types/inbox-state";
 import { isMessengerConversation } from "@/lib/messenger/conversation-id";
 import { isWebQrConversation, webQrConversationId } from "@/lib/web-qr/conversation-id";
 import { formatWhatsAppDisplayPhone, isLikelyWhatsAppLid, normalizeWhatsAppPhoneDigits } from "@/lib/whatsapp/phone";
+import { mapConversationTipification } from "@/lib/conversation-tipification";
+import { DEFAULT_COMPANY_ID } from "@/types/tenant";
 import { ensureSchema, ensureSchemaForRead, getSql, hasDatabase, withDbRetry, withQueryTimeout } from "@/server/db/client";
 
 /** Un mensaje entrante/saliente a persistir. */
@@ -20,8 +23,9 @@ export interface IncomingMessage {
   createdAt: string; // ISO
   /** Número de DuMo (phone_number_id) por el que entró el mensaje. */
   dumoPhoneId?: string;
-  messageType?: "text" | "image";
+  messageType?: "text" | "image" | "audio";
   mediaAssetId?: string;
+  mediaUrl?: string;
   caption?: string;
   /** JID de WhatsApp Web para responder (solo canal WEB_QR). */
   waChatJid?: string;
@@ -44,6 +48,7 @@ export interface ConversationRepository {
   saveMessage(msg: IncomingMessage): Promise<void>;
   updateMessageBodyIfPlaceholder(waMessageId: string, body: string): Promise<boolean>;
   markRead(conversationId: string): Promise<void>;
+  getAssignedAdvisorId(conversationId: string): Promise<string | null>;
   /** phone_number_id de DuMo por el que se debe responder esa conversación. */
   getSendFromPhoneId(conversationId: string): Promise<string | null>;
   getWaChatJid(conversationId: string): Promise<string | null>;
@@ -53,11 +58,14 @@ export interface ConversationRepository {
   /** Mueve mensajes de un hilo duplicado al canónico. */
   mergeWebQrConversations(targetId: string, duplicateId: string): Promise<void>;
   updateDumoPhoneId(conversationId: string, dumoPhoneId: string): Promise<void>;
+  /** Marca la conversación como iniciada a mano por una asesora (bandeja: logo DuMo en vez del canal). */
+  setManualOrigin(conversationId: string, customerName?: string): Promise<void>;
   /** Token de envío registrado para un phone_number_id conectado. */
   getAccessTokenForPhoneId(phoneNumberId: string): Promise<string | null>;
   /** phone_number_id registrados como conectados a DuMo (números activos). */
   listConnectedPhoneIds(): Promise<string[]>;
   registerNumber(number: ConnectedNumber): Promise<void>;
+  setCurrentTipificationSlug(conversationId: string, slug: string): Promise<void>;
 }
 
 /* ----------------------------- Mock ----------------------------- */
@@ -78,6 +86,9 @@ class MockConversationRepository implements ConversationRepository {
   markRead() {
     return Promise.resolve();
   }
+  getAssignedAdvisorId() {
+    return Promise.resolve(null);
+  }
   getSendFromPhoneId() {
     return Promise.resolve(null);
   }
@@ -96,6 +107,9 @@ class MockConversationRepository implements ConversationRepository {
   updateDumoPhoneId() {
     return Promise.resolve();
   }
+  setManualOrigin() {
+    return Promise.resolve();
+  }
   getAccessTokenForPhoneId() {
     return Promise.resolve(null);
   }
@@ -103,6 +117,9 @@ class MockConversationRepository implements ConversationRepository {
     return Promise.resolve([] as string[]);
   }
   registerNumber() {
+    return Promise.resolve();
+  }
+  setCurrentTipificationSlug() {
     return Promise.resolve();
   }
 }
@@ -113,12 +130,23 @@ type ConvRow = {
   id: string;
   phone: string;
   customer_name: string;
+  rut?: string | null;
   last_message: string;
   last_message_at: string;
   last_message_direction?: string;
   unread: number;
   status: string;
   online: boolean;
+  inbox_state?: string;
+  latest_tipification_slug?: string | null;
+  latest_tipification_name?: string | null;
+  badge_bg?: string | null;
+  badge_text?: string | null;
+  sla_scenario?: string | null;
+  sla_status?: string | null;
+  sla_armed_at?: string | Date | null;
+  carrier?: string | null;
+  source?: string | null;
 };
 
 type MsgRow = {
@@ -145,6 +173,47 @@ function toStatus(value: string): ConversationStatus {
     : "new";
 }
 
+function mapSlaWarning(r: ConvRow): Conversation["activeSlaWarning"] {
+  if (
+    r.sla_status !== "warning_sent" &&
+    r.sla_status !== "final_warning_sent" &&
+    r.sla_status !== "escalated_no_advisor"
+  ) {
+    return null;
+  }
+  if (r.sla_scenario !== "first_contact" && r.sla_scenario !== "follow_up") return null;
+  if (!r.sla_armed_at) return null;
+  const armedMs = new Date(r.sla_armed_at).getTime();
+  const minutesUnanswered = Math.max(0, Math.round((Date.now() - armedMs) / 60_000));
+  return { scenario: r.sla_scenario, status: r.sla_status, minutesUnanswered };
+}
+
+function mapConvRow(r: ConvRow): Conversation {
+  const formattedPhone = formatWhatsAppDisplayPhone(r.phone);
+  const displayName =
+    r.customer_name?.trim() ||
+    formattedPhone ||
+    (isWebQrConversation(r.id) && isLikelyWhatsAppLid(r.phone) ? "Contacto WhatsApp" : r.phone);
+  return {
+    id: r.id,
+    customerName: displayName,
+    phone: formattedPhone || r.phone,
+    rut: r.rut ?? "",
+    channel: resolveConversationChannel(r.id),
+    isManualOrigin: r.source === "manual_advisor",
+    lastMessage: r.last_message,
+    lastMessageTime: formatChatTime(r.last_message_at),
+    lastMessageDirection: r.last_message_direction === "out" ? "out" : "in",
+    unread: Number(r.unread) || 0,
+    status: toStatus(r.status),
+    online: Boolean(r.online),
+    inboxState: parseInboxState(r.inbox_state),
+    latestTipification: mapConversationTipification(r),
+    activeSlaWarning: mapSlaWarning(r),
+    carrier: r.carrier ?? "wom",
+  };
+}
+
 class PostgresConversationRepository implements ConversationRepository {
   async getConversations(advisorId?: string): Promise<Conversation[]> {
     await ensureSchemaForRead();
@@ -152,37 +221,66 @@ class PostgresConversationRepository implements ConversationRepository {
     const rows = await withQueryTimeout(
       withDbRetry(() =>
         advisorId
-          ? sql`
-              SELECT * FROM lead_conversations
-              WHERE assigned_advisor_id = ${advisorId}
-              ORDER BY last_message_at DESC
+          ? sql<ConvRow[]>`
+              SELECT
+                c.*,
+                COALESCE(NULLIF(c.current_tipification_slug, ''), lg.gestion_type) AS latest_tipification_slug,
+                t.name AS latest_tipification_name,
+                t.badge_bg,
+                t.badge_text,
+                s.scenario AS sla_scenario,
+                s.status AS sla_status,
+                s.armed_at AS sla_armed_at
+              FROM lead_conversations c
+              LEFT JOIN LATERAL (
+                SELECT gestion_type
+                FROM lead_gestiones
+                WHERE conversation_id = c.id
+                ORDER BY created_at DESC
+                LIMIT 1
+              ) lg ON true
+              LEFT JOIN tipifications t
+                ON t.slug = COALESCE(NULLIF(c.current_tipification_slug, ''), lg.gestion_type) AND t.company_id = ${DEFAULT_COMPANY_ID}
+              LEFT JOIN response_sla_timers s
+                ON s.conversation_id = c.id AND s.status IN ('warning_sent', 'final_warning_sent', 'escalated_no_advisor')
+              WHERE c.assigned_advisor_id = ${advisorId}
+                AND c.inbox_state = 'active'
+                AND NOT EXISTS (
+                  SELECT 1 FROM lead_follow_ups f
+                  WHERE f.conversation_id = c.id
+                    AND f.module = 'recuperacion'
+                    AND f.status <> 'completed'
+                )
+              ORDER BY c.last_message_at DESC
             `
-          : sql`
-              SELECT * FROM lead_conversations ORDER BY last_message_at DESC
+          : sql<ConvRow[]>`
+              SELECT
+                c.*,
+                COALESCE(NULLIF(c.current_tipification_slug, ''), lg.gestion_type) AS latest_tipification_slug,
+                t.name AS latest_tipification_name,
+                t.badge_bg,
+                t.badge_text,
+                s.scenario AS sla_scenario,
+                s.status AS sla_status,
+                s.armed_at AS sla_armed_at
+              FROM lead_conversations c
+              LEFT JOIN LATERAL (
+                SELECT gestion_type
+                FROM lead_gestiones
+                WHERE conversation_id = c.id
+                ORDER BY created_at DESC
+                LIMIT 1
+              ) lg ON true
+              LEFT JOIN tipifications t
+                ON t.slug = COALESCE(NULLIF(c.current_tipification_slug, ''), lg.gestion_type) AND t.company_id = ${DEFAULT_COMPANY_ID}
+              LEFT JOIN response_sla_timers s
+                ON s.conversation_id = c.id AND s.status IN ('warning_sent', 'final_warning_sent', 'escalated_no_advisor')
+              ORDER BY c.last_message_at DESC
             `,
       ),
       8000,
     );
-    return (rows as unknown as ConvRow[]).map((r) => {
-      const formattedPhone = formatWhatsAppDisplayPhone(r.phone);
-      const displayName =
-        r.customer_name?.trim() ||
-        formattedPhone ||
-        (isWebQrConversation(r.id) && isLikelyWhatsAppLid(r.phone) ? "Contacto WhatsApp" : r.phone);
-      return {
-        id: r.id,
-        customerName: displayName,
-        phone: formattedPhone || r.phone,
-        rut: "",
-        channel: resolveConversationChannel(r.id),
-        lastMessage: r.last_message,
-        lastMessageTime: formatChatTime(r.last_message_at),
-        lastMessageDirection: r.last_message_direction === "out" ? "out" : "in",
-        unread: Number(r.unread) || 0,
-        status: toStatus(r.status),
-        online: Boolean(r.online),
-      };
-    });
+    return rows.map(mapConvRow);
   }
 
   async getMessages(conversationId: string): Promise<ChatMessage[]> {
@@ -203,6 +301,8 @@ class PostgresConversationRepository implements ConversationRepository {
     );
     return (rows as unknown as MsgRow[]).map((r) => {
       const isImage = r.message_type === "image" && Boolean(r.media_public_url);
+      const isAudio = r.message_type === "audio" && Boolean(r.media_public_url);
+      const mediaType = isImage ? "image" : isAudio ? "audio" : "text";
       return {
         id: r.id,
         conversationId: r.conversation_id,
@@ -210,10 +310,10 @@ class PostgresConversationRepository implements ConversationRepository {
         time: formatChatTime(isoTimestamp(r.created_at)),
         direction: r.direction === "out" ? "out" : "in",
         read: Boolean(r.read),
-        messageType: isImage ? "image" : "text",
-        mediaUrl: isImage ? (r.media_public_url ?? undefined) : undefined,
+        messageType: mediaType,
+        mediaUrl: isImage || isAudio ? (r.media_public_url ?? undefined) : undefined,
         caption: isImage ? (r.caption ?? undefined) : undefined,
-        mediaAssetId: isImage ? (r.media_asset_id ?? undefined) : undefined,
+        mediaAssetId: isImage || isAudio ? (r.media_asset_id ?? undefined) : undefined,
       };
     });
   }
@@ -223,13 +323,27 @@ class PostgresConversationRepository implements ConversationRepository {
     const sql = getSql()!;
     const incUnread = msg.direction === "in" ? 1 : 0;
 
+    // Operador (WOM/Claro) detectado por el número/canal de entrada — solo
+    // importa al CREAR la conversación (no está en el ON CONFLICT DO UPDATE
+    // de abajo), así una conversación ya existente nunca se pisa por esto.
+    let carrier = "wom";
+    if (msg.dumoPhoneId) {
+      const carrierRows = await sql<{ carrier: string }[]>`
+        SELECT carrier FROM connected_numbers WHERE phone_number_id = ${msg.dumoPhoneId}
+        UNION ALL
+        SELECT carrier FROM whatsapp_channels WHERE id = ${msg.dumoPhoneId}
+        LIMIT 1
+      `;
+      if (carrierRows[0]?.carrier) carrier = carrierRows[0].carrier;
+    }
+
     await sql`
       INSERT INTO lead_conversations
-        (id, phone, customer_name, last_message, last_message_at, unread, status, online, dumo_phone_id, last_message_direction, wa_chat_jid)
+        (id, phone, customer_name, last_message, last_message_at, unread, status, online, dumo_phone_id, last_message_direction, wa_chat_jid, carrier)
       VALUES (
         ${msg.conversationId}, ${msg.phone}, ${msg.customerName},
         ${msg.body}, ${msg.createdAt}, ${incUnread}, 'new', ${msg.direction === "in"},
-        ${msg.dumoPhoneId ?? null}, ${msg.direction}, ${msg.waChatJid ?? null}
+        ${msg.dumoPhoneId ?? null}, ${msg.direction}, ${msg.waChatJid ?? null}, ${carrier}
       )
       ON CONFLICT (id) DO UPDATE SET
         last_message = EXCLUDED.last_message,
@@ -271,6 +385,49 @@ class PostgresConversationRepository implements ConversationRepository {
       )
       ON CONFLICT (id) DO NOTHING
     `;
+
+    const convRows = (await sql`
+      SELECT assigned_advisor_id FROM lead_conversations WHERE id = ${msg.conversationId}
+    `) as unknown as { assigned_advisor_id: string | null }[];
+    const assignedAdvisorId = convRows[0]?.assigned_advisor_id ?? null;
+    const { emitLeadsMessageNew, messageNewPayloadFromIncoming } = await import(
+      "@/server/realtime/emit"
+    );
+    emitLeadsMessageNew(messageNewPayloadFromIncoming(msg, assignedAdvisorId));
+
+    // RESP-1 — único punto de escritura de mensajes salientes de verdad (los
+    // distintos sendXMessage de leads.service.ts todos terminan aquí), así
+    // que es el lugar seguro para resolver el timer sin depender de que cada
+    // caller lo haga por su cuenta.
+    if (msg.direction === "out") {
+      const { resolveTimerAfterOutboundMessage } = await import(
+        "@/services/response-sla.service"
+      );
+      await resolveTimerAfterOutboundMessage(msg.conversationId).catch((err) =>
+        console.error("[saveMessage] resolveTimerAfterOutboundMessage", err),
+      );
+    }
+  }
+
+  async getAssignedAdvisorId(conversationId: string): Promise<string | null> {
+    await ensureSchemaForRead();
+    const sql = getSql();
+    if (!sql) return null;
+    const rows = (await sql`
+      SELECT assigned_advisor_id FROM lead_conversations WHERE id = ${conversationId}
+    `) as unknown as { assigned_advisor_id: string | null }[];
+    return rows[0]?.assigned_advisor_id ?? null;
+  }
+
+  async setCurrentTipificationSlug(conversationId: string, slug: string): Promise<void> {
+    await ensureSchema();
+    const sql = getSql();
+    if (!sql) throw new Error("Base de datos no configurada");
+    await sql`
+      UPDATE lead_conversations
+      SET current_tipification_slug = ${slug}
+      WHERE id = ${conversationId}
+    `;
   }
 
   async updateMessageBodyIfPlaceholder(waMessageId: string, body: string): Promise<boolean> {
@@ -291,13 +448,40 @@ class PostgresConversationRepository implements ConversationRepository {
       WHERE id = ${rows[0].conversation_id}
         AND last_message = ${placeholder}
     `;
+    const convId = rows[0].conversation_id;
+    const convRows = (await sql`
+      SELECT assigned_advisor_id FROM lead_conversations WHERE id = ${convId}
+    `) as unknown as { assigned_advisor_id: string | null }[];
+    const { emitLeadsConversationUpdated } = await import("@/server/realtime/emit");
+    emitLeadsConversationUpdated({
+      conversationId: convId,
+      assignedAdvisorId: convRows[0]?.assigned_advisor_id ?? null,
+      reason: "message",
+    });
     return true;
   }
 
   async markRead(conversationId: string): Promise<void> {
     await ensureSchema();
     const sql = getSql()!;
+    await sql`
+      UPDATE lead_messages
+      SET read = true
+      WHERE conversation_id = ${conversationId}
+        AND direction = 'in'
+        AND read = false
+    `;
     await sql`UPDATE lead_conversations SET unread = 0 WHERE id = ${conversationId}`;
+    const convRows = (await sql`
+      SELECT assigned_advisor_id FROM lead_conversations WHERE id = ${conversationId}
+    `) as unknown as { assigned_advisor_id: string | null }[];
+    const { emitLeadsConversationUpdated } = await import("@/server/realtime/emit");
+    emitLeadsConversationUpdated({
+      conversationId,
+      unread: 0,
+      assignedAdvisorId: convRows[0]?.assigned_advisor_id ?? null,
+      reason: "read",
+    });
   }
 
   async getSendFromPhoneId(conversationId: string): Promise<string | null> {
@@ -418,6 +602,29 @@ class PostgresConversationRepository implements ConversationRepository {
     const sql = getSql()!;
     await sql`
       UPDATE lead_conversations SET dumo_phone_id = ${dumoPhoneId} WHERE id = ${conversationId}
+    `;
+  }
+
+  /**
+   * Marca una conversación como iniciada a mano por una asesora (número +
+   * mensaje, sin venir de ningún canal entrante) — así la bandeja muestra el
+   * logo de DuMo en vez del logo del canal. Se llama justo después de crear
+   * la conversación con el primer envío; `customerName` solo se aplica si
+   * todavía no tiene uno (mismo criterio que ya usa saveMessage al crear).
+   */
+  async setManualOrigin(conversationId: string, customerName?: string): Promise<void> {
+    await ensureSchema();
+    const sql = getSql()!;
+    await sql`
+      UPDATE lead_conversations SET
+        source = 'manual_advisor',
+        customer_name = CASE
+          WHEN ${customerName?.trim() || null}::text IS NOT NULL
+            AND (customer_name = '' OR customer_name IS NULL)
+            THEN ${customerName?.trim() || null}
+          ELSE customer_name
+        END
+      WHERE id = ${conversationId}
     `;
   }
 

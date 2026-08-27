@@ -1,4 +1,4 @@
-/** Tipificación de la gestión (Tipo de gestión). */
+/** Tipificación de la gestión. */
 export type LeadType =
   | "venta"
   | "consulta"
@@ -113,9 +113,9 @@ export interface Lead {
   phone: string;
   customerName: string;
   rut: string;
-  status: LeadType;
+  status: string;
   advisorId: string;
-  type: LeadType;
+  type: string;
   notes: string;
   createdAt: string;
 }
@@ -125,10 +125,13 @@ export type LatestGestionDraft = {
   gestionId: string;
   customerName: string;
   rut: string;
-  type: LeadType;
+  /** Operador (WOM/Claro) elegido en esa gestión — puede diferir del carrier de la conversación. */
+  carrier: string;
+  type: string;
   notes: string;
   lines: SaveLeadInput["lines"];
   hasScript: boolean;
+  folioNumber: string;
 };
 
 /** Payload que la UI envía para guardar una gestión. */
@@ -137,7 +140,10 @@ export interface SaveLeadInput {
   phone: string;
   customerName: string;
   rut: string;
-  type: LeadType;
+  /** Operador (WOM/Claro) elegido al tipificar — puede diferir del carrier de la conversación. */
+  carrier: string;
+  /** Slug de tipificación (ej. "venta", "seguimiento"). */
+  type: string;
   notes: string;
   lines: {
     phone: string;
@@ -169,6 +175,12 @@ export interface SaveLeadInput {
   }[];
   /** Registra la venta en Mis Ventas (botón superior). Por defecto solo guarda gestión/script. */
   registerSale?: boolean;
-  /** Acción del formulario: tipificar, generar script o registrar venta. */
+  /** Acción del formulario: tipificar, generar script, registrar venta o guardar y cerrar. */
   saveAction?: import("@/types/crm-client").SaveLeadAction;
+  /** yyyy-mm-dd — fecha de seguimiento (validada en close; auto en fixed). */
+  followUpDate?: string | null;
+  /** Solo cuando type = "operacion_duo" — crea la fila en duo_sales. */
+  duoSale?: import("@/types/duo-sale").DuoSaleFormInput;
+  /** Radicado escrito por la asesora. Opcional salvo venta/Operación Duo. */
+  folioNumber?: string;
 }

@@ -1,5 +1,6 @@
 import type { LeadFormValues, LeadLineValues } from "@/types/lead-form";
 import { EMPTY_LEAD_LINE } from "@/types/lead-form";
+import { EMPTY_DUO_SALE_FORM } from "@/types/duo-sale";
 import type {
   CurrentOperator,
   DeliveryType,
@@ -10,6 +11,7 @@ import type {
   SaveLeadInput,
 } from "@/types/lead";
 import type { NewSaleInput, SaleType } from "@/types/sale";
+import { NEW_LEAD_TIPIFICATION_SLUG } from "@/lib/tipification-system";
 
 const INTERNAL_NOTES_PREFIX = "\n\nNotas internas: ";
 
@@ -52,14 +54,16 @@ export function mapStoredLinesToForm(
 }
 
 export function draftToFormValues(input: {
-  conversation: { customerName: string; rut: string; phone: string };
+  conversation: { customerName: string; rut: string; phone: string; carrier?: string };
   draft?: {
     gestionId: string;
     customerName: string;
     rut: string;
-    type: LeadType;
+    carrier?: string;
+    type: string;
     notes: string;
     lines: SaveLeadInput["lines"];
+    folioNumber?: string;
   } | null;
 }): LeadFormValues {
   const { observations, internalNotes } = splitGestionNotes(input.draft?.notes ?? "");
@@ -67,10 +71,14 @@ export function draftToFormValues(input: {
     customerName: input.draft?.customerName || input.conversation.customerName,
     rut: input.draft?.rut || input.conversation.rut,
     phone: input.conversation.phone,
-    type: input.draft?.type ?? "venta",
+    carrier: input.draft?.carrier || input.conversation.carrier || "wom",
+    type: input.draft?.type ?? NEW_LEAD_TIPIFICATION_SLUG,
     observations,
     internalNotes,
+    followUpDate: "",
     lines: mapStoredLinesToForm(input.draft?.lines),
+    duo: { ...EMPTY_DUO_SALE_FORM },
+    folioNumber: input.draft?.folioNumber ?? "",
   };
 }
 
@@ -150,17 +158,24 @@ export function mapLeadLineToSaleType(
 }
 
 /** Convierte una gestión de venta guardada en Leads al payload de Mis Ventas. */
-export function leadGestionToNewSaleInput(input: SaveLeadInput): NewSaleInput | null {
-  if (input.type !== "venta" || input.lines.length === 0) return null;
+export function leadGestionToNewSaleInput(
+  input: SaveLeadInput,
+  options?: { isSaleFlowType?: boolean },
+): NewSaleInput | null {
+  const isSaleFlow = options?.isSaleFlowType ?? input.type === "venta";
+  if (!isSaleFlow || input.lines.length === 0) return null;
   return {
     customerName: input.customerName,
     rut: input.rut,
     phone: input.phone,
     email: input.lines.find((l) => l.email?.trim())?.email || undefined,
     notes: input.notes || undefined,
+    folioNumber: input.folioNumber?.trim() || undefined,
+    carrier: input.carrier,
     lines: input.lines.map((line) => ({
       phoneNumber: line.phone,
       saleType: mapLeadLineToSaleType(line.saleType, line.equipmentMode ?? "none"),
+      planId: line.planId?.trim() || undefined,
       deviceName:
         line.equipmentModel?.trim() ||
         line.equipment?.trim() ||

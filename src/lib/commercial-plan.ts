@@ -41,6 +41,12 @@ type StoredCommercialPlan = Omit<Partial<CommercialPlan>, "offer"> & {
   };
 };
 
+/** Normaliza operator a 'wom'|'claro' — datos previos a multi-operador traían texto libre (ej. "WOM"). */
+function normalizeCarrierOperator(operator: string | undefined): string {
+  const value = (operator ?? "").trim().toLowerCase();
+  return value === "claro" ? "claro" : "wom";
+}
+
 export function normalizeCommercialPlan(raw: StoredCommercialPlan): CommercialPlan {
   const legacy = raw.operatorPayment;
   const womValue = raw.womValue ?? legacy ?? 0;
@@ -52,7 +58,7 @@ export function normalizeCommercialPlan(raw: StoredCommercialPlan): CommercialPl
   return {
     id: raw.id,
     name: raw.name,
-    operator: raw.operator,
+    operator: normalizeCarrierOperator(raw.operator),
     saleType: raw.saleType,
     womValue,
     promotionalPrice: raw.promotionalPrice ?? null,
@@ -115,7 +121,18 @@ export function buildPlanValueIndex(plans: CommercialPlan[]): Map<string, { wom:
   const index = new Map<string, { wom: number; dumo: number }>();
   for (const p of plans) {
     if (p.status !== "active") continue;
-    index.set(p.name.toLowerCase(), { wom: p.womValue, dumo: p.dumoValue });
+    const entry = { wom: p.womValue, dumo: p.dumoValue };
+    index.set(p.name.toLowerCase(), entry);
+    index.set(p.id.toLowerCase(), entry);
   }
   return index;
+}
+
+export function findCommercialPlanById(
+  planId: string,
+  plans: CommercialPlan[],
+): CommercialPlan | undefined {
+  const id = planId.trim();
+  if (!id) return undefined;
+  return plans.find((p) => p.id === id && p.status === "active");
 }

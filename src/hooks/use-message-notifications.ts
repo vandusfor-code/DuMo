@@ -2,8 +2,9 @@
 
 import { useEffect, useRef } from "react";
 import {
-  playMessageSound,
+  playInboundClientMessageSound,
   setupMessageNotificationUnlock,
+  shouldPlayPollInboundSound,
   showMessageNotification,
 } from "@/lib/message-notifications";
 import {
@@ -45,15 +46,10 @@ function snap(c: ConvLike): Snap {
   };
 }
 
-function notifyInbound(c: ConvLike, times: number) {
-  const count = Math.max(1, times);
-  playMessageSound();
+function notifyInbound(c: ConvLike) {
+  if (!shouldPlayPollInboundSound(c.id)) return;
+  playInboundClientMessageSound({ conversationId: c.id });
   showMessageNotification(c.customerName, c.lastMessage, c.id);
-  if (count > 1) {
-    for (let i = 1; i < count; i++) {
-      window.setTimeout(() => playMessageSound(), i * 350);
-    }
-  }
 }
 
 function processConversations(
@@ -72,15 +68,14 @@ function processConversations(
 
     if (!prev) {
       if (next.unread > 0 || next.lastMessageDirection === "in") {
-        notifyInbound(c, next.unread || 1);
+        notifyInbound(c);
       }
       store.set(c.id, next);
       continue;
     }
 
     if (isInbound(prev, next)) {
-      const delta = Math.max(1, next.unread - prev.unread);
-      notifyInbound(c, delta);
+      notifyInbound(c);
     }
 
     store.set(c.id, next);

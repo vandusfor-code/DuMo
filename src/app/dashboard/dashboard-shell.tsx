@@ -2,13 +2,19 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { APP_SIDEBAR_OFFSET_CLASS } from "@/components/layout/app-shell.constants";
 import { Sidebar } from "@/components/layout/sidebar";
 import { AdvisorMessageNotifications } from "@/components/messaging/message-notification-listener";
+import { AdvisorPresenceSelect } from "@/components/leads/advisor-presence-select";
+import { AdvisorAvailabilityManager } from "@/components/leads/advisor-availability-manager";
+import { usePresenceDisconnectBeacon } from "@/hooks/use-presence-disconnect-beacon";
 
 /** Shell del área asesora: sidebar fijo + contenido con separación lateral. */
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const fullBleed = pathname?.startsWith("/dashboard/leads") ?? false;
+  usePresenceDisconnectBeacon();
 
   // Leads: bloquear scroll del documento; solo scrollean las columnas internas.
   useEffect(() => {
@@ -26,12 +32,16 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   return (
     <div className={fullBleed ? "h-dvh overflow-hidden bg-canvas" : "min-h-screen bg-canvas"}>
       <AdvisorMessageNotifications />
+      <AdvisorAvailabilityManager />
       <Sidebar />
+      <div className="fixed right-[88px] top-4 z-40">
+        <AdvisorPresenceSelect />
+      </div>
       <main
         className={
           fullBleed
-            ? "h-dvh overflow-hidden lg:pl-[260px]"
-            : "lg:pl-[260px]"
+            ? cn("h-dvh overflow-hidden", APP_SIDEBAR_OFFSET_CLASS)
+            : APP_SIDEBAR_OFFSET_CLASS
         }
       >
         <div

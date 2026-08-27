@@ -32,6 +32,10 @@ export interface SaleSummary {
   date: string;
   lines: number;
   status: SaleStatus;
+  /** DUO-5 — viene de Operación Duo: la comisión de esta venta es la mitad. */
+  isDuo?: boolean;
+  /** Radicado escrito por la asesora al registrar la venta. */
+  folioNumber?: string;
 }
 
 /** Extra fields the dashboard's "Últimas ventas" table shows. */
@@ -72,6 +76,8 @@ export interface SaleDetail {
   notes: string;
   lines: SaleLine[];
   history: SaleHistoryEvent[];
+  /** Radicado escrito por la asesora al registrar la venta. */
+  folioNumber?: string;
 }
 
 /** Payload accepted when registering a new sale. */
@@ -81,9 +87,15 @@ export interface NewSaleInput {
   phone: string;
   email?: string;
   notes?: string;
+  /** Radicado escrito por la asesora — obligatorio y único, validado antes de llegar aquí. */
+  folioNumber?: string;
+  /** Operador (WOM/Claro) elegido en la gestión — decide comisión/reportes. */
+  carrier?: string;
   lines: {
     phoneNumber: string;
     saleType: SaleType;
+    /** ID del plan comercial (config comercial). */
+    planId?: string;
     deviceName?: string;
   }[];
 }

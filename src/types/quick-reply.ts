@@ -57,6 +57,8 @@ export interface QuickReplyTemplate {
   categoryId: string;
   name: string;
   shortcut: string;
+  /** Operador (WOM/Claro) al que pertenece esta plantilla. */
+  carrier: string;
   status: QuickReplyTemplateStatus;
   favorite: boolean;
   timesUsed: number;
@@ -112,6 +114,7 @@ export interface CreateQuickReplyTemplateInput {
   categoryId: string;
   name: string;
   shortcut: string;
+  carrier?: string;
   status?: QuickReplyTemplateStatus;
   favorite?: boolean;
   tagIds?: string[];
@@ -125,8 +128,7 @@ export interface UpdateQuickReplyTemplateInput extends CreateQuickReplyTemplateI
 }
 
 export function inferMediaKindFromMime(mimeType: string): MediaKind {
-  if (!mimeType.startsWith("image/")) {
-    throw new Error("Solo se permiten imágenes en plantillas y chat.");
-  }
-  return "image";
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType.startsWith("audio/")) return "audio";
+  throw new Error("Tipo de archivo no soportado en chat.");
 }

@@ -7,7 +7,7 @@ export interface CrmClient {
   customerName: string;
   rut: string;
   phone: string;
-  gestionType: LeadType;
+  gestionType: string;
   advisorId: string;
   advisorName: string;
   hasSale: boolean;
@@ -22,4 +22,4 @@ export type CrmClientFilters = {
   to?: string;
 };
 
-export type SaveLeadAction = "tipify" | "script" | "sale";
+export type SaveLeadAction = "tipify" | "script" | "sale" | "close";

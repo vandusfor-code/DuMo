@@ -25,9 +25,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { SegmentedControl } from "@/components/ui/segmented-control";
-import { StatusBadge } from "@/components/leads/premium/status-badge";
-import { LEAD_TYPE_LABELS } from "@/types/lead";
+import { DynamicTipificationBadge } from "@/components/shared/dynamic-tipification-badge";
 import { formatLongDate, getInitials } from "@/lib/format";
+import {
+  adminTableHeaderCellClass,
+  adminTableHeaderRowClass,
+} from "@/lib/admin-table-header-styles";
+import { cn } from "@/lib/utils";
 import type { CrmClient } from "@/types/crm-client";
 
 type DateRange = "today" | "week" | "month" | "all";
@@ -73,12 +77,8 @@ function buildColumns(showAdvisor: boolean, leadsHref: string) {
       },
     }),
     columnHelper.accessor("gestionType", {
-      header: "Tipo",
-      cell: (info) => (
-        <StatusBadge variant={info.getValue() === "venta" ? "active" : "in_progress"}>
-          {LEAD_TYPE_LABELS[info.getValue()]}
-        </StatusBadge>
-      ),
+      header: "Tipificación",
+      cell: (info) => <DynamicTipificationBadge slug={info.getValue()} />,
     }),
     columnHelper.accessor("updatedDate", {
       header: "Última gestión",
@@ -195,9 +195,15 @@ export function ClientsPortfolio({
             <Table>
               <TableHeader>
                 {table.getHeaderGroups().map((hg) => (
-                  <TableRow key={hg.id}>
+                  <TableRow key={hg.id} className={adminTableHeaderRowClass}>
                     {hg.headers.map((header) => (
-                      <TableHead key={header.id}>
+                      <TableHead
+                        key={header.id}
+                        className={cn(
+                          adminTableHeaderCellClass,
+                          header.id === "actions" ? "text-right" : "",
+                        )}
+                      >
                         {flexRender(header.column.columnDef.header, header.getContext())}
                       </TableHead>
                     ))}

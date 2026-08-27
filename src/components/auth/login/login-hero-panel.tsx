@@ -26,7 +26,7 @@ export function LoginHeroPanel() {
   return (
     <motion.section
       variants={container}
-      initial="hidden"
+      initial={false}
       animate="show"
       className="flex flex-col text-left"
     >

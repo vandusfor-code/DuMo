@@ -6,6 +6,7 @@ import type {
   LeadType,
   LineAccountType,
 } from "./lead";
+import type { DuoSaleFormInput } from "./duo-sale";
 
 export interface LeadLineValues {
   phone: string;
@@ -39,10 +40,18 @@ export interface LeadFormValues {
   customerName: string;
   rut: string;
   phone: string;
-  type: LeadType;
+  /** Operador (WOM/Claro) — decide qué catálogo de tipificaciones se muestra. */
+  carrier: string;
+  type: string;
   observations: string;
   internalNotes: string;
+  /** yyyy-mm-dd — seguimiento al guardar y cerrar (P1.3). */
+  followUpDate: string;
   lines: LeadLineValues[];
+  /** Solo se usa/valida cuando type = "operacion_duo". */
+  duo: DuoSaleFormInput;
+  /** Radicado escrito por la asesora. Opcional salvo venta/Operación Duo. */
+  folioNumber: string;
 }
 
 export const EMPTY_LEAD_LINE: LeadLineValues = {

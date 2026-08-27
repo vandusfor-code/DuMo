@@ -16,6 +16,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  adminTableHeaderCellClass,
+  adminTableHeaderRowClass,
+} from "@/lib/admin-table-header-styles";
 import type { AdvisorsResult } from "@/types/admin-advisor";
 
 export function AdvisorsKpis({ summary }: { summary: AdvisorsResult["summary"] }) {
@@ -110,15 +114,15 @@ export function AdvisorsTable({ rows }: { rows: AdvisorsResult["rows"] }) {
       </div>
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead>Asesora</TableHead>
-            <TableHead>Usuario</TableHead>
-            <TableHead>Meta del mes</TableHead>
-            <TableHead>Ventas registradas</TableHead>
-            <TableHead>Finalizadas</TableHead>
-            <TableHead>En reparto</TableHead>
-            <TableHead>Conversión</TableHead>
-            <TableHead>Estado</TableHead>
+          <TableRow className={adminTableHeaderRowClass}>
+            <TableHead className={adminTableHeaderCellClass}>Asesora</TableHead>
+            <TableHead className={adminTableHeaderCellClass}>Usuario</TableHead>
+            <TableHead className={adminTableHeaderCellClass}>Meta del mes</TableHead>
+            <TableHead className={adminTableHeaderCellClass}>Ventas registradas</TableHead>
+            <TableHead className={adminTableHeaderCellClass}>Finalizadas</TableHead>
+            <TableHead className={adminTableHeaderCellClass}>En reparto</TableHead>
+            <TableHead className={adminTableHeaderCellClass}>Conversión</TableHead>
+            <TableHead className={adminTableHeaderCellClass}>Estado</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

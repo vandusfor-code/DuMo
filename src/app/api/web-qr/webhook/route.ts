@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import crypto from "node:crypto";
 import { persistWebQrInbound } from "@/server/web-qr/inbound";
+import { enqueueWebQrInbound } from "@/server/queue/inbound-queue";
+import { isQueueEnabled } from "@/server/queue/redis";
 import { normalizeWhatsAppPhoneDigits } from "@/lib/whatsapp/phone";
 import { webQrWebhookSecret } from "@/server/web-qr/config";
 import type { BridgeInboundPayload } from "@/server/web-qr/types";
@@ -65,6 +67,16 @@ export async function POST(request: NextRequest) {
   }
 
   if (body.type === "message.inbound" && body.payload) {
+    if (isQueueEnabled()) {
+      try {
+        const queued = await enqueueWebQrInbound(body.payload);
+        if (queued) {
+          return NextResponse.json({ ok: true, queued: true });
+        }
+      } catch (error) {
+        console.error("[POST /api/web-qr/webhook] enqueue:", error);
+      }
+    }
     try {
       await persistWebQrInbound(body.payload);
     } catch (error) {

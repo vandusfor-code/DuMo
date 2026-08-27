@@ -1,0 +1,22 @@
+name: Deploy Web QR Bridge
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, feat/railway-phase-3]
+    paths:
+      - "services/web-qr-bridge/**"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Redeploy DuMo bridge service
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: railway redeploy --service DuMo --from-source --yes

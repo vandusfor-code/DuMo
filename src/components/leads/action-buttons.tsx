@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, ScrollText, Tag } from "lucide-react";
+import { Loader2, DoorClosed, ScrollText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function ActionButtons({
@@ -11,10 +11,10 @@ export function ActionButtons({
 }: {
   isSaving: boolean;
   onCancel: () => void;
-  mode: "script" | "tipify";
+  mode: "script" | "close";
   onPrimaryAction?: () => void;
 }) {
-  const isTipify = mode === "tipify";
+  const isClose = mode === "close";
 
   return (
     <div className="flex items-center justify-end gap-3 border-t border-line pt-4">
@@ -24,12 +24,12 @@ export function ActionButtons({
       <Button type="submit" disabled={isSaving} onClick={() => onPrimaryAction?.()}>
         {isSaving ? (
           <Loader2 className="size-[18px] animate-spin" />
-        ) : isTipify ? (
-          <Tag className="size-[18px]" />
+        ) : isClose ? (
+          <DoorClosed className="size-[18px]" />
         ) : (
           <ScrollText className="size-[18px]" />
         )}
-        {isTipify ? "Tipificar" : "Generar Script"}
+        {isClose ? "Guardar y cerrar" : "Guardar venta y generar script"}
       </Button>
     </div>
   );

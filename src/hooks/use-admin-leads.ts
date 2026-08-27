@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiDelete, apiGet, apiPost, apiPostForm, apiPut } from "@/lib/api-client";
+import { REALTIME_FALLBACK_POLL_MS } from "@/providers/realtime-provider";
 import type {
   AdminAdvisor,
   AdminConversation,
@@ -17,7 +18,7 @@ export function useAdminConversations() {
   return useQuery({
     queryKey: ["admin", "leads", "conversations"],
     queryFn: () => apiGet<AdminConversation[]>("/api/admin/leads"),
-    refetchInterval: 10_000,
+    refetchInterval: REALTIME_FALLBACK_POLL_MS,
     refetchIntervalInBackground: false,
     staleTime: 5000,
     retry: 2,
@@ -45,7 +46,7 @@ export function useAdminMessages(conversationId: string | null) {
     queryKey: ["admin", "leads", "messages", conversationId],
     queryFn: () => apiGet<ChatMessage[]>(`/api/admin/leads?conversationId=${conversationId}&messages=1`),
     enabled: !!conversationId,
-    refetchInterval: 3000,
+    refetchInterval: REALTIME_FALLBACK_POLL_MS,
     // Sin reintentos infinitos: si falla, se muestra el error de inmediato en
     // vez de quedarse cargando (el polling vuelve a intentarlo igual).
     retry: 1,
@@ -64,14 +65,26 @@ export function useAssignAdvisor() {
   });
 }
 
-export function useSaveAdminLead(conversationId?: string) {
+export function useSaveAdminLead(conversationId?: string, onInboxClosed?: () => void) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: SaveLeadInput) => apiPost<SaveLeadResult>("/api/admin/leads", input),
     onSuccess: (result) => {
+      if (result.inboxClosed && conversationId) {
+        qc.setQueryData<AdminConversation[]>(["admin", "leads", "conversations"], (old) =>
+          old?.filter((c) => c.id !== conversationId),
+        );
+        onInboxClosed?.();
+      }
       qc.invalidateQueries({ queryKey: ["admin", "leads"] });
       if (result.script && conversationId) {
         qc.setQueryData(["leads", "script", conversationId], result.script);
+      }
+      if (result.sale) {
+        qc.invalidateQueries({ queryKey: ["admin", "dashboard"] });
+        qc.invalidateQueries({ queryKey: ["admin", "sales"] });
+        qc.invalidateQueries({ queryKey: ["admin", "accounting"] });
+        qc.invalidateQueries({ queryKey: ["admin", "commissions"] });
       }
     },
   });
@@ -143,6 +156,25 @@ export function useSetAutoAssign() {
         enabled,
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "leads", "auto-assign"] }),
+  });
+}
+
+export function useSlaAutoReassignSettings() {
+  return useQuery({
+    queryKey: ["admin", "leads", "sla-auto-reassign"],
+    queryFn: () => apiGet<{ enabled: boolean }>("/api/admin/leads?slaSettings=1"),
+  });
+}
+
+export function useSetSlaAutoReassign() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) =>
+      apiPost<{ enabled: boolean }>("/api/admin/leads", {
+        action: "setSlaAutoReassign",
+        enabled,
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "leads", "sla-auto-reassign"] }),
   });
 }
 

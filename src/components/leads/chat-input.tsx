@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useSendMediaMessage, useSendMessage } from "@/hooks/use-leads";
 import { useAdminSendMediaMessage, useAdminSendMessage } from "@/hooks/use-admin-leads";
 import {
@@ -12,14 +12,18 @@ import {
   ChatComposerControls,
   MediaAttachmentPreview,
   useMediaAttachment,
+  useVoiceRecorder,
+  VoiceRecordingIndicator,
 } from "@/components/messaging/chat-composer";
+import { EmojiPicker, insertTextAtCursor } from "@/components/messaging/emoji-picker";
 import { PinnedQuickReplies } from "@/components/leads/premium/pinned-quick-replies";
 import type { ChatUiTheme } from "@/components/leads/premium/chat-theme";
 import { cn } from "@/lib/utils";
 import { isMessengerConversation } from "@/lib/messenger/conversation-id";
+import { isInstagramConversation } from "@/lib/instagram/conversation-id";
 
 /**
- * Composer del chat. Envía texto e imágenes por la Cloud API; el mensaje
+ * Composer del chat. Envía texto, imágenes y audios; el mensaje
  * se persiste como saliente y la bandeja se refresca sola.
  */
 export function ChatInput({
@@ -37,8 +41,12 @@ export function ChatInput({
 }) {
   const premium = uiTheme === "premium";
   const isMessenger = isMessengerConversation(conversationId);
+  const isInstagram = isInstagramConversation(conversationId);
+  const canRecord = true;
   const [value, setValue] = useState("");
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const textInputRef = useRef<HTMLInputElement>(null);
   const advisorSend = useSendMessage(conversationId);
   const advisorSendMedia = useSendMediaMessage(conversationId);
   const adminSend = useAdminSendMessage(conversationId);
@@ -48,6 +56,7 @@ export function ChatInput({
   const enableTemplates = variant === "advisor" && !premium;
   const showPinnedReplies = premium;
   const media = useMediaAttachment();
+  const voice = useVoiceRecorder((file) => media.setMediaFile(file));
   const picker = useTemplatePickerState();
   const templateSend = useTemplateSend({
     conversationId,
@@ -56,6 +65,7 @@ export function ChatInput({
     onInsertText: (text) => {
       setValue(text);
       picker.closePicker();
+      setEmojiOpen(false);
     },
     onSent: () => {
       setValue("");
@@ -70,23 +80,28 @@ export function ChatInput({
   const hasText = value.trim().length > 0;
   const hasAttachment = Boolean(media.attachment);
 
-  const handleImageFile = (file: File) => {
-    const type = file.type || "";
-    const looksLikeImage =
-      type.startsWith("image/") || /\.(jpe?g|png|webp|gif)$/i.test(file.name || "");
-    if (!looksLikeImage) return;
-    media.setImageFile(file);
+  const handleMediaFile = (file: File) => {
+    media.setMediaFile(file);
   };
 
   const submit = () => {
     if (isSending) return;
+    setEmojiOpen(false);
+
+    if (voice.isRecording) {
+      voice.stop();
+      return;
+    }
 
     if (media.attachment) {
       sendMedia.mutate(
         {
           to,
           file: media.attachment.file,
-          caption: media.attachment.caption.trim() || undefined,
+          caption:
+            media.attachment.kind === "image"
+              ? media.attachment.caption.trim() || undefined
+              : undefined,
         },
         {
           onSuccess: () => {
@@ -99,8 +114,14 @@ export function ChatInput({
     }
 
     const text = value.trim();
-    if (!text) return;
-    send.mutate({ to, text }, { onSuccess: () => setValue("") });
+    if (text) {
+      send.mutate({ to, text }, { onSuccess: () => setValue("") });
+      return;
+    }
+
+    if (canRecord) {
+      void voice.start();
+    }
   };
 
   const handleChange = (next: string) => {
@@ -108,11 +129,26 @@ export function ChatInput({
     if (enableTemplates) picker.onValueChange(next);
   };
 
+  const insertEmoji = (emoji: string) => {
+    if (media.attachment?.kind === "image") {
+      media.setCaption(`${media.attachment.caption}${emoji}`);
+      return;
+    }
+    const { next, caret } = insertTextAtCursor(value, emoji, textInputRef.current);
+    handleChange(next);
+    requestAnimationFrame(() => {
+      const el = textInputRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(caret, caret);
+    });
+  };
+
   return (
     <div
       className={cn(
-        "relative shrink-0 border-t border-line bg-card pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]",
-        premium ? "px-4 py-3" : "px-4 py-3",
+        "relative shrink-0 overflow-visible border-t border-line bg-card pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]",
+        premium ? "z-20 px-4 py-3" : "px-4 py-3",
       )}
       onDragEnter={(e) => {
         e.preventDefault();
@@ -134,20 +170,29 @@ export function ChatInput({
         />
       ) : null}
 
+      <EmojiPicker
+        open={emojiOpen}
+        onSelect={insertEmoji}
+        onClose={() => setEmojiOpen(false)}
+      />
+
       {media.attachment ? (
         <MediaAttachmentPreview
           attachment={media.attachment}
           onCaptionChange={media.setCaption}
           onRemove={media.clearAttachment}
-          disabled={isSending}
+          disabled={isSending || voice.isRecording}
         />
       ) : null}
 
-      {showPinnedReplies && !media.attachment ? (
+      {voice.isRecording ? <VoiceRecordingIndicator seconds={voice.seconds} /> : null}
+
+      {showPinnedReplies && !media.attachment && !voice.isRecording ? (
         <PinnedQuickReplies
           conversationId={conversationId}
           to={to}
           customerName={customerName}
+          variant={variant}
           disabled={isSending}
           onInsertText={(text) => setValue(text)}
           onSent={() => setValue("")}
@@ -158,20 +203,29 @@ export function ChatInput({
         hasText={hasText}
         hasAttachment={hasAttachment}
         isSending={isSending}
+        canRecord={canRecord}
+        isRecording={voice.isRecording}
         onAttach={media.openFilePicker}
         onSubmit={submit}
+        onEmojiToggle={() => {
+          setEmojiOpen((open) => {
+            if (!open) picker.closePicker();
+            return !open;
+          });
+        }}
+        emojiOpen={emojiOpen}
         fileInputRef={media.fileInputRef}
-        onFileSelected={handleImageFile}
+        onFileSelected={handleMediaFile}
         dragActive={dragActive}
         uiTheme={uiTheme}
         onPaste={(e) => {
           const items = e.clipboardData?.items;
           if (!items) return;
           for (const item of items) {
-            if (item.type.startsWith("image/")) {
+            if (item.type.startsWith("image/") || item.type.startsWith("audio/")) {
               e.preventDefault();
               const file = item.getAsFile();
-              if (file) handleImageFile(file);
+              if (file) handleMediaFile(file);
               break;
             }
           }
@@ -180,10 +234,11 @@ export function ChatInput({
           e.preventDefault();
           setDragActive(false);
           const file = e.dataTransfer.files?.[0];
-          if (file) handleImageFile(file);
+          if (file) handleMediaFile(file);
         }}
       >
         <input
+          ref={textInputRef}
           value={value}
           onChange={(e) => handleChange(e.target.value)}
           onKeyDown={(e) => {
@@ -201,12 +256,12 @@ export function ChatInput({
           }}
           placeholder={
             premium
-              ? "Escribe un mensaje..."
+              ? "Escribe tu mensaje..."
               : enableTemplates
                 ? "Escribe un mensaje o / para plantillas…"
                 : "Escribe un mensaje..."
           }
-          disabled={isSending}
+          disabled={isSending || voice.isRecording}
           className={cn(
             "w-full border border-border-strong bg-card text-[14px] text-ink outline-none transition-all duration-150",
             "placeholder:text-placeholder focus:border-brand focus:shadow-[0_0_0_4px_rgba(124,58,237,0.08)] disabled:opacity-60",
@@ -217,15 +272,19 @@ export function ChatInput({
         />
       </ChatComposerControls>
 
-      {(send.isError || sendMedia.isError) && (
+      {(send.isError || sendMedia.isError || voice.error) && (
         <p className="mt-2 text-[12px] text-danger-ink">
-          {send.error instanceof Error
-            ? send.error.message
-            : sendMedia.error instanceof Error
-              ? sendMedia.error.message
-              : isMessenger
-                ? "No se pudo enviar. Revisa la configuración de Messenger."
-                : "No se pudo enviar. Revisa la configuración de WhatsApp."}
+          {voice.error
+            ? voice.error
+            : send.error instanceof Error
+              ? send.error.message
+              : sendMedia.error instanceof Error
+                ? sendMedia.error.message
+                : isMessenger
+                  ? "No se pudo enviar. Revisa la configuración de Messenger."
+                  : isInstagram
+                    ? "No se pudo enviar. Revisa la configuración de Instagram."
+                    : "No se pudo enviar. Revisa la configuración de WhatsApp."}
         </p>
       )}
     </div>

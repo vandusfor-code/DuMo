@@ -1,12 +1,13 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiPost, apiPostForm } from "@/lib/api-client";
-import { advisorApiGet } from "@/lib/advisor-query";
+import { advisorApiGet, advisorApiPost, advisorApiPostForm, AdvisorFetchError } from "@/lib/advisor-query";
 import { salesScriptKeys } from "@/hooks/use-sales-script";
 import { latestGestionKeys } from "@/hooks/use-latest-gestion";
 import { crmClientKeys } from "@/hooks/use-crm-clients";
 import { salesKeys } from "@/hooks/use-sales";
+import { recuperacionKeys } from "@/hooks/use-advisor-recuperacion";
+import { REALTIME_FALLBACK_POLL_MS } from "@/providers/realtime-provider";
 import type { ChatMessage, Conversation } from "@/types/conversation";
 import type { Plan, SaveLeadInput } from "@/types/lead";
 import type { SaveLeadResult } from "@/types/sales-script";
@@ -29,15 +30,56 @@ export function fetchConversationMessages(conversationId: string) {
   );
 }
 
+export function patchConversationUnread(
+  queryClient: ReturnType<typeof useQueryClient>,
+  conversationId: string,
+) {
+  queryClient.setQueryData<Conversation[]>(leadKeys.conversations, (prev) =>
+    prev?.map((c) => (c.id === conversationId ? { ...c, unread: 0 } : c)),
+  );
+}
+
+export function useMarkConversationRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (conversationId: string) =>
+      advisorApiPost<{ ok: boolean }>(
+        `/api/leads/conversations/${encodeURIComponent(conversationId)}/read`,
+        {},
+      ),
+    onMutate: (conversationId) => {
+      patchConversationUnread(queryClient, conversationId);
+    },
+    onSettled: (_data, _err, conversationId) => {
+      queryClient.invalidateQueries({ queryKey: leadKeys.conversations });
+      if (conversationId) {
+        queryClient.invalidateQueries({ queryKey: leadKeys.messages(conversationId) });
+      }
+    },
+  });
+}
+
+/** No conservar bandeja/mensajes tras 401/403 — evita mostrar datos de otra sesión. */
+function keepPlaceholderOnAuthError<T>(
+  prev: T | undefined,
+  prevQuery: { state: { error: unknown } } | undefined,
+): T | undefined {
+  const err = prevQuery?.state.error;
+  if (err instanceof AdvisorFetchError && (err.status === 401 || err.status === 403)) {
+    return undefined;
+  }
+  return prev;
+}
+
 export function useConversations() {
   return useQuery({
     queryKey: leadKeys.conversations,
     queryFn: fetchAdvisorConversations,
-    refetchInterval: 6000,
+    refetchInterval: REALTIME_FALLBACK_POLL_MS,
     refetchIntervalInBackground: true,
     staleTime: 3000,
     retry: 2,
-    placeholderData: (prev) => prev,
+    placeholderData: keepPlaceholderOnAuthError,
   });
 }
 
@@ -46,11 +88,11 @@ export function useConversationMessages(conversationId: string | null) {
     queryKey: leadKeys.messages(conversationId ?? ""),
     queryFn: () => fetchConversationMessages(conversationId!),
     enabled: Boolean(conversationId),
-    refetchInterval: 5000,
+    refetchInterval: REALTIME_FALLBACK_POLL_MS,
     refetchIntervalInBackground: true,
     staleTime: 2000,
     retry: 2,
-    placeholderData: (prev) => prev,
+    placeholderData: keepPlaceholderOnAuthError,
   });
 }
 
@@ -66,7 +108,7 @@ export function usePlans() {
 export function useSaveLead(conversationId?: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: SaveLeadInput) => apiPost<SaveLeadResult>("/api/leads", input),
+    mutationFn: (input: SaveLeadInput) => advisorApiPost<SaveLeadResult>("/api/leads", input),
     onSuccess: (result) => {
       if (!conversationId) return;
       if (result.script) {
@@ -78,8 +120,23 @@ export function useSaveLead(conversationId?: string) {
       if (result.sale) {
         queryClient.invalidateQueries({ queryKey: salesKeys.all });
         queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+        queryClient.invalidateQueries({ queryKey: ["admin", "dashboard"] });
+        queryClient.invalidateQueries({ queryKey: ["admin", "sales"] });
+        queryClient.invalidateQueries({ queryKey: ["admin", "accounting"] });
+        queryClient.invalidateQueries({ queryKey: ["admin", "commissions"] });
+        queryClient.invalidateQueries({ queryKey: ["commissions"] });
       }
       queryClient.invalidateQueries({ queryKey: crmClientKeys.all });
+      queryClient.invalidateQueries({ queryKey: leadKeys.conversations });
+      queryClient.invalidateQueries({ queryKey: recuperacionKeys.all });
+      if (result.inboxClosed && conversationId) {
+        queryClient.setQueryData<Conversation[]>(leadKeys.conversations, (old) =>
+          old?.filter((c) => c.id !== conversationId),
+        );
+      }
+      if (result.saveAction === "close" || result.inboxClosed) {
+        queryClient.invalidateQueries({ queryKey: ["admin", "pendientes"] });
+      }
     },
   });
 }
@@ -88,7 +145,7 @@ export function useSendMessage(conversationId: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: { to: string; text: string }) =>
-      apiPost<{ ok: boolean; id: string }>("/api/whatsapp/send", {
+      advisorApiPost<{ ok: boolean; id: string }>("/api/whatsapp/send", {
         conversationId,
         to: input.to,
         text: input.text,
@@ -111,7 +168,7 @@ export function useSendMediaMessage(conversationId: string | null) {
       form.append("conversationId", conversationId ?? "");
       form.append("to", input.to);
       if (input.caption) form.append("caption", input.caption);
-      return apiPostForm<{ ok: boolean; id: string }>("/api/whatsapp/send-media", form);
+      return advisorApiPostForm<{ ok: boolean; id: string }>("/api/whatsapp/send-media", form);
     },
     onSuccess: () => {
       if (conversationId) {

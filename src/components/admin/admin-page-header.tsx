@@ -3,23 +3,26 @@
 import { Bell, Calendar, ChevronDown } from "lucide-react";
 import { PhotoAvatar, InitialsAvatar } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/format";
+import { businessDateISO, formatBusinessDateLabel } from "@/lib/date";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useUnreadMessageCount } from "@/hooks/use-unread-messages";
 
 function todayLabel(): string {
-  const now = new Date();
-  const month = new Intl.DateTimeFormat("es-CL", { month: "long" }).format(now);
-  const dd = String(now.getDate()).padStart(2, "0");
-  return `${dd} de ${month}, ${now.getFullYear()}`;
+  return formatBusinessDateLabel(businessDateISO());
 }
 
 /** Cabecera del área admin: título/subtítulo + fecha, campana y usuario admin. */
 export function AdminPageHeader({
   title,
   subtitle,
+  selectedDate,
+  onDateChange,
 }: {
   title: string;
   subtitle?: string;
+  /** yyyy-mm-dd — habilita selector de fecha operativa. */
+  selectedDate?: string;
+  onDateChange?: (dateIso: string) => void;
 }) {
   const { data: user } = useCurrentUser();
   const unread = useUnreadMessageCount("admin");
@@ -36,14 +39,32 @@ export function AdminPageHeader({
       </div>
 
       <div className="flex items-center gap-3">
-        <button
-          type="button"
-          className="inline-flex h-11 items-center gap-2.5 rounded-2xl border border-line bg-card px-4 text-[14px] font-medium text-ink transition-colors hover:bg-canvas"
-        >
-          <Calendar className="size-[18px] text-muted" />
-          {todayLabel()}
-          <ChevronDown className="size-4 text-muted" />
-        </button>
+        {onDateChange ? (
+          <label className="relative inline-flex h-11 cursor-pointer items-center gap-2.5 rounded-2xl border border-line bg-card px-4 text-[14px] font-medium text-ink transition-colors hover:bg-canvas">
+            <Calendar className="size-[18px] text-muted" />
+            <span>{formatBusinessDateLabel(selectedDate ?? businessDateISO())}</span>
+            <ChevronDown className="size-4 text-muted" />
+            <input
+              type="date"
+              value={selectedDate ?? businessDateISO()}
+              max={businessDateISO()}
+              onChange={(e) => {
+                if (e.target.value) onDateChange(e.target.value);
+              }}
+              className="absolute inset-0 cursor-pointer opacity-0"
+              aria-label="Seleccionar fecha operativa"
+            />
+          </label>
+        ) : (
+          <button
+            type="button"
+            className="inline-flex h-11 items-center gap-2.5 rounded-2xl border border-line bg-card px-4 text-[14px] font-medium text-ink transition-colors hover:bg-canvas"
+          >
+            <Calendar className="size-[18px] text-muted" />
+            {todayLabel()}
+            <ChevronDown className="size-4 text-muted" />
+          </button>
+        )}
 
         <button
           type="button"

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { QueryProvider } from "@/providers/query-provider";
+import { RealtimeProvider } from "@/providers/realtime-provider";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -28,7 +29,9 @@ export default function RootLayout({
   return (
     <html lang="es" className={`${inter.variable} h-full`}>
       <body className="min-h-full antialiased">
-        <QueryProvider>{children}</QueryProvider>
+        <QueryProvider>
+          <RealtimeProvider>{children}</RealtimeProvider>
+        </QueryProvider>
       </body>
     </html>
   );

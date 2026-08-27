@@ -11,6 +11,8 @@ export interface EquipmentCatalogItem {
   installmentsCount: number;
   installmentValue: number;
   commercialText: string;
+  /** Operador (WOM/Claro) al que pertenece este equipo. */
+  carrier: string;
   /** Campaña comercial Pie Cero (independiente del valor económico del pie). */
   isPieCero: boolean;
   color?: string;
@@ -21,6 +23,11 @@ export interface EquipmentCatalogItem {
 }
 
 export type UpsertEquipmentInput = Omit<EquipmentCatalogItem, "id">;
+
+export type EquipmentBulkImportResult = {
+  created: { rowNumber: number; id: string; commercialName: string }[];
+  failed: { rowNumber: number; error: string }[];
+};
 
 /** Vista reducida para el selector en Gestión (solo activos). */
 export interface AdvisorEquipmentOption {

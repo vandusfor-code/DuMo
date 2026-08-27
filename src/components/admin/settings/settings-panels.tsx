@@ -5,6 +5,7 @@ import {
   Building2,
   Facebook,
   FileSpreadsheet,
+  Instagram,
   MessageCircle,
   Server,
 } from "lucide-react";
@@ -32,6 +33,7 @@ export function SettingsSections({
   onSaveCompany,
   onSaveWhatsApp,
   onSaveMessenger,
+  onSaveInstagram,
   onSaveGoogleSheets,
   onTestGoogleSheets,
 }: {
@@ -39,12 +41,14 @@ export function SettingsSections({
   onSaveCompany: (values: SettingsSnapshot["company"]) => void;
   onSaveWhatsApp: (values: SettingsSnapshot["whatsapp"]) => void;
   onSaveMessenger: (values: SettingsSnapshot["messenger"]) => void;
+  onSaveInstagram: (values: SettingsSnapshot["instagram"]) => void;
   onSaveGoogleSheets: (values: SettingsSnapshot["googleSheets"]) => void;
   onTestGoogleSheets: () => void;
 }) {
   const [company, setCompany] = useState(data.company);
   const [whatsapp, setWhatsapp] = useState(data.whatsapp);
   const [messenger, setMessenger] = useState(data.messenger);
+  const [instagram, setInstagram] = useState(data.instagram);
   const [sheets, setSheets] = useState(data.googleSheets);
 
   return (
@@ -161,6 +165,63 @@ export function SettingsSections({
       <Card className="p-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
+            <span className="grid size-10 place-items-center rounded-xl bg-brand-soft text-brand">
+              <Instagram className="size-5" />
+            </span>
+            <div>
+              <h3 className="text-[15px] font-semibold text-ink">Instagram (Direct)</h3>
+              <ConnectionBadge status={instagram.connectionStatus} />
+            </div>
+          </div>
+          <p className="max-w-xs text-right text-[12px] text-muted">
+            Webhook: <code className="text-[11px]">/api/instagram/webhook</code> · Suscripción:{" "}
+            <strong>messages</strong>
+          </p>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="text-[13px] text-muted">IG User ID</span>
+            <input
+              value={instagram.igUserId}
+              onChange={(e) => setInstagram({ ...instagram, igUserId: e.target.value })}
+              className="mt-1 h-11 w-full rounded-xl border border-line px-4 text-[14px]"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[13px] text-muted">Usuario de Instagram (opcional)</span>
+            <input
+              value={instagram.username}
+              onChange={(e) => setInstagram({ ...instagram, username: e.target.value })}
+              className="mt-1 h-11 w-full rounded-xl border border-line px-4 text-[14px]"
+            />
+          </label>
+          <label className="block sm:col-span-2">
+            <span className="text-[13px] text-muted">Verify token (Vercel)</span>
+            <input
+              value={instagram.verifyToken}
+              readOnly
+              placeholder="Define INSTAGRAM_VERIFY_TOKEN en Vercel"
+              className="mt-1 h-11 w-full rounded-xl border border-line bg-canvas px-4 text-[14px] text-muted"
+            />
+          </label>
+          <label className="block sm:col-span-2">
+            <span className="text-[13px] text-muted">Access Token</span>
+            <input
+              value={instagram.accessToken}
+              onChange={(e) => setInstagram({ ...instagram, accessToken: e.target.value })}
+              placeholder="Token de Instagram Business Login (instagram_business_manage_messages)"
+              className="mt-1 h-11 w-full rounded-xl border border-line px-4 text-[14px]"
+            />
+          </label>
+        </div>
+        <div className="mt-4 flex justify-end">
+          <Button size="sm" onClick={() => onSaveInstagram(instagram)}>Guardar Instagram</Button>
+        </div>
+      </Card>
+
+      <Card className="p-5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
             <span className="grid size-10 place-items-center rounded-xl bg-brand-soft text-brand"><FileSpreadsheet className="size-5" /></span>
             <div>
               <h3 className="text-[15px] font-semibold text-ink">Google Sheets</h3>
@@ -204,6 +265,7 @@ function SystemStatusCard({
     { label: "Google Sheets", value: system.googleSheetsStatus },
     { label: "WhatsApp", value: system.whatsappStatus },
     { label: "Messenger", value: system.messengerStatus },
+    { label: "Instagram", value: system.instagramStatus },
     { label: "APIs", value: system.apisStatus },
     { label: "Último respaldo", value: system.lastBackup ? new Date(system.lastBackup).toLocaleString("es-CL") : "—" },
   ];

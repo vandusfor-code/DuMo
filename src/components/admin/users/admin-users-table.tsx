@@ -6,6 +6,11 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
+  adminTableHeaderActionsClass,
+  adminTableHeaderCellClass,
+  adminTableHeaderRowClass,
+} from "@/lib/admin-table-header-styles";
+import {
   Table,
   TableBody,
   TableCell,
@@ -63,13 +68,13 @@ export function AdminUsersTable({
         </div>
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Usuario</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Rol</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="w-12" />
+            <TableRow className={adminTableHeaderRowClass}>
+              <TableHead className={adminTableHeaderCellClass}>Nombre</TableHead>
+              <TableHead className={adminTableHeaderCellClass}>Usuario</TableHead>
+              <TableHead className={adminTableHeaderCellClass}>Email</TableHead>
+              <TableHead className={adminTableHeaderCellClass}>Rol</TableHead>
+              <TableHead className={adminTableHeaderCellClass}>Estado</TableHead>
+              <TableHead className={adminTableHeaderActionsClass} />
             </TableRow>
           </TableHeader>
           <TableBody>

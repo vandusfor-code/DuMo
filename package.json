@@ -6,9 +6,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "start:realtime": "node server.mjs",
     "lint": "eslint",
     "db:migrate": "node scripts/migrate-db.mjs",
-    "db:backup": "node scripts/backup-db.mjs"
+    "db:backup": "node scripts/backup-db.mjs",
+    "dev:db-env": "node scripts/sync-local-postgres-env.mjs",
+    "railway:postgres:migrate": "node scripts/railway-postgres-migrate.mjs",
+    "railway:postgres:import": "node scripts/railway-postgres-import.mjs",
+    "railway:postgres:verify": "node scripts/railway-postgres-verify.mjs",
+    "railway:crm:env-sync": "node scripts/railway-crm-env-sync.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -20,10 +26,12 @@
     "@supabase/supabase-js": "^2.112.2",
     "@tanstack/react-query": "^5.62.0",
     "@tanstack/react-table": "^8.20.6",
+    "bullmq": "^6.0.9",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^11.15.0",
     "googleapis": "^174.0.0",
+    "ioredis": "^6.0.0",
     "lucide-react": "^0.468.0",
     "next": "^15.5.0",
     "postgres": "^3.4.9",
@@ -32,7 +40,10 @@
     "react-hook-form": "^7.54.2",
     "recharts": "^2.15.0",
     "server-only": "^0.0.1",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "tailwind-merge": "^2.6.0",
+    "xlsx": "^0.18.5",
     "zod": "^3.24.1"
   },
   "devDependencies": {

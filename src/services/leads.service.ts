@@ -19,15 +19,18 @@ import {
 } from "@/server/whatsapp/credentials";
 import { downloadWhatsAppMedia } from "@/server/whatsapp/media";
 import { DEFAULT_COMPANY_ID } from "@/types/tenant";
-import { assertSupportedImageMime } from "@/types/media";
+import { assertSupportedAudioMime, assertSupportedImageMime } from "@/types/media";
 import { normalizeWhatsAppRecipient } from "@/lib/whatsapp/phone";
 import {
   isMessengerConversation,
   parseMessengerPsid,
 } from "@/lib/messenger/conversation-id";
 import { isWebQrConversation } from "@/lib/web-qr/conversation-id";
-import { sendWebQrText, resolveWebQrChannelId } from "@/server/web-qr/send";
-import { sendMessengerText } from "@/server/messenger/send";
+import { isInstagramConversation, parseInstagramIgsid } from "@/lib/instagram/conversation-id";
+import { sendWebQrAudio, sendWebQrMedia, sendWebQrText, resolveWebQrChannelId } from "@/server/web-qr/send";
+import { sendMessengerAttachment, sendMessengerText } from "@/server/messenger/send";
+import { sendInstagramAttachment, sendInstagramText } from "@/server/instagram/send";
+import { getInstagramIntegrationConfig } from "@/server/instagram/config";
 import { getMessengerIntegrationConfig } from "@/server/messenger/config";
 
 const GRAPH = "https://graph.facebook.com";
@@ -40,6 +43,16 @@ export interface SendMessageInput {
   conversationId: string;
   to: string;
   text: string;
+  companyId?: string;
+}
+
+export interface SendAudioMessageInput {
+  conversationId: string;
+  to: string;
+  mediaUrl: string;
+  mimeType: string;
+  mediaAssetId?: string;
+  ptt?: boolean;
   companyId?: string;
 }
 
@@ -96,10 +109,59 @@ export const leadsService = {
 
   /** Persiste un mensaje entrante recibido por el webhook. */
   async receiveMessage(msg: IncomingMessage): Promise<void> {
-    await getConversationRepository().saveMessage(msg);
+    const repo = getConversationRepository();
+    const assignedBefore = await repo.getAssignedAdvisorId(msg.conversationId);
+    let wasClosed = false;
     if (msg.direction === "in") {
+      const { getConversationInboxState } = await import("@/repositories/inbox-lifecycle.repository");
+      wasClosed = (await getConversationInboxState(msg.conversationId)) === "closed";
+    }
+    await repo.saveMessage(msg);
+    if (msg.direction === "in") {
+      const { maybeMarkCampaignResponse } = await import(
+        "@/services/campaign-response-link.service"
+      );
+      await maybeMarkCampaignResponse(msg.conversationId).catch((err) =>
+        console.error("[receiveMessage] maybeMarkCampaignResponse", err),
+      );
+
+      if (wasClosed) {
+        const { maybeReopenClosedConversationOnInbound } = await import(
+          "@/services/inbox-reopen.service"
+        );
+        await maybeReopenClosedConversationOnInbound(msg.conversationId);
+      }
       const { adminLeadsService } = await import("@/services/admin-leads.service");
       await adminLeadsService.autoAssignIfNeeded(msg.conversationId);
+      const assignedAfter = await repo.getAssignedAdvisorId(msg.conversationId);
+      if (assignedAfter && !assignedBefore) {
+        const { emitLeadsMessageNew, messageNewPayloadFromIncoming } = await import(
+          "@/server/realtime/emit"
+        );
+        emitLeadsMessageNew(messageNewPayloadFromIncoming(msg, assignedAfter));
+      }
+
+      // RESP-1 — se arma DESPUÉS de que P2 (reapertura) y el auto-assign ya
+      // corrieron, con `assignedAfter` (regla de desempate A): si P2 dejó la
+      // conversación sin asesora, no se arma nada — no hay a quién
+      // responsabilizar.
+      const { armTimerAfterInboundMessage } = await import(
+        "@/services/response-sla.service"
+      );
+      await armTimerAfterInboundMessage({
+        conversationId: msg.conversationId,
+        assignedAdvisorId: assignedAfter,
+        messageId: msg.waMessageId,
+      }).catch((err) => console.error("[receiveMessage] armTimerAfterInboundMessage", err));
+
+      // Primer contacto WhatsApp: dos mensajes automáticos. Nunca en reapertura
+      // ni si el chat ya tenía asesora. El envío no debe tumbar el inbound.
+      if (!wasClosed && !assignedBefore) {
+        const { maybeSendNewLeadWelcome } = await import("@/services/new-lead-welcome.service");
+        await maybeSendNewLeadWelcome(msg.conversationId).catch((err) =>
+          console.error("[receiveMessage] maybeSendNewLeadWelcome", err),
+        );
+      }
     }
   },
 
@@ -155,7 +217,110 @@ export const leadsService = {
       dumoPhoneId: input.dumoPhoneId,
       messageType: "image",
       mediaAssetId: asset.id,
+      mediaUrl: asset.publicUrl,
       caption: input.caption,
+      companyId,
+    });
+  },
+
+  /** Imagen ya subida por el bridge QR — registra media_asset y persiste mensaje entrante. */
+  async receiveInboundImageFromUrl(input: {
+    waMessageId: string;
+    conversationId: string;
+    phone: string;
+    customerName: string;
+    createdAt: string;
+    dumoPhoneId?: string;
+    mediaUrl: string;
+    mimeType?: string;
+    caption?: string;
+    companyId?: string;
+  }): Promise<void> {
+    const companyId = input.companyId ?? DEFAULT_COMPANY_ID;
+    const mimeType = input.mimeType?.trim() || "image/jpeg";
+    assertSupportedImageMime(mimeType);
+
+    const fileName = input.mediaUrl.split("/").pop()?.split("?")[0] || "image.jpg";
+    const asset = await mediaService.registerExistingChatMedia({
+      companyId,
+      publicUrl: input.mediaUrl,
+      fileName: decodeURIComponent(fileName),
+      mimeType,
+      source: "whatsapp_inbound",
+    });
+
+    const preview = input.caption?.trim() || "📷 Imagen";
+
+    await this.receiveMessage({
+      waMessageId: input.waMessageId,
+      conversationId: input.conversationId,
+      phone: input.phone,
+      customerName: input.customerName,
+      body: preview,
+      direction: "in",
+      createdAt: input.createdAt,
+      dumoPhoneId: input.dumoPhoneId,
+      messageType: "image",
+      mediaAssetId: asset.id,
+      mediaUrl: asset.publicUrl,
+      caption: input.caption,
+      companyId,
+    });
+  },
+
+  /** Descarga audio de Meta, lo guarda en Supabase y persiste el mensaje entrante. */
+  async receiveInboundAudio(input: {
+    waMessageId: string;
+    conversationId: string;
+    phone: string;
+    customerName: string;
+    createdAt: string;
+    dumoPhoneId?: string;
+    waMediaId: string;
+    mimeType?: string;
+    companyId?: string;
+    voice?: boolean;
+  }): Promise<void> {
+    const repo = getConversationRepository();
+    const companyId = input.companyId ?? DEFAULT_COMPANY_ID;
+    const phoneId = input.dumoPhoneId?.trim() || defaultPhoneNumberId() || "";
+    const perNumberToken = phoneId ? await repo.getAccessTokenForPhoneId(phoneId) : null;
+    const creds = resolveSendCredentials(phoneId, perNumberToken);
+    if ("error" in creds) {
+      throw new Error(creds.error);
+    }
+
+    const downloaded = await downloadWhatsAppMedia({
+      mediaId: input.waMediaId,
+      token: creds.token,
+    });
+    const mimeType = input.mimeType ?? downloaded.mimeType;
+    assertSupportedAudioMime(mimeType);
+
+    const asset = await mediaService.uploadChatMedia({
+      companyId,
+      conversationId: input.conversationId,
+      direction: "inbound",
+      fileName: downloaded.fileName ?? `wa-${input.waMediaId}.ogg`,
+      mimeType,
+      data: downloaded.data,
+      waMediaId: input.waMediaId,
+    });
+
+    const preview = input.voice ? "🎤 Nota de voz" : "🔊 Audio";
+
+    await this.receiveMessage({
+      waMessageId: input.waMessageId,
+      conversationId: input.conversationId,
+      phone: input.phone,
+      customerName: input.customerName,
+      body: preview,
+      direction: "in",
+      createdAt: input.createdAt,
+      dumoPhoneId: input.dumoPhoneId,
+      messageType: "audio",
+      mediaAssetId: asset.id,
+      mediaUrl: asset.publicUrl,
       companyId,
     });
   },
@@ -224,6 +389,27 @@ export const leadsService = {
       return sent;
     }
 
+    if (isInstagramConversation(input.conversationId)) {
+      const igsid = parseInstagramIgsid(input.conversationId);
+      if (!igsid) throw new Error("Conversación de Instagram inválida.");
+      const sent = await sendInstagramText({ igsid, text: input.text });
+      const instagramConfig = await getInstagramIntegrationConfig();
+      const repo = getConversationRepository();
+      await repo.saveMessage({
+        waMessageId: sent.id,
+        conversationId: input.conversationId,
+        phone: igsid,
+        customerName: "",
+        body: input.text,
+        direction: "out",
+        createdAt: new Date().toISOString(),
+        dumoPhoneId: instagramConfig?.igUserId,
+        messageType: "text",
+        companyId: input.companyId,
+      });
+      return sent;
+    }
+
     if (isWebQrConversation(input.conversationId)) {
       const channelId = await resolveWebQrChannelId(input.conversationId);
       return sendWebQrText({
@@ -281,13 +467,161 @@ export const leadsService = {
     return { id };
   },
 
+  /** Audio ya subido por el bridge QR — registra media_asset y persiste mensaje entrante. */
+  async receiveInboundAudioFromUrl(input: {
+    waMessageId: string;
+    conversationId: string;
+    phone: string;
+    customerName: string;
+    createdAt: string;
+    dumoPhoneId?: string;
+    mediaUrl: string;
+    mimeType?: string;
+    preview?: string;
+    audioPtt?: boolean;
+    companyId?: string;
+  }): Promise<void> {
+    const companyId = input.companyId ?? DEFAULT_COMPANY_ID;
+    const mimeType = input.mimeType?.trim() || "audio/ogg; codecs=opus";
+    assertSupportedAudioMime(mimeType);
+
+    const fileName = input.mediaUrl.split("/").pop()?.split("?")[0] || "audio.ogg";
+    const asset = await mediaService.registerExistingChatMedia({
+      companyId,
+      publicUrl: input.mediaUrl,
+      fileName: decodeURIComponent(fileName),
+      mimeType,
+      source: "whatsapp_inbound",
+    });
+
+    const preview =
+      input.preview?.trim() ||
+      (input.audioPtt ? "🎤 Nota de voz" : "🔊 Audio");
+
+    await this.receiveMessage({
+      waMessageId: input.waMessageId,
+      conversationId: input.conversationId,
+      phone: input.phone,
+      customerName: input.customerName,
+      body: preview,
+      direction: "in",
+      createdAt: input.createdAt,
+      dumoPhoneId: input.dumoPhoneId,
+      messageType: "audio",
+      mediaAssetId: asset.id,
+      mediaUrl: asset.publicUrl,
+      companyId,
+    });
+  },
+
+  /** Sube audio al storage propio y lo envía por WhatsApp. */
+  async sendAudioFromUpload(input: {
+    conversationId: string;
+    to: string;
+    fileName: string;
+    mimeType: string;
+    data: Buffer;
+    ptt?: boolean;
+    companyId?: string;
+    createdBy?: string;
+  }): Promise<{ id: string; mediaAssetId: string }> {
+    assertSupportedAudioMime(input.mimeType);
+    const companyId = input.companyId ?? DEFAULT_COMPANY_ID;
+    const asset = await mediaService.uploadChatMedia({
+      companyId,
+      conversationId: input.conversationId,
+      direction: "outbound",
+      fileName: input.fileName,
+      mimeType: input.mimeType,
+      data: input.data,
+      createdBy: input.createdBy,
+    });
+
+    const ptt =
+      input.ptt ??
+      (input.mimeType.toLowerCase().includes("ogg") ||
+        input.mimeType.toLowerCase().includes("opus"));
+
+    const result = await this.sendAudioMessage({
+      conversationId: input.conversationId,
+      to: waTo({ to: input.to, conversationId: input.conversationId }),
+      mediaUrl: asset.publicUrl,
+      mimeType: input.mimeType,
+      mediaAssetId: asset.id,
+      ptt,
+      companyId,
+    });
+
+    return { id: result.id, mediaAssetId: asset.id };
+  },
+
   /** Envía imagen por URL pública (Supabase) y persiste el mensaje. */
   async sendMediaMessage(input: SendMediaMessageInput): Promise<{ id: string }> {
     if (isMessengerConversation(input.conversationId)) {
-      throw new Error("El envío de imágenes por Messenger aún no está disponible. Usa texto.");
+      const psid = parseMessengerPsid(input.conversationId);
+      if (!psid) throw new Error("Conversación Messenger inválida.");
+      assertSupportedImageMime(input.mimeType);
+      const sent = await sendMessengerAttachment({
+        psid,
+        type: "image",
+        url: input.mediaUrl,
+      });
+      const preview = input.caption?.trim() || "Imagen";
+      await getConversationRepository().saveMessage({
+        waMessageId: sent.id,
+        conversationId: input.conversationId,
+        phone: psid,
+        customerName: "",
+        body: preview,
+        direction: "out",
+        createdAt: new Date().toISOString(),
+        messageType: "image",
+        mediaAssetId: input.mediaAssetId,
+        mediaUrl: input.mediaUrl,
+        caption: input.caption,
+        companyId: input.companyId,
+      });
+      return sent;
+    }
+    if (isInstagramConversation(input.conversationId)) {
+      const igsid = parseInstagramIgsid(input.conversationId);
+      if (!igsid) throw new Error("Conversación de Instagram inválida.");
+      assertSupportedImageMime(input.mimeType);
+      const sent = await sendInstagramAttachment({
+        igsid,
+        type: "image",
+        url: input.mediaUrl,
+      });
+      const preview = input.caption?.trim() || "Imagen";
+      await getConversationRepository().saveMessage({
+        waMessageId: sent.id,
+        conversationId: input.conversationId,
+        phone: igsid,
+        customerName: "",
+        body: preview,
+        direction: "out",
+        createdAt: new Date().toISOString(),
+        messageType: "image",
+        mediaAssetId: input.mediaAssetId,
+        mediaUrl: input.mediaUrl,
+        caption: input.caption,
+        companyId: input.companyId,
+      });
+      return sent;
     }
     if (isWebQrConversation(input.conversationId)) {
-      throw new Error("El envío de imágenes por WhatsApp Web estará disponible en la siguiente fase.");
+      const channelId = await resolveWebQrChannelId(input.conversationId);
+      assertSupportedImageMime(input.mimeType);
+      return sendWebQrMedia({
+        channelId,
+        conversationId: input.conversationId,
+        to: input.to,
+        mediaUrl: input.mediaUrl,
+        mimeType: input.mimeType,
+        caption: input.caption,
+        mediaAssetId: input.mediaAssetId,
+        companyId: input.companyId,
+      });
     }
     const version = graphVersion();
     const repo = getConversationRepository();
@@ -332,7 +666,121 @@ export const leadsService = {
       dumoPhoneId: creds.phoneNumberId,
       messageType: "image",
       mediaAssetId: input.mediaAssetId,
+      mediaUrl: input.mediaUrl,
       caption: input.caption,
+      companyId: input.companyId,
+    });
+    return { id };
+  },
+
+  /** Envía audio por URL pública y persiste el mensaje. */
+  async sendAudioMessage(input: SendAudioMessageInput): Promise<{ id: string }> {
+    assertSupportedAudioMime(input.mimeType);
+
+    if (isMessengerConversation(input.conversationId)) {
+      const psid = parseMessengerPsid(input.conversationId);
+      if (!psid) throw new Error("Conversación Messenger inválida.");
+      const sent = await sendMessengerAttachment({
+        psid,
+        type: "audio",
+        url: input.mediaUrl,
+      });
+      const preview = input.ptt === false ? "🔊 Audio" : "🎤 Nota de voz";
+      await getConversationRepository().saveMessage({
+        waMessageId: sent.id,
+        conversationId: input.conversationId,
+        phone: psid,
+        customerName: "",
+        body: preview,
+        direction: "out",
+        createdAt: new Date().toISOString(),
+        messageType: "audio",
+        mediaAssetId: input.mediaAssetId,
+        mediaUrl: input.mediaUrl,
+        companyId: input.companyId,
+      });
+      return sent;
+    }
+
+    if (isInstagramConversation(input.conversationId)) {
+      const igsid = parseInstagramIgsid(input.conversationId);
+      if (!igsid) throw new Error("Conversación de Instagram inválida.");
+      const sent = await sendInstagramAttachment({
+        igsid,
+        type: "audio",
+        url: input.mediaUrl,
+      });
+      const preview = input.ptt === false ? "🔊 Audio" : "🎤 Nota de voz";
+      await getConversationRepository().saveMessage({
+        waMessageId: sent.id,
+        conversationId: input.conversationId,
+        phone: igsid,
+        customerName: "",
+        body: preview,
+        direction: "out",
+        createdAt: new Date().toISOString(),
+        messageType: "audio",
+        mediaAssetId: input.mediaAssetId,
+        mediaUrl: input.mediaUrl,
+        companyId: input.companyId,
+      });
+      return sent;
+    }
+
+    if (isWebQrConversation(input.conversationId)) {
+      const channelId = await resolveWebQrChannelId(input.conversationId);
+      return sendWebQrAudio({
+        channelId,
+        conversationId: input.conversationId,
+        to: input.to,
+        mediaUrl: input.mediaUrl,
+        mimeType: input.mimeType,
+        mediaAssetId: input.mediaAssetId,
+        ptt: input.ptt,
+        companyId: input.companyId,
+      });
+    }
+
+    const version = graphVersion();
+    const repo = getConversationRepository();
+    const creds = await resolveSendCreds(input.conversationId);
+    const to = waTo({ to: input.to, conversationId: input.conversationId });
+
+    const res = await fetch(`${GRAPH}/${version}/${creds.phoneNumberId}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${creds.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to,
+        type: "audio",
+        audio: { link: input.mediaUrl },
+      }),
+    });
+    const json = (await res.json()) as {
+      messages?: { id?: string }[];
+      error?: { message?: string };
+    };
+    if (!res.ok) {
+      throw new Error(json.error?.message ?? "Error enviando el audio.");
+    }
+    const id = json.messages?.[0]?.id ?? `out-${Date.now()}`;
+    const preview = input.ptt === false ? "🔊 Audio" : "🎤 Nota de voz";
+
+    await repo.saveMessage({
+      waMessageId: id,
+      conversationId: input.conversationId,
+      phone: input.to,
+      customerName: "",
+      body: preview,
+      direction: "out",
+      createdAt: new Date().toISOString(),
+      dumoPhoneId: creds.phoneNumberId,
+      messageType: "audio",
+      mediaAssetId: input.mediaAssetId,
+      mediaUrl: input.mediaUrl,
       companyId: input.companyId,
     });
     return { id };

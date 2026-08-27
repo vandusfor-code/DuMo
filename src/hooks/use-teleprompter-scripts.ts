@@ -40,13 +40,14 @@ export function useScriptField(input: {
   flowKey: ScriptFlowKey | null;
   blockId: string | null;
   fieldKey: string | null;
+  carrier: string;
 }) {
   return useQuery({
-    queryKey: ["admin-scripts", "field", input.flowKey, input.blockId, input.fieldKey],
+    queryKey: ["admin-scripts", "field", input.flowKey, input.blockId, input.fieldKey, input.carrier],
     enabled: Boolean(input.flowKey && input.blockId && input.fieldKey),
     queryFn: () =>
       fetchJson<ScriptBlockFieldState>(
-        `/api/admin/scripts?section=field&flowKey=${input.flowKey}&blockId=${input.blockId}&fieldKey=${encodeURIComponent(input.fieldKey ?? "")}`,
+        `/api/admin/scripts?section=field&flowKey=${input.flowKey}&blockId=${input.blockId}&fieldKey=${encodeURIComponent(input.fieldKey ?? "")}&carrier=${input.carrier}`,
       ),
   });
 }
@@ -69,6 +70,7 @@ export function useSaveScriptField() {
       flowKey: ScriptFlowKey;
       blockId: string;
       fieldKey: string;
+      carrier: string;
       templateText: string;
     }) => {
       const response = await fetch("/api/admin/scripts", {
@@ -88,7 +90,14 @@ export function useSaveScriptField() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
-        queryKey: ["admin-scripts", "field", variables.flowKey, variables.blockId, variables.fieldKey],
+        queryKey: [
+          "admin-scripts",
+          "field",
+          variables.flowKey,
+          variables.blockId,
+          variables.fieldKey,
+          variables.carrier,
+        ],
       });
     },
   });
@@ -101,6 +110,7 @@ export function useRestoreScriptField() {
       flowKey: ScriptFlowKey;
       blockId: string;
       fieldKey: string;
+      carrier: string;
     }) =>
       fetchJson<ScriptBlockFieldState>("/api/admin/scripts", {
         method: "POST",
@@ -109,7 +119,14 @@ export function useRestoreScriptField() {
       }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
-        queryKey: ["admin-scripts", "field", variables.flowKey, variables.blockId, variables.fieldKey],
+        queryKey: [
+          "admin-scripts",
+          "field",
+          variables.flowKey,
+          variables.blockId,
+          variables.fieldKey,
+          variables.carrier,
+        ],
       });
     },
   });

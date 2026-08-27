@@ -1,5 +1,7 @@
 # DuMo — Checklist de variables de entorno (Fase 0)
 
+> **⚠️ Post-corte (desde 2026-08-08):** mantener **Vercel activo ≥ 7 días** (hasta ~15 ago 2026). No desactivar el proyecto Vercel — es la red de seguridad para rollback. Ver [`README.md`](../README.md) y [`railway-phase-7-cutover.md`](railway-phase-7-cutover.md).
+
 Copiar de Vercel → Railway CRM (mismo valor, especialmente `AUTH_SECRET`).
 
 ## Base de datos
@@ -20,14 +22,17 @@ Copiar de Vercel → Railway CRM (mismo valor, especialmente `AUTH_SECRET`).
 | `SUPABASE_SERVICE_ROLE_KEY` | Solo servidor, storage |
 | `SUPABASE_STORAGE_BUCKET` | Default `dumo-media` |
 
-## WhatsApp WABA (dulabs / Meta)
+## WhatsApp WABA (dulabs / Meta) — **LEGADO, solo lectura**
+
+> **2026-08-08:** WABA se retira como canal activo. QR es el único flujo para mensajes nuevos. El historial WABA permanece en BD para consulta en Leads.
+
 | Variable | Notas |
 |----------|--------|
-| `WHATSAPP_FORWARD_SECRET` | Webhook dulabs |
-| `WHATSAPP_TOKEN` | Envío Meta |
-| `WHATSAPP_PHONE_NUMBER_ID` | |
-| `META_APP_SECRET` | Firma webhook |
-| `WHATSAPP_PHONE_NUMBER_IDS` | Opcional filtro |
+| `WHATSAPP_FORWARD_SECRET` | Secreto **DuMo ↔ dulabs** (header `X-DuMo-Forward-Secret`). **No es de Meta.** Solo para reenvío webhook / register-number. Opcional si dulabs ya no reenvía |
+| `WHATSAPP_TOKEN` | Envío Meta — ya no usado para mensajes nuevos |
+| `WHATSAPP_PHONE_NUMBER_ID` | Opcional; sin números WABA activos no aplica |
+| `META_APP_SECRET` | Firma webhook Meta directo — legado |
+
 
 ## WhatsApp Web QR (Railway bridge)
 | Variable | Notas |

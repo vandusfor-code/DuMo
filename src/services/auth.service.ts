@@ -13,6 +13,11 @@ import {
   type SessionPayload,
 } from "@/lib/auth/session-cookie";
 import { verifySessionTokenEdge } from "@/lib/auth/session-edge";
+import {
+  assertSessionNotRevoked,
+  canUseJwtFallback,
+  SessionRevokedError,
+} from "@/lib/auth/resolve-session-user";
 import type { AuthRole, AuthUser, LoginResult } from "@/types/auth";
 import { DEFAULT_COMPANY_ID } from "@/types/tenant";
 import { withQueryTimeout } from "@/server/db/client";
@@ -45,10 +50,15 @@ export const authService = {
     return { user, redirectTo: redirectForRole(user.role) };
   },
 
-  async setSessionCookie(userId: string, role?: string, companyId?: string): Promise<void> {
+  async setSessionCookie(
+    userId: string,
+    role?: string,
+    companyId?: string,
+    tokenVersion?: number,
+  ): Promise<void> {
     // El rol debe viajar siempre en el token: un token sin rol deja la sesión
     // sin separación admin/asesora.
-    const token = createSessionToken(userId, role, companyId);
+    const token = createSessionToken(userId, role, companyId, tokenVersion);
     const jar = await cookies();
     jar.set(SESSION_COOKIE, token, sessionCookieOptions());
   },
@@ -59,10 +69,13 @@ export const authService = {
   },
 
   async getSessionUser(): Promise<AuthUser | null> {
-    // Cookie o cabecera Bearer (respaldo si el navegador no guarda cookies).
     const { getSessionToken } = await import("@/lib/require-admin");
     const token = await getSessionToken();
     if (!token) return null;
+    return this.getSessionUserFromToken(token);
+  },
+
+  async getSessionUserFromToken(token: string): Promise<AuthUser | null> {
     const payload = await resolveSessionPayload(token);
     if (!payload) return null;
 
@@ -71,11 +84,18 @@ export const authService = {
         getAuthRepository().findById(payload.userId),
         6000,
       );
-      if (user?.active) {
-        void getAuthRepository().touchLastSeen(user.id);
-        return user;
-      }
+      if (!user?.active) return null;
+      assertSessionNotRevoked(payload, user);
+      void getAuthRepository().touchLastSeen(user.id);
+      return user;
     } catch (err) {
+      if (err instanceof SessionRevokedError) {
+        return null;
+      }
+      if (!canUseJwtFallback(payload)) {
+        console.error("[getSessionUser] DB lookup failed — no JWT fallback (tokenVersion present)", err);
+        return null;
+      }
       console.error("[getSessionUser] DB lookup failed, using JWT fallback", err);
     }
 

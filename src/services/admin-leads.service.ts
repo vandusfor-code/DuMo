@@ -1,5 +1,6 @@
 import "server-only";
 import { getAdminLeadsRepository } from "@/repositories/admin-leads.repository";
+import { getConversationRepository } from "@/repositories/conversation.repository";
 import { commercialPlansService } from "@/services/commercial-plans.service";
 import type {
   AdminAdvisor,
@@ -33,6 +34,10 @@ export const adminLeadsService = {
   },
   getMessages(conversationId: string): Promise<ChatMessage[]> {
     return getAdminLeadsRepository().getMessages(conversationId);
+  },
+  /** Mismo markRead que ya usa asesora — el admin nunca lo llamaba, así que el contador de no leídos no bajaba nunca. */
+  markRead(conversationId: string): Promise<void> {
+    return getConversationRepository().markRead(conversationId);
   },
   listNotes(conversationId: string): Promise<LeadNote[]> {
     return getAdminLeadsRepository().listNotes(conversationId);

@@ -127,4 +127,13 @@ export type SaveLeadResult = {
   /** true si el cliente quedó en la cartera CRM (pantalla Clientes). */
   clientSaved?: boolean;
   clientError?: string | null;
+  /** P1.4 — bandeja cerrada tras aplicar matriz. */
+  inboxClosed?: boolean;
+  inboxState?: import("./inbox-state").InboxState;
+  /** yyyy-mm-dd persistido en lead_gestiones.follow_up_date. */
+  followUpDate?: string | null;
+  /** P4.0 — fila creada en lead_follow_ups. */
+  followUpCreated?: boolean;
+  /** DUO-1 — solo cuando type = "operacion_duo". */
+  duoSaleError?: string | null;
 };

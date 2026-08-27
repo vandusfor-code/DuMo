@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
       tagId: p.get("tagId") ?? undefined,
       status: (p.get("status") as QuickReplyTemplateFilters["status"]) ?? undefined,
       includeDeleted: p.get("includeDeleted") === "1",
+      carrier: p.get("carrier") ?? undefined,
     };
     const data = await withAdminFallback(
       () => quickReplyService.listTemplates(scope, filters),

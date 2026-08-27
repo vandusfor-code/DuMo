@@ -58,6 +58,7 @@ class MockSalesRepository implements SalesRepository {
       status: "pending",
       createdAt: businessDateISO(),
       notes: input.notes ?? "",
+      folioNumber: input.folioNumber ?? "",
       lines: input.lines.map((l) => ({
         phoneNumber: l.phoneNumber,
         saleType: l.saleType,

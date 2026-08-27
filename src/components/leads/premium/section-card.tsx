@@ -28,16 +28,21 @@ export function SectionCard({
 
 export function SectionCardHeader({
   title,
+  subtitle,
   action,
   className,
 }: {
   title: string;
+  subtitle?: string;
   action?: React.ReactNode;
   className?: string;
 }) {
   return (
     <div className={cn("flex items-center justify-between gap-3 px-5 py-4", className)}>
-      <h3 className="text-[16px] font-semibold leading-[1.45] text-ink">{title}</h3>
+      <div>
+        <h3 className="text-[16px] font-semibold leading-[1.45] text-ink">{title}</h3>
+        {subtitle && <p className="mt-0.5 text-[13px] text-muted">{subtitle}</p>}
+      </div>
       {action}
     </div>
   );

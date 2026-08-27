@@ -1,4 +1,5 @@
 import {
+  ArchiveRestore,
   Bell,
   CircleDollarSign,
   FileText,
@@ -7,6 +8,7 @@ import {
   LineChart,
   LogOut,
   MessagesSquare,
+  PhoneCall,
   User,
   Users,
   type LucideIcon,
@@ -28,6 +30,8 @@ export const PRIMARY_NAV: NavItem[] = [
   { label: "Inicio", href: "/dashboard", icon: Home },
   { label: "Mis ventas", href: "/dashboard/mis-ventas", icon: FileText },
   { label: "Leads", href: "/dashboard/leads", icon: MessagesSquare },
+  { label: "Recuperación", href: "/dashboard/recuperacion", icon: ArchiveRestore },
+  { label: "Ventas por cerrar", href: "/dashboard/ventas-por-cerrar", icon: PhoneCall },
   { label: "Clientes", href: "/dashboard/clientes", icon: Users },
   { label: "Reportes", href: "/dashboard/reportes", icon: LineChart },
   { label: "Comisiones", href: "/dashboard/comisiones", icon: CircleDollarSign },

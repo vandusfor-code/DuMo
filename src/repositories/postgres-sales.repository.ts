@@ -25,7 +25,7 @@ import type { AdvisorScope } from "@/lib/advisor-scope";
 import { matchesAdvisor } from "@/lib/advisor-scope";
 import { getAuthRepository } from "@/repositories/auth.repository";
 import { getCommercialConfigurationRepository } from "@/repositories/commercial-configuration.repository";
-import { buildPlanValueIndex } from "@/lib/commercial-plan";
+import { buildPlanValueIndex, findCommercialPlanById } from "@/lib/commercial-plan";
 import { findPlanCommission } from "@/data/mock/commercial-config.mock";
 import {
   economicProgress,
@@ -36,6 +36,7 @@ import {
 } from "@/lib/commercial-settings";
 import { ADMIN_DASHBOARD_MOCK } from "@/data/mock/admin-dashboard.mock";
 import { ensureSchema, getSql, withDbRetry, withQueryTimeout } from "@/server/db/client";
+import { FolioNumberValidationError } from "@/lib/folio-number";
 import {
   adminDateInPeriod,
   adminTypeToCanonical,
@@ -66,6 +67,13 @@ type SaleRow = {
   notes: string;
   created_at: string | Date;
   line_count?: number | string;
+  /** DUO-4 — cuando no es null, la comisión de esta venta es este valor fijo
+   * en vez de perLine(plan) * lines (solo se escribe en ventas de Operación
+   * Duo, para que la asesora de origen cobre la mitad). */
+  commission_override?: number | string | null;
+  /** DUO-4/5 — referencia a duo_sales cuando esta venta viene de un cierre. */
+  duo_sale_id?: string | null;
+  folio_number?: string | null;
 };
 
 type LineRow = {
@@ -176,6 +184,12 @@ function rowToAdminSale(
     dumoValue,
     status: row.status as AdminSale["status"],
     lines: lineCount(row),
+    isDuo: Boolean(row.duo_sale_id),
+    commissionOverride:
+      row.commission_override === null || row.commission_override === undefined
+        ? null
+        : Number(row.commission_override),
+    folioNumber: row.folio_number ?? "",
   };
 }
 
@@ -247,6 +261,8 @@ export class PostgresSalesStore {
         date: isoFromRow(row),
         lines: lineCount(row),
         status: toAdvisorStatus(row.status),
+        isDuo: Boolean(row.duo_sale_id),
+        folioNumber: row.folio_number ?? "",
       }));
     } catch (err) {
       console.error("[listSummaries]", err);
@@ -290,6 +306,7 @@ export class PostgresSalesStore {
       status: toAdvisorStatus(row.status),
       createdAt: isoFromRow(row),
       notes: row.notes ?? "",
+      folioNumber: row.folio_number ?? "",
       lines: lines.map((l) => ({
         phoneNumber: l.phone_number,
         saleType: adminTypeToCanonical(toAdminSaleType(l.sale_type)),
@@ -326,29 +343,54 @@ export class PostgresSalesStore {
     const id = `VTA-${year}-${String(seq).padStart(5, "0")}`;
     const now = new Date();
     const today = businessDateISO(now);
-    const primaryType = input.lines[0]?.saleType ?? "portability";
+    const config = await getCommercialConfigurationRepository().getSnapshot();
+    const primaryLine = input.lines[0];
+    const primaryType = primaryLine?.saleType ?? "portability";
     const adminType = canonicalToAdminType(primaryType);
+    const primaryPlan = primaryLine?.planId
+      ? findCommercialPlanById(primaryLine.planId, config.plans)
+      : undefined;
+    const planName = primaryPlan?.name ?? "";
+    const operatorValue = primaryPlan?.womValue ?? 0;
+    const dumoValue = primaryPlan?.dumoValue ?? 0;
 
-    await withDbRetry(async () => {
-      await sql`
+    const folioNumber = input.folioNumber?.trim() ?? "";
+
+    await sql.begin(async (tx) => {
+      if (folioNumber) {
+        // Registro atómico de unicidad — si el folio ya fue usado (por otra
+        // venta o por un cierre de Operación Duo), la PK duplicada revierte
+        // toda la transacción antes de tocar sales/sale_lines.
+        try {
+          await tx`INSERT INTO folio_numbers (folio_number, sale_id) VALUES (${folioNumber}, ${id})`;
+        } catch {
+          throw new FolioNumberValidationError(
+            "Ese número de folio ya fue usado en otra venta. Verifícalo e intenta de nuevo.",
+          );
+        }
+      }
+
+      await tx`
         INSERT INTO sales (
           id, customer_name, rut, phone, email, advisor_id, advisor_name,
-          status, sale_type, plan, operator_value, sale_date, notes, created_at
+          status, sale_type, plan, operator_value, dumo_value, sale_date, notes, created_at, folio_number, carrier
         ) VALUES (
           ${id}, ${input.customerName}, ${input.rut}, ${input.phone},
           ${input.email ?? ""}, ${advisorId}, ${advisorName}, ${"registrada"},
-          ${adminType}, ${""}, ${0}, ${today}, ${input.notes ?? ""}, ${now.toISOString()}
+          ${adminType}, ${planName}, ${operatorValue}, ${dumoValue}, ${today},
+          ${input.notes ?? ""}, ${now.toISOString()}, ${folioNumber}, ${input.carrier ?? "wom"}
         )
       `;
       for (let i = 0; i < input.lines.length; i++) {
         const l = input.lines[i];
         const lineAdminType = canonicalToAdminType(l.saleType);
-        await sql`
+        const linePlanId = l.planId?.trim() ?? primaryLine?.planId?.trim() ?? "";
+        await tx`
           INSERT INTO sale_lines (
             id, sale_id, phone_number, sale_type, device_name, plan_id, status
           ) VALUES (
             ${`${id}-L${i + 1}`}, ${id}, ${l.phoneNumber}, ${lineAdminType},
-            ${l.deviceName ?? ""}, ${""}, ${"registrada"}
+            ${l.deviceName ?? ""}, ${linePlanId}, ${"registrada"}
           )
         `;
       }
@@ -433,6 +475,22 @@ export class PostgresSalesStore {
     const sales = (await fetchSalesWithLineCounts()).map((r) => rowToAdminSale(r, planIndex));
     const paidRows = await this.loadCommissionPayments(filters.month, filters.year);
 
+    // DUO-4: comisión de cierre de Operación Duo, sumada por asesora para el
+    // mismo período que se está calculando.
+    const allExtras = await this.loadCommissionExtras(null);
+    const extrasByAdvisor = new Map<string, number>();
+    for (const extra of allExtras) {
+      const created = extra.created_at instanceof Date ? extra.created_at : new Date(extra.created_at);
+      const matchesPeriod =
+        String(created.getMonth() + 1).padStart(2, "0") === filters.month.padStart(2, "0") &&
+        String(created.getFullYear()) === filters.year;
+      if (!matchesPeriod) continue;
+      extrasByAdvisor.set(
+        extra.advisor_id,
+        (extrasByAdvisor.get(extra.advisor_id) ?? 0) + Number(extra.amount),
+      );
+    }
+
     const rows = await Promise.all(
       advisors.map(async (advisor) => {
         const advisorSales = sales.filter(
@@ -441,9 +499,15 @@ export class PostgresSalesStore {
         const finalized = advisorSales.filter((s) => s.status === "finalizada");
         let calculatedCommission = 0;
         for (const sale of finalized) {
+          if (sale.commissionOverride != null) {
+            calculatedCommission += sale.commissionOverride;
+            continue;
+          }
           const perLine = findPlanCommission(sale.plan, config.plans);
           calculatedCommission += perLine * sale.lines;
         }
+        // DUO-4: comisión de cierre de Operación Duo — no tiene fila en sales.
+        calculatedCommission += extrasByAdvisor.get(advisor.id) ?? 0;
 
         const paidRecord = paidRows.find((p) => p.advisor_id === advisor.id);
         const status: AdminCommissionStatus =
@@ -515,10 +579,10 @@ export class PostgresSalesStore {
       );
 
     const saleDetails = sales.map((s) => {
-      const commission = findPlanCommission(s.plan, config.plans) * s.lines;
+      const commission = s.commissionOverride ?? findPlanCommission(s.plan, config.plans) * s.lines;
       return {
         saleId: s.id,
-        customerName: s.customerName,
+        customerName: s.isDuo ? `${s.customerName} (Operación Duo)` : s.customerName,
         date: s.date,
         plan: s.plan,
         lines: s.lines,
@@ -526,6 +590,28 @@ export class PostgresSalesStore {
         commission,
       };
     });
+
+    // DUO-4: entradas de cierre de Operación Duo del período, sin fila en sales.
+    const advisorExtras = (await this.loadCommissionExtras(null)).filter((e) => {
+      if (e.advisor_id !== advisorId) return false;
+      const created = e.created_at instanceof Date ? e.created_at : new Date(e.created_at);
+      return (
+        String(created.getMonth() + 1).padStart(2, "0") === filters.month.padStart(2, "0") &&
+        String(created.getFullYear()) === filters.year
+      );
+    });
+    for (const extra of advisorExtras) {
+      const created = extra.created_at instanceof Date ? extra.created_at : new Date(extra.created_at);
+      saleDetails.push({
+        saleId: extra.sale_id ?? extra.id,
+        customerName: `${extra.customer_name} — ${extra.label}`,
+        date: toAdminDate(created.toISOString().slice(0, 10)),
+        plan: "",
+        lines: 0,
+        womValue: 0,
+        commission: Number(extra.amount),
+      });
+    }
 
     return {
       advisor,
@@ -592,6 +678,22 @@ export class PostgresSalesStore {
     );
   }
 
+  /** DUO-4 — entradas de comisión sin venta propia (ej. cierre de Operación Duo). */
+  private async loadCommissionExtras(
+    scope: AdvisorScope | null,
+  ): Promise<
+    { id: string; advisor_id: string; label: string; amount: number | string; duo_sale_id: string | null; sale_id: string | null; customer_name: string; created_at: string | Date }[]
+  > {
+    await ensureSchema();
+    const sql = getSql();
+    if (!sql) return [];
+    return withDbRetry(() =>
+      scope?.id
+        ? sql`SELECT * FROM commission_extras WHERE advisor_id = ${scope.id} ORDER BY created_at DESC`
+        : sql`SELECT * FROM commission_extras ORDER BY created_at DESC`,
+    );
+  }
+
   async listAdvisorCommissions(
     month?: string,
     scope: AdvisorScope | null = null,
@@ -622,8 +724,15 @@ export class PostgresSalesStore {
         const iso = isoFromRow(row);
         if (!isoDateInMonth(iso, monthKey)) continue;
         const lines = lineCount(row);
+        // DUO-4: si la venta trae commission_override (asesora de origen de
+        // una Operación Duo), se usa ese valor fijo en vez de la fórmula
+        // normal — para cualquier venta sin override, el cálculo no cambia.
+        const overrideValue =
+          row.commission_override === null || row.commission_override === undefined
+            ? null
+            : Number(row.commission_override);
         const perLine = findPlanCommission(row.plan ?? "", plans);
-        const amount = perLine * lines;
+        const amount = overrideValue ?? perLine * lines;
         const paid = row.advisor_id ? paidByAdvisorMonth.get(row.advisor_id) : false;
         commissions.push({
           id: `COM-${row.id.replace(/^VTA-/, "")}`,
@@ -632,6 +741,30 @@ export class PostgresSalesStore {
           date: iso,
           lines,
           amount,
+          status: paid ? "paid" : "pending",
+          paymentDate: paid ? `${monthKey}-05` : null,
+        });
+      }
+
+      // DUO-4: comisión de la asesora de cierre — no tiene fila en sales, así
+      // que no está en `rows`. Se agrega aparte y se pesa contra el mismo
+      // flag de "mes pagado" que ya cubre el resto de sus comisiones.
+      const extras = await this.loadCommissionExtras(scope);
+      for (const extra of extras) {
+        const created =
+          extra.created_at instanceof Date
+            ? extra.created_at.toISOString()
+            : String(extra.created_at);
+        const iso = created.slice(0, 10);
+        if (!isoDateInMonth(iso, monthKey)) continue;
+        const paid = paidByAdvisorMonth.get(extra.advisor_id);
+        commissions.push({
+          id: `COM-${extra.id}`,
+          saleId: extra.sale_id ?? "",
+          customerName: `${extra.customer_name} — ${extra.label}`,
+          date: iso,
+          lines: 0,
+          amount: Number(extra.amount),
           status: paid ? "paid" : "pending",
           paymentDate: paid ? `${monthKey}-05` : null,
         });
@@ -735,6 +868,7 @@ export class PostgresSalesStore {
           status: toAdvisorStatus(v.status),
           saleType: adminTypeToCanonical(toAdminSaleType(v.sale_type)),
           plan: v.plan ?? "",
+          folioNumber: v.folio_number ?? "",
         }));
 
       const pending = rows.filter((v) => toAdvisorStatus(v.status) === "pending").length;

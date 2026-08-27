@@ -29,6 +29,7 @@ export default function AdminConfigComercialPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<CommercialPlan | null>(null);
+  const [carrierFilter, setCarrierFilter] = useState("wom");
 
   return (
     <div>
@@ -47,7 +48,9 @@ export default function AdminConfigComercialPage() {
       ) : (
         <div className="space-y-5">
           <CommercialPlansTable
-            plans={data.plans}
+            plans={data.plans.filter((p) => p.operator === carrierFilter)}
+            carrierFilter={carrierFilter}
+            onCarrierFilterChange={setCarrierFilter}
             onCreate={() => { setEditing(null); setDialogOpen(true); }}
             onEdit={(p) => { setEditing(p); setDialogOpen(true); }}
             onDuplicate={(id) => duplicatePlan.mutate(id)}
@@ -64,6 +67,7 @@ export default function AdminConfigComercialPage() {
       <CommercialPlanDialog
         open={dialogOpen}
         initial={editing}
+        defaultCarrier={carrierFilter}
         onClose={() => setDialogOpen(false)}
         onSave={(values) => {
           if (editing) {

@@ -29,12 +29,34 @@ import {
   getContentType,
   makeCacheableSignalKeyStore,
 } from "@whiskeysockets/baileys";
+import { processInboundAudioMessage } from "./inbound-audio.js";
+import { processInboundImageMessage } from "./inbound-image.js";
+import { prepareWhatsAppAudio } from "./audio-transcode.js";
+import {
+  assertAllowedInboundAudioMime,
+  extensionFromAudioMime,
+  isSupabaseStorageConfigured,
+  MAX_INBOUND_AUDIO_BYTES,
+  newMediaAssetId,
+} from "./media-config.js";
+import { getSupabaseStorageStatus } from "./supabase-upload.js";
 
 const log = pino({ level: process.env.LOG_LEVEL ?? "info" });
 const msgRetryCounterCache = new NodeCache();
 const PORT = Number(process.env.PORT ?? 8787);
 const BRIDGE_SECRET = process.env.BRIDGE_SECRET ?? "";
 const SESSIONS_DIR = process.env.SESSIONS_DIR ?? "./data/sessions";
+
+/**
+ * Backoff para el reintento automático genérico (cortes que no son logout ni
+ * connectionReplaced — esos dos ya tienen su propio manejo). Sin esto, un
+ * problema persistente (de red, de WhatsApp, o de una restricción de cuenta)
+ * reintentaría cada 3s para siempre — ese patrón por sí solo puede parecer
+ * actividad automatizada sospechosa ante WhatsApp, independiente de la
+ * carrera de sockets ya corregida.
+ */
+const RECONNECT_BACKOFF_MS = [3000, 8000, 20000, 45000, 90000, 120000];
+const RECONNECT_MAX_ATTEMPTS = 10;
 
 if (!BRIDGE_SECRET) {
   console.error("Falta BRIDGE_SECRET");
@@ -247,30 +269,118 @@ async function forwardInboundToDuMo(session, msg, upsertType) {
   }
 
   const text = extractMessageText(msg);
-  const isImage = Boolean(extractMessageContent(msg.message ?? {})?.imageMessage);
-  if (!text && !isImage) {
+  const content = extractMessageContent(msg.message ?? {});
+  const isImage = Boolean(content?.imageMessage);
+  const isAudio = Boolean(content?.audioMessage);
+  if (!text && !isImage && !isAudio) {
     rememberMessage(msg);
     return;
   }
 
   rememberMessage(msg);
   const ts = Number(msg.messageTimestamp ?? Math.floor(Date.now() / 1000));
+  const resolvedPhone = senderPhone ?? from;
+
+  /** @type {Record<string, unknown>} */
+  const payload = {
+    channelId: session.channelId,
+    from: resolvedPhone,
+    senderJid,
+    messageId: msg.key.id ?? `qr-${Date.now()}`,
+    timestamp: ts,
+    type: isImage ? "image" : isAudio ? "audio" : "text",
+    text: text || undefined,
+    customerName: msg.pushName ?? "",
+  };
+
+  if (isAudio) {
+    if (!isSupabaseStorageConfigured()) {
+      log.error({ channelId: session.channelId, messageId: msg.key.id }, "audio QR: Supabase no configurado");
+      payload.type = "text";
+      payload.text =
+        "⚠️ No se pudo recibir el audio (almacenamiento no configurado). Pide al cliente que lo reenvíe.";
+    } else if (!session.sock) {
+      log.error({ channelId: session.channelId, messageId: msg.key.id }, "audio QR: socket no conectado");
+      payload.type = "text";
+      payload.text = "⚠️ No se pudo recibir el audio. Pide al cliente que lo reenvíe.";
+    } else {
+      try {
+        const audio = await processInboundAudioMessage({
+          sock: session.sock,
+          msg,
+          audioMessage: content.audioMessage,
+          phone: resolvedPhone,
+        });
+        payload.mediaUrl = audio.publicUrl;
+        payload.mimeType = audio.mimeType;
+        payload.audioPtt = audio.ptt;
+        if (!payload.text) {
+          payload.text = audio.ptt ? "🎤 Nota de voz" : "🔊 Audio";
+        }
+      } catch (err) {
+        log.error(
+          { err, channelId: session.channelId, messageId: msg.key.id },
+          "audio QR: descarga o upload falló",
+        );
+        payload.type = "text";
+        payload.text =
+          err instanceof Error && err.message.includes("no compatible")
+            ? `⚠️ ${err.message}`
+            : "⚠️ No se pudo recibir el audio. Pide al cliente que lo reenvíe.";
+      }
+    }
+  }
+
+  if (isImage) {
+    if (!isSupabaseStorageConfigured()) {
+      log.error({ channelId: session.channelId, messageId: msg.key.id }, "image QR: Supabase no configurado");
+      payload.type = "text";
+      payload.text =
+        "⚠️ No se pudo recibir la imagen (almacenamiento no configurado). Pide al cliente que la reenvíe.";
+    } else if (!session.sock) {
+      log.error({ channelId: session.channelId, messageId: msg.key.id }, "image QR: socket no conectado");
+      payload.type = "text";
+      payload.text = "⚠️ No se pudo recibir la imagen. Pide al cliente que la reenvíe.";
+    } else {
+      try {
+        const image = await processInboundImageMessage({
+          sock: session.sock,
+          msg,
+          imageMessage: content.imageMessage,
+          phone: resolvedPhone,
+        });
+        payload.mediaUrl = image.publicUrl;
+        payload.mimeType = image.mimeType;
+        if (image.caption) payload.caption = image.caption;
+        if (!payload.text) {
+          payload.text = image.caption || "📷 Imagen";
+        }
+      } catch (err) {
+        log.error(
+          { err, channelId: session.channelId, messageId: msg.key.id },
+          "image QR: descarga o upload falló",
+        );
+        payload.type = "text";
+        payload.text = "⚠️ No se pudo recibir la imagen. Pide al cliente que la reenvíe.";
+      }
+    }
+  }
 
   await notifyDuMo(session, {
     type: "message.inbound",
-    payload: {
-      channelId: session.channelId,
-      from: senderPhone ?? from,
-      senderJid,
-      messageId: msg.key.id ?? `qr-${Date.now()}`,
-      timestamp: ts,
-      type: isImage ? "image" : "text",
-      text: text || undefined,
-      customerName: msg.pushName ?? "",
-    },
+    payload,
   });
   log.info(
-    { channelId: session.channelId, from, senderJid, messageId: msg.key.id, upsertType, text: text?.slice(0, 40) },
+    {
+      channelId: session.channelId,
+      from,
+      senderJid,
+      messageId: msg.key.id,
+      upsertType,
+      inboundType: payload.type,
+      hasMediaUrl: Boolean(payload.mediaUrl),
+      text: typeof payload.text === "string" ? payload.text.slice(0, 40) : undefined,
+    },
     "mensaje QR reenviado a DuMo",
   );
 }
@@ -299,6 +409,22 @@ function createSessionRuntime(channelId, overrides = {}) {
     qrDataUrl: null,
     phoneNumber: null,
     sock: null,
+    // true desde que arranca un intento de conexión hasta que llega a un
+    // estado terminal (open o close) — a diferencia de `starting`, cubre
+    // TODO el handshake con WhatsApp, no solo el setup síncrono. Es lo que
+    // evita que un POST /sessions (disparado por cada envío saliente de
+    // DuMo) abra un SEGUNDO socket mientras el reintento automático tras un
+    // corte todavía está en curso — eso era lo que producía dos sockets
+    // vivos con las mismas credenciales peleándose (connectionReplaced en
+    // bucle infinito).
+    connecting: false,
+    connectAttempt: 0,
+    // Cuenta cortes consecutivos (se resetea a 0 al llegar a "open"). Maneja
+    // el backoff/tope del reintento genérico — ver RECONNECT_BACKOFF_MS más
+    // abajo. Sin esto, un problema persistente (no solo la carrera ya
+    // corregida) reintentaría cada 3s para siempre, lo cual por sí solo
+    // puede parecer actividad automatizada sospechosa ante WhatsApp.
+    consecutiveCloses: 0,
     lastError: null,
     lastWebhookStatus: null,
     lastWebhookError: null,
@@ -475,6 +601,54 @@ async function fetchImageFromUrl(mediaUrl) {
   }
 }
 
+
+async function fetchAudioFromUrl(audioUrl) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), MEDIA_FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(audioUrl, { signal: controller.signal, redirect: "follow" });
+    if (!res.ok) {
+      throw new Error(`No se pudo descargar audio (HTTP ${res.status})`);
+    }
+
+    const contentLength = Number(res.headers.get("content-length") ?? 0);
+    if (contentLength > MAX_INBOUND_AUDIO_BYTES) {
+      throw new Error(`Audio demasiado grande (máx ${MAX_INBOUND_AUDIO_BYTES} bytes)`);
+    }
+
+    const buffer = Buffer.from(await res.arrayBuffer());
+    if (buffer.length > MAX_INBOUND_AUDIO_BYTES) {
+      throw new Error(`Audio demasiado grande (máx ${MAX_INBOUND_AUDIO_BYTES} bytes)`);
+    }
+
+    const headerMime = res.headers.get("content-type") ?? undefined;
+    let mimeType;
+    try {
+      mimeType = assertAllowedInboundAudioMime(headerMime, false);
+    } catch {
+      const ext = path.extname(new URL(audioUrl).pathname).toLowerCase();
+      if (ext === ".mp3") mimeType = assertAllowedInboundAudioMime("audio/mpeg", false);
+      else if (ext === ".ogg" || ext === ".opus") {
+        mimeType = assertAllowedInboundAudioMime("audio/ogg", true);
+      } else if (ext === ".webm") {
+        mimeType = assertAllowedInboundAudioMime("audio/webm", false);
+      } else {
+        throw new Error(
+          `Formato de audio no compatible (${headerMime || ext || "desconocido"}). Usa OGG/Opus o MP3.`,
+        );
+      }
+    }
+    return { buffer, mimeType };
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error("Timeout descargando audio");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** @returns {Promise<SessionRuntime>} */
 async function getConnectedSession(channelId) {
   const sessionId = `bridge-${channelId}`;
@@ -520,8 +694,13 @@ function mapOutboundSessionError(err, res) {
 }
 
 async function startBaileys(session) {
-  if (session.starting) return;
-  session.starting = true;
+  // Cubre TODO el intento de conexión (hasta open/close), no solo el setup
+  // síncrono — ver comentario en createSessionRuntime(). Si ya hay un
+  // intento en curso, no arrancar uno segundo (eso era lo que producía dos
+  // sockets vivos con las mismas credenciales).
+  if (session.connecting) return;
+  session.connecting = true;
+  const myAttempt = ++session.connectAttempt;
 
   try {
     if (session.sock) {
@@ -584,6 +763,10 @@ async function startBaileys(session) {
   sock.ev.on("connection.update", async (update) => {
     const { connection, lastDisconnect, qr } = update;
 
+    // Evento tardío de un socket ya reemplazado por un intento más nuevo —
+    // ignorar por completo, no tocar el estado de la sesión actual.
+    if (myAttempt !== session.connectAttempt) return;
+
     if (qr) {
       session.status = "QR_PENDING";
       session.qrDataUrl = await QRCode.toDataURL(qr, { margin: 1, width: 280 });
@@ -592,6 +775,8 @@ async function startBaileys(session) {
     }
 
     if (connection === "open") {
+      session.connecting = false;
+      session.consecutiveCloses = 0;
       if (!session.webhookUrl && process.env.DUMO_WEBHOOK_URL) {
         session.webhookUrl = process.env.DUMO_WEBHOOK_URL.trim();
       }
@@ -620,6 +805,7 @@ async function startBaileys(session) {
 
     if (connection === "close") {
       const code = lastDisconnect?.error?.output?.statusCode;
+      session.connecting = false;
       session.status = "DISCONNECTED";
       session.sock = null;
       session.qrDataUrl = null;
@@ -639,8 +825,48 @@ async function startBaileys(session) {
 
       await notifyDuMo(session, { type: "session.disconnected", channelId: session.channelId });
 
-      log.info({ channelId: session.channelId, code }, "reconectando Baileys…");
-      setTimeout(() => startBaileys(session).catch((e) => log.error(e)), 3000);
+      if (code === DisconnectReason.connectionReplaced) {
+        // Otra conexión con las mismas credenciales ya tomó esta sesión —
+        // reintentar de inmediato es exactamente lo que producía el bucle
+        // infinito (cada lado se reemplaza al otro sin parar). No reintentar
+        // acá: la sesión "ganadora" (la que sí sigue conectada) se queda
+        // tranquila, y el próximo trigger legítimo (un envío saliente vía
+        // ensureWebQrBridgeReady, o un reconecte manual desde el admin)
+        // arranca UN solo intento limpio, protegido por `connecting`.
+        log.warn(
+          { channelId: session.channelId },
+          "conexión reemplazada por otra sesión con las mismas credenciales — no se reintenta automáticamente",
+        );
+        return;
+      }
+
+      session.consecutiveCloses += 1;
+
+      if (session.consecutiveCloses > RECONNECT_MAX_ATTEMPTS) {
+        // Cortes repetidos sin lograr abrir una sola vez — seguir
+        // reintentando en bucle es justo el patrón que puede leerse como
+        // actividad automatizada sospechosa. Se detiene solo: el próximo
+        // trigger legítimo (envío saliente o reconecte manual desde el
+        // admin) vuelve a arrancar desde cero, con consecutiveCloses en 0.
+        log.error(
+          { channelId: session.channelId, code, attempts: session.consecutiveCloses },
+          "demasiados cortes seguidos — se detiene el reintento automático, requiere reconexión manual",
+        );
+        return;
+      }
+
+      const delayMs =
+        RECONNECT_BACKOFF_MS[Math.min(session.consecutiveCloses - 1, RECONNECT_BACKOFF_MS.length - 1)];
+      log.info({ channelId: session.channelId, code, delayMs, attempt: session.consecutiveCloses }, "reconectando Baileys…");
+      // Si para cuando dispare este timer ya hay un intento más nuevo en
+      // curso o conectado (disparado por otra vía, p. ej. un POST /sessions
+      // que llegó mientras tanto), no pisarlo — este reintento programado ya
+      // quedó obsoleto.
+      const scheduledForAttempt = session.connectAttempt;
+      setTimeout(() => {
+        if (session.connectAttempt !== scheduledForAttempt) return;
+        startBaileys(session).catch((e) => log.error(e));
+      }, delayMs);
     }
   });
 
@@ -665,8 +891,13 @@ async function startBaileys(session) {
       await forwardInboundToDuMo(session, msg, "update");
     }
   });
-  } finally {
-    session.starting = false;
+  } catch (err) {
+    // Falló el setup síncrono (auth state, fetchLatestBaileysVersion, etc.)
+    // antes de siquiera abrir el socket — nunca llegará un evento open/close
+    // que libere `connecting`, así que hay que liberarlo acá o la sesión
+    // quedaría bloqueada para siempre sin poder reintentar.
+    session.connecting = false;
+    throw err;
   }
 }
 
@@ -698,7 +929,7 @@ app.post("/sessions", auth, async (req, res) => {
     if (label) session.label = label;
     if (trimmedWebhookUrl) session.webhookUrl = trimmedWebhookUrl;
     if (trimmedWebhookSecret) session.webhookSecret = trimmedWebhookSecret;
-    if (!session.sock && session.status !== "QR_PENDING") {
+    if (!session.sock && !session.connecting && session.status !== "QR_PENDING") {
       log.info({ channelId }, "reiniciando sesión Baileys en memoria");
       startBaileys(session).catch((err) => {
         session.lastError = err instanceof Error ? err.message : String(err);
@@ -860,6 +1091,117 @@ app.post("/send-media", auth, async (req, res) => {
   }
 });
 
+
+app.post("/send-audio", auth, async (req, res) => {
+  const { channelId, to, jid, mediaUrl, mimeType, ptt } = req.body ?? {};
+  if (!channelId) return res.status(400).json({ error: "channelId requerido" });
+
+  let validatedUrl;
+  try {
+    validatedUrl = validateMediaUrl(mediaUrl);
+  } catch (err) {
+    return res.status(400).json({
+      error: err instanceof Error ? err.message : "mediaUrl inválida",
+    });
+  }
+
+  let session;
+  try {
+    session = await getConnectedSession(channelId);
+  } catch (err) {
+    const mapped = mapOutboundSessionError(err, res);
+    if (mapped) return mapped;
+    throw err;
+  }
+
+  try {
+    const targetJid = await resolveSendJid(session, { to, jid });
+    const { buffer, mimeType: fetchedMime } = await fetchAudioFromUrl(validatedUrl);
+    const wantPtt = ptt !== false;
+    let resolvedMime;
+    try {
+      resolvedMime =
+        typeof mimeType === "string" && mimeType.trim()
+          ? assertAllowedInboundAudioMime(mimeType, wantPtt)
+          : fetchedMime;
+    } catch {
+      resolvedMime = fetchedMime;
+    }
+
+    const prepared = await prepareWhatsAppAudio(buffer, resolvedMime, wantPtt);
+
+    log.info(
+      {
+        channelId,
+        targetJid,
+        inputJid: jid,
+        to,
+        bytesIn: buffer.length,
+        bytesOut: prepared.buffer.length,
+        mimeType: prepared.mimeType,
+        ptt: prepared.ptt,
+        transcoded: prepared.mimeType !== resolvedMime,
+      },
+      "enviando audio QR",
+    );
+
+    const sent = await session.sock.sendMessage(targetJid, {
+      audio: prepared.buffer,
+      mimetype: prepared.mimeType,
+      ptt: prepared.ptt,
+    });
+    if (sent?.message) rememberMessage(sent);
+    res.json({ id: sent?.key?.id ?? `out-${Date.now()}`, jid: targetJid });
+  } catch (err) {
+    log.error({ err, channelId, to, jid, mediaUrl: validatedUrl }, "send-audio falló");
+    res.status(502).json({
+      error: err instanceof Error ? err.message : "No se pudo enviar audio por WhatsApp Web",
+    });
+  }
+});
+
+/**
+ * Validación PCS — consulta en lote si los números tienen WhatsApp activo,
+ * usando la sesión ya conectada (no crea sesión nueva). Lote pensado para
+ * ~20-30 números por llamada; el llamador (worker de DuMo) es responsable
+ * de trocear listas grandes y pausar entre lotes.
+ */
+app.post("/check-numbers", auth, async (req, res) => {
+  const { channelId, numeros } = req.body ?? {};
+  if (!channelId) return res.status(400).json({ error: "channelId requerido" });
+  if (!Array.isArray(numeros) || numeros.length === 0) {
+    return res.status(400).json({ error: "numeros (array) requerido" });
+  }
+
+  let session;
+  try {
+    session = await getConnectedSession(channelId);
+  } catch (err) {
+    const mapped = mapOutboundSessionError(err, res);
+    if (mapped) return mapped;
+    throw err;
+  }
+
+  try {
+    const results = await session.sock.onWhatsApp(...numeros);
+    const foundByDigits = new Map(
+      (results ?? [])
+        .filter((r) => r?.exists)
+        .map((r) => [phoneFromJid(r.jid), r.jid]),
+    );
+    const payload = numeros.map((pcs) => {
+      const jid = foundByDigits.get(String(pcs).replace(/\D/g, ""));
+      return { pcs, exists: Boolean(jid), jid: jid ?? null };
+    });
+    res.json(payload);
+  } catch (err) {
+    log.error({ err, channelId, count: numeros.length }, "check-numbers falló");
+    res.status(502).json({
+      error: err instanceof Error ? err.message : "No se pudo consultar WhatsApp",
+    });
+  }
+});
+
 app.post("/test-webhook", auth, async (req, res) => {
   const { channelId } = req.body ?? {};
   if (!channelId) return res.status(400).json({ error: "channelId requerido" });
@@ -882,6 +1224,56 @@ app.post("/test-webhook", auth, async (req, res) => {
   });
 });
 
+app.post("/debug/supabase-audio-upload", auth, async (req, res) => {
+  const { audioUrl, phone = "57000000000", ptt = false } = req.body ?? {};
+
+  if (!isSupabaseStorageConfigured()) {
+    return res.status(503).json({
+      error: "Supabase Storage no configurado en el bridge.",
+      storage: getSupabaseStorageStatus(),
+    });
+  }
+
+  try {
+    let buffer;
+    let mimeType;
+    if (audioUrl) {
+      const validatedUrl = validateMediaUrl(audioUrl);
+      ({ buffer, mimeType } = await fetchAudioFromUrl(validatedUrl));
+    } else {
+      buffer = Buffer.from(
+        "OggS\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+        "binary",
+      );
+      mimeType = assertAllowedInboundAudioMime("audio/ogg; codecs=opus", Boolean(ptt));
+    }
+
+    const assetId = newMediaAssetId();
+    const extension = extensionFromAudioMime(mimeType);
+    const uploaded = await uploadInboundAudioToSupabase({
+      phone: String(phone).replace(/\D/g, "") || "57000000000",
+      assetId,
+      extension,
+      data: buffer,
+      contentType: mimeType,
+    });
+
+    res.json({
+      ok: true,
+      publicUrl: uploaded.publicUrl,
+      storagePath: uploaded.storagePath,
+      mimeType,
+      bytes: buffer.length,
+      phone: String(phone).replace(/\D/g, "") || "57000000000",
+    });
+  } catch (err) {
+    log.error({ err, audioUrl }, "debug supabase-audio-upload falló");
+    res.status(502).json({
+      error: err instanceof Error ? err.message : "No se pudo subir audio de prueba",
+    });
+  }
+});
+
 app.get("/health", (_req, res) => {
   const persistedChannelIds = listPersistedChannelIds();
   res.json({
@@ -893,6 +1285,9 @@ app.get("/health", (_req, res) => {
     webhookEnvConfigured: Boolean(
       (process.env.DUMO_WEBHOOK_URL ?? "").trim() && (process.env.DUMO_WEBHOOK_SECRET ?? "").trim(),
     ),
+    supabaseStorage: getSupabaseStorageStatus(),
+    inboundAudioEnabled: isSupabaseStorageConfigured(),
+    inboundImageEnabled: isSupabaseStorageConfigured(),
     active: [...sessions.values()].map((s) => ({
       channelId: s.channelId,
       status: s.status,

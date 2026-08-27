@@ -1,14 +1,13 @@
 "use client";
 
 import { useState, type FormEvent, type ReactNode } from "react";
-import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { LoginLogo } from "./login-logo";
 import { ApiError, apiPost } from "@/lib/api-client";
-import { saveClientToken } from "@/lib/auth/client-token";
+import { saveClientToken, clearClientToken } from "@/lib/auth/client-token";
 
 const container = {
   hidden: { opacity: 0 },
@@ -76,8 +75,7 @@ function LoginField({
   );
 }
 
-export function LoginFormPanel() {
-  const searchParams = useSearchParams();
+export function LoginFormPanel({ nextPath }: { nextPath?: string | null }) {
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -94,12 +92,12 @@ export function LoginFormPanel() {
         { login, password },
       );
       // Respaldo por si el navegador no guarda la cookie de sesión.
+      clearClientToken();
       saveClientToken(res.token);
-      const next = searchParams.get("next");
       // `next` solo se respeta si pertenece al área del rol del usuario; si no,
       // manda el destino por rol (evita que un admin caiga en /dashboard).
       const dest =
-        next && next.startsWith(res.redirectTo) ? next : res.redirectTo;
+        nextPath && nextPath.startsWith(res.redirectTo) ? nextPath : res.redirectTo;
       // Navegación completa: garantiza que la cookie Set-Cookie del login
       // viaje en la primera petición al área protegida (evita cierre de sesión).
       window.location.assign(dest);
@@ -119,7 +117,7 @@ export function LoginFormPanel() {
     <div className="flex w-full justify-center lg:justify-end">
       <motion.div
         variants={container}
-        initial="hidden"
+        initial={false}
         animate="show"
         className="w-full max-w-[620px] rounded-[32px] bg-white p-10 shadow-[0_20px_60px_rgba(109,40,255,0.10)] sm:p-12"
       >

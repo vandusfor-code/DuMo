@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { SESSION_COOKIE } from "@/lib/auth/session-edge";
+import { browserRedirectUrl } from "@/lib/request-origin";
 
 const PUBLIC_PREFIXES = [
   "/login",
@@ -34,7 +35,7 @@ export async function middleware(request: NextRequest) {
   const token = request.cookies.get(SESSION_COOKIE)?.value;
 
   if (!token) {
-    const login = new URL("/login", request.url);
+    const login = browserRedirectUrl(request, "/login");
     login.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
     return NextResponse.redirect(login);
   }
