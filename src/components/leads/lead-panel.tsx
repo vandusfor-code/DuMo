@@ -53,6 +53,7 @@ export function LeadPanel({
   saleError,
   saleRegistered = false,
   lastSaveAction = null,
+  inboxClosed = false,
   clientError,
   clientSaved = false,
   duoSaleError,
@@ -75,6 +76,7 @@ export function LeadPanel({
   saleError?: string | null;
   saleRegistered?: boolean;
   lastSaveAction?: SaveLeadAction | null;
+  inboxClosed?: boolean;
   clientError?: string | null;
   clientSaved?: boolean;
   duoSaleError?: string | null;
@@ -216,9 +218,13 @@ export function LeadPanel({
               <div className="flex items-center gap-2.5 rounded-card border border-success/20 bg-success-soft px-4 py-3 text-[13px] text-success-ink">
                 <CheckCircle2 className="size-[18px]" />
                 {lastSaveAction === "close"
-                  ? clientSaved
-                    ? "Gestión guardada y cerrada. El cliente quedó tipificado."
-                    : "Gestión guardada y cerrada correctamente."
+                  ? inboxClosed
+                    ? clientSaved
+                      ? "Gestión guardada y cerrada. El cliente quedó tipificado."
+                      : "Gestión guardada y cerrada correctamente."
+                    : clientSaved
+                      ? "Gestión guardada. El cliente quedó tipificado, pero el chat sigue en la bandeja."
+                      : "Gestión guardada, pero el chat sigue en la bandeja. Revisa la tipificación o el seguimiento."
                   : lastSaveAction === "tipify"
                   ? clientSaved
                     ? "Cliente tipificado correctamente. Ya aparece en Clientes."

@@ -29,7 +29,13 @@ import { useQueryClient } from "@tanstack/react-query";
  * the page, so switching conversations gives a fresh form with no stale
  * field-array keys (avoids duplicated line cards).
  */
-export function LeadFormPanel({ conversation }: { conversation: Conversation }) {
+export function LeadFormPanel({
+  conversation,
+  onInboxClosed,
+}: {
+  conversation: Conversation;
+  onInboxClosed?: () => void;
+}) {
   const saveLead = useSaveLead(conversation.id);
   const gestionDraft = useLatestGestionDraft(conversation.id);
   const saveModeRef = useRef<SaveLeadAction>("close");
@@ -88,10 +94,13 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
       folioNumber: values.folioNumber,
     };
     try {
-      await saveLead.mutateAsync(input);
+      const result = await saveLead.mutateAsync(input);
       commitTipificationLabel(queryClient, conversation.id, values.type, catalog);
       methods.clearErrors("root");
       methods.clearErrors("followUpDate");
+      if (result.inboxClosed) {
+        onInboxClosed?.();
+      }
     } catch (error) {
       methods.setError("root", { message: formatSaveLeadApiError(error) });
     }
@@ -115,6 +124,7 @@ export function LeadFormPanel({ conversation }: { conversation: Conversation }) 
           clientSaved={saveLead.data?.clientSaved ?? false}
           duoSaleError={saveLead.data?.duoSaleError ?? null}
           lastSaveAction={saveLead.data?.saveAction ?? null}
+          inboxClosed={saveLead.data?.inboxClosed ?? false}
           onSaveSale={() => {
             saveModeRef.current = "sale";
           }}

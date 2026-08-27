@@ -114,7 +114,11 @@ function LeadsPageContent() {
               />
             </SectionCard>
             <SectionCard className="flex min-h-0 flex-col overflow-hidden">
-              <LeadFormPanel key={selected.id} conversation={selected} />
+              <LeadFormPanel
+                key={selected.id}
+                conversation={selected}
+                onInboxClosed={() => setSelectedId(null)}
+              />
             </SectionCard>
           </>
         ) : (

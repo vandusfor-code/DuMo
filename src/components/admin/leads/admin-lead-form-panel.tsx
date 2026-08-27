@@ -72,14 +72,16 @@ export function AdminLeadFormPanel({
   client,
   notes,
   timeline: _timeline,
+  onInboxClosed,
 }: {
   conversation: AdminConversation;
   client: ClientProfile;
   notes: LeadNote[];
   timeline: LeadTimelineEvent[];
+  onInboxClosed?: () => void;
 }) {
   void _timeline;
-  const saveLead = useSaveAdminLead(conversation.id);
+  const saveLead = useSaveAdminLead(conversation.id, onInboxClosed);
   const saveModeRef = useRef<SaveLeadAction>("close");
   const [activeTab, setActiveTab] = useState("gestion");
   const [scriptTabUnlocked, setScriptTabUnlocked] = useState(false);
@@ -227,15 +229,21 @@ export function AdminLeadFormPanel({
                 {saveLead.isSuccess && (
                   <div className="flex items-center gap-2.5 rounded-xl border border-success/20 bg-success-soft px-4 py-3 text-[13px] text-success-ink">
                     <CheckCircle2 className="size-[18px]" />
-                    {saveLead.data?.sale
-                      ? script
-                        ? "Venta guardada en Mis Ventas. El script de la llamada ya está disponible."
-                        : "Venta guardada correctamente. Ya aparece en Mis Ventas."
-                      : isSaleFlow
-                        ? "Gestión guardada. No se pudo registrar la venta en Mis Ventas."
-                        : script
-                          ? "Gestión guardada correctamente. El script de venta ya está disponible."
-                          : "Gestión guardada correctamente."}
+                    {saveLead.data?.inboxClosed
+                      ? saveLead.data?.sale
+                        ? script
+                          ? "Venta guardada y chat cerrado. El script de la llamada ya está disponible."
+                          : "Venta guardada y chat cerrado correctamente."
+                        : "Gestión guardada y chat cerrado correctamente."
+                      : saveLead.data?.sale
+                        ? script
+                          ? "Venta guardada en Mis Ventas. El script de la llamada ya está disponible."
+                          : "Venta guardada correctamente. Ya aparece en Mis Ventas."
+                        : isSaleFlow
+                          ? "Gestión guardada. No se pudo registrar la venta en Mis Ventas."
+                          : script
+                            ? "Gestión guardada correctamente. El script de venta ya está disponible."
+                            : "Gestión guardada correctamente."}
                   </div>
                 )}
                 {saveLead.isSuccess && saveLead.data?.saleError ? (

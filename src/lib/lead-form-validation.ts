@@ -4,6 +4,7 @@ import type { LeadFormValues } from "@/types/lead-form";
 import type { SaveLeadAction } from "@/types/crm-client";
 import type { Tipification } from "@/types/tipification";
 import { isValidFolioNumberFormat } from "@/lib/folio-number";
+import { NEW_LEAD_TIPIFICATION_SLUG } from "@/lib/tipification-system";
 import {
   resolveFollowUpDateForSave,
   validateFollowUpDateForCloseAction,
@@ -69,6 +70,14 @@ export function validateLeadFormBeforeSave(input: {
 
   if (input.saveAction !== "close") {
     return { ok: true, followUpDate: null };
+  }
+
+  if (input.values.type === NEW_LEAD_TIPIFICATION_SLUG) {
+    return {
+      ok: false,
+      message: "Selecciona una tipificación antes de guardar y cerrar.",
+      field: "type",
+    };
   }
 
   const followUpError = validateFollowUpDateForCloseAction({

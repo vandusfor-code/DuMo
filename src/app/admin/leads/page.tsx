@@ -189,6 +189,7 @@ function AdminLeadsPageContent() {
                   client={detail.data.client}
                   notes={detail.data.notes}
                   timeline={detail.data.timeline}
+                  onInboxClosed={() => setSelectedId(null)}
                 />
               ) : null}
             </SectionCard>

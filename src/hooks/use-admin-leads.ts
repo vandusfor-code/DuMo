@@ -65,11 +65,17 @@ export function useAssignAdvisor() {
   });
 }
 
-export function useSaveAdminLead(conversationId?: string) {
+export function useSaveAdminLead(conversationId?: string, onInboxClosed?: () => void) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: SaveLeadInput) => apiPost<SaveLeadResult>("/api/admin/leads", input),
     onSuccess: (result) => {
+      if (result.inboxClosed && conversationId) {
+        qc.setQueryData<AdminConversation[]>(["admin", "leads", "conversations"], (old) =>
+          old?.filter((c) => c.id !== conversationId),
+        );
+        onInboxClosed?.();
+      }
       qc.invalidateQueries({ queryKey: ["admin", "leads"] });
       if (result.script && conversationId) {
         qc.setQueryData(["leads", "script", conversationId], result.script);

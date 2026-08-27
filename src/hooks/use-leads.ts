@@ -129,7 +129,12 @@ export function useSaveLead(conversationId?: string) {
       queryClient.invalidateQueries({ queryKey: crmClientKeys.all });
       queryClient.invalidateQueries({ queryKey: leadKeys.conversations });
       queryClient.invalidateQueries({ queryKey: recuperacionKeys.all });
-      if (result.saveAction === "close") {
+      if (result.inboxClosed && conversationId) {
+        queryClient.setQueryData<Conversation[]>(leadKeys.conversations, (old) =>
+          old?.filter((c) => c.id !== conversationId),
+        );
+      }
+      if (result.saveAction === "close" || result.inboxClosed) {
         queryClient.invalidateQueries({ queryKey: ["admin", "pendientes"] });
       }
     },

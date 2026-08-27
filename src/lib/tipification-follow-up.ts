@@ -99,9 +99,13 @@ export function shouldCloseInboxAfterSave(input: {
   if (!input.behavior.closesInbox) return false;
 
   if (input.behavior.triggersSaleFlow) {
+    if (!input.saleRegistered) return false;
+    // Tras P0 la venta también se registra con saveAction "close" (Enter o
+    // flujos legacy); debe cerrar la bandeja igual que sale/script.
     return (
-      input.saleRegistered &&
-      (input.saveAction === "sale" || input.saveAction === "script")
+      input.saveAction === "close" ||
+      input.saveAction === "sale" ||
+      input.saveAction === "script"
     );
   }
 

@@ -49,6 +49,24 @@ assert(
 
 assert(
   shouldCloseInboxAfterSave({
+    behavior: ventaBehavior,
+    saveAction: "close",
+    saleRegistered: true,
+  }),
+  "venta + guardar y cerrar con venta OK → cierra bandeja",
+);
+
+assert(
+  !shouldCloseInboxAfterSave({
+    behavior: ventaBehavior,
+    saveAction: "close",
+    saleRegistered: false,
+  }),
+  "venta + guardar y cerrar sin venta → NO cierra bandeja",
+);
+
+assert(
+  shouldCloseInboxAfterSave({
     behavior: consultaBehavior,
     saveAction: "close",
     saleRegistered: false,
