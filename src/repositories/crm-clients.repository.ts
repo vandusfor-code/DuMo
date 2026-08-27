@@ -3,6 +3,7 @@ import type { AdvisorScope } from "@/lib/advisor-scope";
 import type { LeadType } from "@/types/lead";
 import type { CrmClient, CrmClientFilters } from "@/types/crm-client";
 import { LEAD_TYPE_LABELS } from "@/types/lead";
+import { getConversationRepository } from "@/repositories/conversation.repository";
 import { ensureSchema, getSql, hasDatabase, withDbRetry } from "@/server/db/client";
 
 type ClientRow = {
@@ -52,6 +53,20 @@ export interface CrmClientsRepository {
 }
 
 class PostgresCrmClientsRepository implements CrmClientsRepository {
+  /** Si el id guardado quedó obsoleto (p. ej. tras fusionar chats), resolver por teléfono. */
+  private async resolveConversationId(storedId: string, phone: string): Promise<string> {
+    const sql = getSql();
+    if (!sql) return storedId;
+    const exists = (await sql`
+      SELECT id FROM lead_conversations WHERE id = ${storedId} LIMIT 1
+    `) as { id: string }[];
+    if (exists[0]?.id) return storedId;
+    const digits = phone.replace(/\D/g, "");
+    if (!digits) return storedId;
+    const found = await getConversationRepository().findWebQrConversationId(digits);
+    return found ?? storedId;
+  }
+
   async upsert(input: {
     conversationId: string;
     customerName: string;
@@ -245,7 +260,13 @@ class PostgresCrmClientsRepository implements CrmClientsRepository {
       `;
     });
 
-    return rows.map(rowToClient);
+    const resolved = await Promise.all(
+      rows.map(async (row) => {
+        const conversationId = await this.resolveConversationId(row.conversation_id, row.phone);
+        return rowToClient({ ...row, conversation_id: conversationId });
+      }),
+    );
+    return resolved;
   }
 }
 
