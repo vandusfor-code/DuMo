@@ -1,3 +1,4 @@
+import { toDisplayCompanyName } from "@/lib/verificador/company-display-name";
 import { SUBTEL_INDEX_PATH } from "@/lib/verificador/config";
 import { normalizePhoneForLookup } from "@/lib/verificador/normalize-phone";
 
@@ -32,7 +33,7 @@ export function lookupCompany(index: SubtelIndex, rawNumber: string): string {
     const [start, end, companyIdx] = ranges[mid];
     if (num < start) hi = mid - 1;
     else if (num > end) lo = mid + 1;
-    else return companies[companyIdx] ?? "";
+    else return toDisplayCompanyName(companies[companyIdx] ?? "");
   }
   return "";
 }

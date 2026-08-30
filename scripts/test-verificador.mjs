@@ -6,6 +6,40 @@ import { readFileSync } from "node:fs";
 
 const index = JSON.parse(readFileSync("public/verificador/subtel-index.json", "utf8"));
 
+function toDisplayCompanyName(legalName) {
+  const raw = legalName.trim();
+  if (!raw) return "";
+  const key = raw
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  if (key.includes("TELEFONICA MOVIL") || key.includes("TELEFONICA MOVIBLE")) return "Movistar";
+  if (
+    key.includes("TELEFONICA CHILE") ||
+    key.includes("COMPANIA DE TELECOMUNICACIONES DE CHILE") ||
+    key.includes("TELEFONICA DEL SUR") ||
+    key.includes("TELEFONICA UNO UNO CUATRO") ||
+    key.includes("TELEFONICA VIVA") ||
+    key.includes("TELEFONICA LARGA DISTANCIA")
+  ) {
+    return "Movistar";
+  }
+  if (key.includes("CLARO")) return "Claro";
+  if (key.includes("ENTEL") || key.includes("EMPRESA NACIONAL DE TELECOMUNICACIONES")) return "Entel";
+  if (/\bWOM\b/.test(key)) return "WOM";
+  if (key.includes("VIRGIN MOBILE")) return "Virgin Mobile";
+  if (key.includes("VTR")) return key.includes("MOVIL") ? "VTR Móvil" : "VTR";
+  if (key.includes("NEXTEL")) return "Nextel";
+  if (key.includes("GTD")) return "GTD";
+  if (key.includes("FALABELLA MOVIL")) return "Falabella Móvil";
+  if (key.includes("AT&T") || key.includes("AT AND T")) return "AT&T";
+  return raw
+    .replace(/\s*\([^)]*\)\s*/g, " ")
+    .replace(/\s*(S\.?A\.?|S\.?P\.?A\.?|SPA|LTDA\.?|LIMITADA|EIRL)\.?\s*$/i, "")
+    .replace(/\s*,\s*.*$/, "")
+    .trim();
+}
+
 function normalizePhoneForLookup(raw) {
   const trimmed = raw.trim();
   if (!trimmed) return null;
@@ -91,7 +125,7 @@ function lookupCompany(rawNumber) {
     const [start, end, companyIdx] = index.ranges[mid];
     if (num < start) hi = mid - 1;
     else if (num > end) lo = mid + 1;
-    else return index.companies[companyIdx] ?? "";
+    else return toDisplayCompanyName(index.companies[companyIdx] ?? "");
   }
   return "";
 }
@@ -124,7 +158,7 @@ console.log("Prueba 1 — CSV básico");
 const p1 = parseCsv("numero\n912345678\n987654321\n912111222\n");
 const r1 = processRows(p1.rows);
 assert(r1.length === 3, "3 filas");
-assert(r1[1].compania.includes("ENTEL"), "987654321 debe resolver ENTEL PCS");
+assert(r1[1].compania === "Entel", "987654321 debe resolver Entel");
 console.log(" OK", r1.map((r) => [r.numero, r.compania]));
 
 console.log("Prueba 2 — formatos +56");
@@ -156,6 +190,15 @@ const r2b = processRows(p2b.rows);
 assert(r2b[0].numero === "56912345678", "conserva original internacional");
 assert(r2b[1].numero === "912345678", "conserva original nacional");
 assert(r2b[0].compania === r2b[1].compania, "mismo lookup internacional y nacional");
+console.log(" OK");
+
+console.log("Prueba 2b — nombres comerciales");
+assert(toDisplayCompanyName("TELEFÓNICA MÓVILES CHILE S.A.") === "Movistar");
+assert(toDisplayCompanyName("ENTEL PCS TELECOMUNICACIONES S.A.") === "Entel");
+assert(toDisplayCompanyName("CLARO CHILE S.A.") === "Claro");
+assert(lookupCompany("56971659287") === "Movistar");
+assert(lookupCompany("56932526421") === "Entel");
+assert(lookupCompany("56971915057") === "Claro");
 console.log(" OK");
 
 console.log("Prueba 3 — más de 1000");
