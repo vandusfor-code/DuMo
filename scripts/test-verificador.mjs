@@ -147,7 +147,11 @@ function processRows(inputRows) {
 }
 
 function generateResultCsv(rows) {
-  return ["numero,compania", ...rows.map((r) => `${r.numero},${r.compania}`)].join("\n");
+  const lines = ["sep=;", "numero;compania"];
+  for (const row of rows) {
+    lines.push(`${row.numero};${row.compania}`);
+  }
+  return lines.join("\n");
 }
 
 function assert(cond, msg) {
@@ -225,7 +229,8 @@ console.log(" OK");
 console.log("Prueba 7 — columnas extra");
 const r7 = processRows(parseCsv("numero,nombre\n912345678,Juan\n987654321,Pedro\n").rows);
 const csv7 = generateResultCsv(r7);
-assert(csv7.split("\n")[0] === "numero,compania");
+assert(csv7.split("\n")[0] === "sep=;");
+assert(csv7.split("\n")[1] === "numero;compania");
 assert(!csv7.includes("Juan"));
 console.log(" OK");
 

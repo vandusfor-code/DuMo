@@ -541,8 +541,10 @@ export function VerificadorApp() {
       {(uiState === "processing" || uiState === "done") && (
         <section className={`${cardClassName} py-3`}>
           <div className="mb-2 flex items-center justify-between gap-2">
-            <h2 className="text-[15px] font-semibold text-[#0f172a]">2. Procesando números</h2>
-            {uiState === "processing" && (
+            <h2 className="text-[15px] font-semibold text-[#0f172a]">
+              {uiState === "processing" ? "2. Procesando números" : "2. Procesamiento completado"}
+            </h2>
+            {uiState === "processing" ? (
               <button
                 type="button"
                 onClick={stopProcessing}
@@ -550,6 +552,15 @@ export function VerificadorApp() {
               >
                 <Square className="size-3" aria-hidden />
                 Detener proceso
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => downloadResultCsv(results, RESULT_FILENAME)}
+                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[#2563eb] bg-[#2563eb] px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#1d4ed8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]"
+              >
+                <Download className="size-4" aria-hidden />
+                Descargar CSV procesado
               </button>
             )}
           </div>
@@ -572,21 +583,11 @@ export function VerificadorApp() {
 
       {uiState === "done" && results.length > 0 && (
         <section className={cardClassName}>
-          <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2 className="text-[15px] font-semibold text-[#0f172a]">3. Resultados</h2>
-              <p className="mt-0.5 text-xs text-[#64748b]">
-                Consulta completada · {results.length.toLocaleString("es-CL")} números procesados
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => downloadResultCsv(results, RESULT_FILENAME)}
-              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[#2563eb] bg-[#2563eb] px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#1d4ed8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]"
-            >
-              <Download className="size-4" aria-hidden />
-              Descargar CSV procesado
-            </button>
+          <div className="mb-3">
+            <h2 className="text-[15px] font-semibold text-[#0f172a]">3. Resumen</h2>
+            <p className="mt-0.5 text-xs text-[#64748b]">
+              {results.length.toLocaleString("es-CL")} números procesados
+            </p>
           </div>
 
           <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
@@ -609,10 +610,10 @@ export function VerificadorApp() {
           <div className="flex items-start gap-2 rounded-lg border border-[#dcfce7] bg-[#f0fdf4] px-3 py-2.5 text-xs text-[#166534]">
             <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden />
             <p>
-              Procesamiento finalizado. El detalle completo de{" "}
-              {results.length.toLocaleString("es-CL")} números está en el CSV descargable (
-              columnas <code className="rounded bg-white/80 px-1">numero</code> y{" "}
-              <code className="rounded bg-white/80 px-1">compania</code>).
+              Listo para descargar. El CSV incluye{" "}
+              {results.length.toLocaleString("es-CL")} filas con columnas{" "}
+              <code className="rounded bg-white/80 px-1">numero</code> y{" "}
+              <code className="rounded bg-white/80 px-1">compania</code> separadas para Excel.
             </p>
           </div>
         </section>
