@@ -14,7 +14,9 @@
     "railway:postgres:migrate": "node scripts/railway-postgres-migrate.mjs",
     "railway:postgres:import": "node scripts/railway-postgres-import.mjs",
     "railway:postgres:verify": "node scripts/railway-postgres-verify.mjs",
-    "railway:crm:env-sync": "node scripts/railway-crm-env-sync.mjs"
+    "railway:crm:env-sync": "node scripts/railway-crm-env-sync.mjs",
+    "verificador:build-index": "python scripts/build-verificador-subtel-index.py",
+    "verificador:test": "node scripts/test-verificador.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
