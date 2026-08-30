@@ -11,10 +11,15 @@ function normalizePhoneForLookup(raw) {
   if (!trimmed) return null;
   let digits = trimmed.replace(/\D/g, "");
   if (!digits) return null;
-  if (digits.startsWith("56") && digits.length >= 11) digits = digits.slice(2);
-  if (digits.length === 8 && /^[2-9]/.test(digits)) digits = `9${digits}`;
-  if (digits.length !== 9) return null;
-  return digits;
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  const originalLength = digits.length;
+  if (digits.startsWith("56") && digits.length >= 10) digits = digits.slice(2);
+  if (digits.length === 9) return digits;
+  if (originalLength === 10 && digits.length === 8 && digits.startsWith("9")) {
+    return `${digits}0`;
+  }
+  if (digits.length === 8 && /^[2-8]/.test(digits)) return `9${digits}`;
+  return null;
 }
 
 function parseCsv(text) {
@@ -125,11 +130,32 @@ console.log(" OK", r1.map((r) => [r.numero, r.compania]));
 console.log("Prueba 2 — formatos +56");
 const p2 = parseCsv("numero\n+56912345678\n+56 9 8765 4321\n9 1234 5678\n");
 assert(normalizePhoneForLookup("+56912345678") === "912345678");
+assert(normalizePhoneForLookup("56912345678") === "912345678");
+assert(normalizePhoneForLookup("+56 912345678") === "912345678");
 assert(normalizePhoneForLookup("+56 9 8765 4321") === "987654321");
 assert(normalizePhoneForLookup("9 1234 5678") === "912345678");
+assert(normalizePhoneForLookup("912345678") === "912345678");
 const r2 = processRows(p2.rows);
 assert(r2[0].numero === "+56912345678");
 assert(r2[1].numero === "+56 9 8765 4321");
+console.log(" OK");
+
+console.log("Prueba 2b — formatos internacionales reales");
+const real = [
+  ["56971915057", "971915057"],
+  ["56979492451", "979492451"],
+  ["56991066201", "991066201"],
+  ["5697792232", "977922320"],
+  ["5699055619", "990556190"],
+];
+for (const [input, expected] of real) {
+  assert(normalizePhoneForLookup(input) === expected, `${input} -> ${expected}`);
+}
+const p2b = parseCsv("numero\n56912345678\n912345678\n");
+const r2b = processRows(p2b.rows);
+assert(r2b[0].numero === "56912345678", "conserva original internacional");
+assert(r2b[1].numero === "912345678", "conserva original nacional");
+assert(r2b[0].compania === r2b[1].compania, "mismo lookup internacional y nacional");
 console.log(" OK");
 
 console.log("Prueba 3 — más de 1000");
