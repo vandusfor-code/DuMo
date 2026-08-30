@@ -136,7 +136,6 @@ export function VerificadorApp() {
   const [dragOver, setDragOver] = useState(false);
 
   const [progress, setProgress] = useState({ processed: 0, total: 0 });
-  const [liveRows, setLiveRows] = useState<ProcessedRow[]>([]);
   const [results, setResults] = useState<ProcessedRow[]>([]);
 
   const [manualInput, setManualInput] = useState("");
@@ -145,7 +144,6 @@ export function VerificadorApp() {
 
   const resetResults = () => {
     setResults([]);
-    setLiveRows([]);
     setProgress({ processed: 0, total: 0 });
     abortRef.current = false;
   };
@@ -226,7 +224,6 @@ export function VerificadorApp() {
           return;
         }
         setProgress({ processed: step.processed, total: step.total });
-        setLiveRows(step.rows);
         finalRows.length = 0;
         finalRows.push(...step.rows);
       }
@@ -575,11 +572,21 @@ export function VerificadorApp() {
 
       {uiState === "done" && results.length > 0 && (
         <section className={cardClassName}>
-          <div className="mb-3">
-            <h2 className="text-[15px] font-semibold text-[#0f172a]">3. Resultados</h2>
-            <p className="mt-0.5 text-xs text-[#64748b]">
-              Consulta completada · {results.length.toLocaleString("es-CL")} números procesados
-            </p>
+          <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-[15px] font-semibold text-[#0f172a]">3. Resultados</h2>
+              <p className="mt-0.5 text-xs text-[#64748b]">
+                Consulta completada · {results.length.toLocaleString("es-CL")} números procesados
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => downloadResultCsv(results, RESULT_FILENAME)}
+              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[#2563eb] bg-[#2563eb] px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#1d4ed8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]"
+            >
+              <Download className="size-4" aria-hidden />
+              Descargar CSV procesado
+            </button>
           </div>
 
           <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
@@ -599,40 +606,14 @@ export function VerificadorApp() {
             ))}
           </div>
 
-          <div className="overflow-x-auto rounded-lg border border-[#e2e8f0]">
-            <table className="min-w-full border-collapse text-left text-[13px]">
-              <thead className="bg-[#f8fafc] text-[#475569]">
-                <tr>
-                  <th className="border-b border-[#e2e8f0] px-3 py-2 font-semibold">Número</th>
-                  <th className="border-b border-[#e2e8f0] px-3 py-2 font-semibold">Compañía</th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.map((row, i) => (
-                  <tr key={`${row.numero}-${i}`} className="border-b border-[#f1f5f9] last:border-0">
-                    <td className="px-3 py-2 font-medium text-[#0f172a]">{row.numero}</td>
-                    <td className="px-3 py-2 text-[#334155]">{row.compania}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <p className="flex items-start gap-1.5 text-[11px] text-[#64748b]">
-              <Info className="mt-0.5 size-3 shrink-0" aria-hidden />
-              El archivo descargado contiene únicamente las columnas{" "}
-              <code className="rounded bg-[#f8fafc] px-1">numero</code> y{" "}
-              <code className="rounded bg-[#f8fafc] px-1">compania</code>.
+          <div className="flex items-start gap-2 rounded-lg border border-[#dcfce7] bg-[#f0fdf4] px-3 py-2.5 text-xs text-[#166534]">
+            <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <p>
+              Procesamiento finalizado. El detalle completo de{" "}
+              {results.length.toLocaleString("es-CL")} números está en el CSV descargable (
+              columnas <code className="rounded bg-white/80 px-1">numero</code> y{" "}
+              <code className="rounded bg-white/80 px-1">compania</code>).
             </p>
-            <button
-              type="button"
-              onClick={() => downloadResultCsv(results, RESULT_FILENAME)}
-              className="inline-flex shrink-0 items-center justify-center gap-1.5 self-end rounded-lg border border-[#2563eb] bg-white px-4 py-2 text-xs font-semibold text-[#2563eb] shadow-sm transition hover:bg-[#eff6ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb] sm:self-auto"
-            >
-              <Download className="size-4" aria-hidden />
-              Descargar CSV procesado
-            </button>
           </div>
         </section>
       )}
