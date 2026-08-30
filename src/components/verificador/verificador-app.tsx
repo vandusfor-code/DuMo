@@ -51,7 +51,7 @@ function isValidManualInput(raw: string): boolean {
 }
 
 const cardClassName =
-  "rounded-2xl border border-[#e2e8f0] bg-white p-5 shadow-[0_1px_3px_rgba(15,23,42,0.06)] sm:p-6";
+  "rounded-xl border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]";
 
 export function VerificadorApp() {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -241,30 +241,30 @@ export function VerificadorApp() {
   })();
 
   return (
-    <main className="mx-auto w-full max-w-[1680px] px-4 py-6 sm:px-8 sm:py-8 lg:px-10">
-      <section className="mb-6">
-        <h1 className="text-[28px] font-bold tracking-tight text-[#0f172a] sm:text-[32px]">
+    <main className="mx-auto w-full max-w-[1720px] px-5 py-3 sm:px-8 lg:px-12">
+      <section className="mb-3">
+        <h1 className="text-[22px] font-bold tracking-tight text-[#0f172a] sm:text-2xl">
           Verificador de Numeración
         </h1>
-        <p className="mt-2 text-[15px] text-[#64748b]">
+        <p className="mt-1 text-[13px] leading-snug text-[#64748b] sm:text-sm">
           Consulta números de Chile utilizando la base oficial de numeración de SUBTEL.
         </p>
       </section>
 
-      <div className="mb-6 flex items-start gap-3 rounded-xl border border-[#bfdbfe] bg-[#eff6ff] px-4 py-3.5 text-sm text-[#1e40af]">
-        <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
+      <div className="mb-3 flex items-start gap-2 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-3 py-2 text-[12px] leading-snug text-[#1e40af] sm:text-[13px]">
+        <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
         <p>
           La información corresponde al operador asignatario según SUBTEL y no necesariamente
           al operador actual del número.
         </p>
       </div>
 
-      <section className={`mb-6 ${cardClassName}`}>
-        <h2 className="mb-4 text-base font-semibold text-[#0f172a] sm:text-lg">
+      <section className={`mb-3 ${cardClassName}`}>
+        <h2 className="mb-2.5 text-[13px] font-semibold text-[#0f172a] sm:text-sm">
           Buscar número manualmente
         </h2>
         <form
-          className="flex flex-col gap-3 sm:flex-row sm:items-center"
+          className="flex flex-col gap-2 sm:flex-row sm:items-center"
           onSubmit={(e) => {
             e.preventDefault();
             void runManualSearch();
@@ -284,12 +284,12 @@ export function VerificadorApp() {
               setManualInput(e.target.value);
               setManualResult(null);
             }}
-            className="h-12 w-full flex-1 rounded-xl border border-[#cbd5e1] bg-white px-4 text-[15px] text-[#0f172a] outline-none transition placeholder:text-[#94a3b8] focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb]/20"
+            className="h-10 w-full flex-1 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm text-[#0f172a] outline-none transition placeholder:text-[#94a3b8] focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb]/20"
           />
           <button
             type="submit"
             disabled={manualLoading || !manualInput.trim()}
-            className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-6 text-sm font-semibold text-white transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb] sm:min-w-[148px]"
+            className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[#2563eb] px-5 text-[13px] font-semibold text-white transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb] sm:min-w-[120px]"
           >
             {manualLoading ? (
               <>
@@ -304,37 +304,39 @@ export function VerificadorApp() {
             )}
           </button>
         </form>
-        <p className="mt-3 text-sm text-[#94a3b8]">Ingresa 9 a 12 dígitos, con o sin +56</p>
+        <p className="mt-1.5 text-[11px] text-[#94a3b8] sm:text-xs">
+          Ingresa 9 a 12 dígitos, con o sin +56
+        </p>
 
         {manualResult?.kind === "invalid" && (
-          <p className="mt-4 text-sm text-[#b45309]" role="alert">
+          <p className="mt-2 text-xs text-[#b45309]" role="alert">
             Ingresa un número válido de Chile (9 a 12 dígitos, con o sin +56).
           </p>
         )}
 
         {manualResult?.kind === "not_found" && (
-          <p className="mt-4 text-sm text-[#64748b]" role="status">
+          <p className="mt-2 text-xs text-[#64748b]" role="status">
             No encontramos una compañía para este número en la base de SUBTEL.
           </p>
         )}
 
         {manualResult?.kind === "found" && (
-          <div className="mt-5 rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4 sm:p-5">
-            <p className="mb-3 text-sm font-semibold text-[#0f172a]">Resultado</p>
-            <div className="grid gap-4 sm:grid-cols-2">
+          <div className="mt-2.5 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3">
+            <p className="mb-2 text-xs font-semibold text-[#0f172a]">Resultado</p>
+            <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-[#94a3b8]">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-[#94a3b8]">
                   Número
                 </p>
-                <p className="mt-1 text-[15px] font-medium text-[#0f172a]">
+                <p className="mt-0.5 text-sm font-medium text-[#0f172a]">
                   {manualResult.numero}
                 </p>
               </div>
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-[#94a3b8]">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-[#94a3b8]">
                   Compañía
                 </p>
-                <p className="mt-1 text-[15px] font-medium text-[#0f172a]">
+                <p className="mt-0.5 text-sm font-medium text-[#0f172a]">
                   {manualResult.compania}
                 </p>
               </div>
@@ -346,7 +348,7 @@ export function VerificadorApp() {
       {error && (
         <div
           role="alert"
-          className="mb-6 flex items-start gap-3 rounded-xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm text-[#b91c1c]"
+          className="mb-3 flex items-start gap-2 rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-xs text-[#b91c1c]"
         >
           <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
           <p>{error}</p>
@@ -354,19 +356,19 @@ export function VerificadorApp() {
       )}
 
       {warning && uiState !== "error" && (
-        <div className="mb-6 flex items-start gap-3 rounded-xl border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]">
-          <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
+        <div className="mb-3 flex items-start gap-2 rounded-lg border border-[#fde68a] bg-[#fffbeb] px-3 py-2 text-xs text-[#92400e]">
+          <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
           <p>{warning}</p>
         </div>
       )}
 
-      <section className={`mb-6 ${cardClassName}`}>
-        <h2 className="mb-5 text-base font-semibold text-[#0f172a] sm:text-lg">
+      <section className={`mb-3 ${cardClassName}`}>
+        <h2 className="mb-3 text-[13px] font-semibold text-[#0f172a] sm:text-sm">
           1. Cargar archivo CSV
         </h2>
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_260px_280px]">
-          <div className="space-y-4">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_200px_220px] xl:grid-cols-[minmax(0,1fr)_220px_240px]">
+          <div className="space-y-2.5">
             {!loaded ? (
               <div
                 role="button"
@@ -381,18 +383,18 @@ export function VerificadorApp() {
                 onDragLeave={() => setDragOver(false)}
                 onDrop={onDrop}
                 onClick={() => inputRef.current?.click()}
-                className={`flex min-h-[240px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10 text-center transition ${
+                className={`flex min-h-[128px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-5 text-center transition ${
                   dragOver
                     ? "border-[#2563eb] bg-[#eff6ff]"
                     : "border-[#cbd5e1] bg-[#fafbfd] hover:border-[#93c5fd] hover:bg-[#f8fbff]"
                 }`}
               >
-                <UploadCloud className="mb-4 size-11 text-[#2563eb]" aria-hidden />
-                <p className="text-base font-medium text-[#0f172a]">
+                <UploadCloud className="mb-2 size-8 text-[#2563eb]" aria-hidden />
+                <p className="text-sm font-medium text-[#0f172a]">
                   Arrastra tu archivo CSV aquí
                 </p>
-                <p className="mt-1 text-sm text-[#64748b]">o haz clic para seleccionar</p>
-                <p className="mt-4 text-xs text-[#94a3b8]">
+                <p className="mt-0.5 text-xs text-[#64748b]">o haz clic para seleccionar</p>
+                <p className="mt-2 text-[11px] text-[#94a3b8]">
                   Formato: CSV · Máximo {MAX_NUMBERS.toLocaleString("es-CL")} números
                 </p>
                 <input
@@ -405,25 +407,25 @@ export function VerificadorApp() {
                 />
               </div>
             ) : (
-              <div className="flex min-h-[240px] items-center justify-center rounded-xl border border-[#e2e8f0] bg-[#fafbfd] px-5 py-6 xl:hidden">
-                <p className="text-sm text-[#64748b]">Archivo cargado. Revisa el panel central.</p>
+              <div className="flex min-h-[128px] items-center justify-center rounded-lg border border-[#e2e8f0] bg-[#fafbfd] px-4 py-4 lg:hidden">
+                <p className="text-xs text-[#64748b]">Archivo cargado. Revisa el panel central.</p>
               </div>
             )}
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
               <a
                 href={PLANTILLA_PATH}
                 download="plantilla_verificador_numeracion_dumo.csv"
-                className="inline-flex items-center gap-2 text-sm font-medium text-[#2563eb] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]"
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-[#2563eb] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]"
               >
-                <Download className="size-4" aria-hidden />
+                <Download className="size-3.5" aria-hidden />
                 Descargar plantilla CSV
               </a>
               <button
                 type="button"
                 disabled={!loaded || uiState === "processing"}
                 onClick={() => void finalizeProcessing()}
-                className="inline-flex items-center gap-2 rounded-xl bg-[#2563eb] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#2563eb] px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]"
               >
                 {uiState === "processing" ? (
                   <Loader2 className="size-4 animate-spin" aria-hidden />
@@ -432,24 +434,24 @@ export function VerificadorApp() {
                 )}
                 Procesar números
               </button>
-              <p className="inline-flex items-center gap-2 text-xs text-[#64748b]">
-                <Lock className="size-3.5" aria-hidden />
+              <p className="inline-flex items-center gap-1.5 text-[11px] text-[#64748b]">
+                <Lock className="size-3" aria-hidden />
                 Tus datos están protegidos y no se almacenan.
               </p>
             </div>
           </div>
 
-          <div className="hidden xl:block">
+          <div className="hidden lg:block">
             {loaded ? (
-              <div className="flex h-full min-h-[240px] flex-col justify-center rounded-xl border border-[#e2e8f0] bg-[#fafbfd] px-4 py-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-[#ecfdf3] text-[#059669]">
-                      <FileSpreadsheet className="size-5" aria-hidden />
+              <div className="flex h-full min-h-[128px] flex-col justify-center rounded-lg border border-[#e2e8f0] bg-[#fafbfd] px-3 py-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <div className="grid size-8 shrink-0 place-items-center rounded-md bg-[#ecfdf3] text-[#059669]">
+                      <FileSpreadsheet className="size-4" aria-hidden />
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-[#0f172a]">{loaded.name}</p>
-                      <p className="text-xs text-[#64748b]">
+                      <p className="truncate text-xs font-medium text-[#0f172a]">{loaded.name}</p>
+                      <p className="text-[11px] text-[#64748b]">
                         {loaded.rows.length.toLocaleString("es-CL")} registros
                       </p>
                     </div>
@@ -457,37 +459,37 @@ export function VerificadorApp() {
                   <button
                     type="button"
                     onClick={removeFile}
-                    className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-[#dc2626] transition hover:bg-[#fef2f2]"
+                    className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-medium text-[#dc2626] transition hover:bg-[#fef2f2]"
                   >
-                    <Trash2 className="size-3.5" aria-hidden />
+                    <Trash2 className="size-3" aria-hidden />
                     Eliminar
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="flex h-full min-h-[240px] items-center justify-center rounded-xl border border-dashed border-[#e2e8f0] bg-[#fafbfd] px-4 text-center text-sm text-[#94a3b8]">
+              <div className="flex h-full min-h-[128px] items-center justify-center rounded-lg border border-dashed border-[#e2e8f0] bg-[#fafbfd] px-3 text-center text-xs text-[#94a3b8]">
                 Sin archivo cargado
               </div>
             )}
           </div>
 
-          <aside className="rounded-xl border border-[#dbeafe] bg-[#f8fbff] p-4">
-            <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-[#0f172a]">
-              <Info className="size-4 text-[#2563eb]" aria-hidden />
+          <aside className="rounded-lg border border-[#dbeafe] bg-[#f8fbff] p-3">
+            <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-[#0f172a]">
+              <Info className="size-3.5 text-[#2563eb]" aria-hidden />
               Formato esperado
             </p>
-            <p className="mb-3 text-sm text-[#64748b]">
+            <p className="mb-2 text-[11px] leading-snug text-[#64748b]">
               El CSV debe incluir una columna llamada{" "}
               <code className="rounded bg-white px-1">numero</code>.
             </p>
-            <div className="overflow-hidden rounded-lg border border-[#e2e8f0] bg-white text-sm">
-              <div className="border-b border-[#e2e8f0] bg-[#f8fafc] px-3 py-2 font-medium">
+            <div className="overflow-hidden rounded-md border border-[#e2e8f0] bg-white text-xs">
+              <div className="border-b border-[#e2e8f0] bg-[#f8fafc] px-2.5 py-1.5 font-medium">
                 numero
               </div>
               {["912345678", "987654321", "912111222"].map((n) => (
                 <div
                   key={n}
-                  className="border-b border-[#f1f5f9] px-3 py-2 text-[#475569] last:border-0"
+                  className="border-b border-[#f1f5f9] px-2.5 py-1.5 text-[#475569] last:border-0"
                 >
                   {n}
                 </div>
@@ -497,14 +499,14 @@ export function VerificadorApp() {
         </div>
 
         {loaded && (
-          <div className="mt-4 flex items-center justify-between gap-4 rounded-xl border border-[#e2e8f0] bg-[#fafbfd] px-4 py-4 xl:hidden">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="grid size-10 place-items-center rounded-lg bg-[#ecfdf3] text-[#059669]">
-                <FileSpreadsheet className="size-5" aria-hidden />
+          <div className="mt-2.5 flex items-center justify-between gap-3 rounded-lg border border-[#e2e8f0] bg-[#fafbfd] px-3 py-2.5 lg:hidden">
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="grid size-8 place-items-center rounded-md bg-[#ecfdf3] text-[#059669]">
+                <FileSpreadsheet className="size-4" aria-hidden />
               </div>
               <div className="min-w-0">
-                <p className="truncate font-medium text-[#0f172a]">{loaded.name}</p>
-                <p className="text-sm text-[#64748b]">
+                <p className="truncate text-sm font-medium text-[#0f172a]">{loaded.name}</p>
+                <p className="text-xs text-[#64748b]">
                   {loaded.rows.length.toLocaleString("es-CL")} registros
                 </p>
               </div>
@@ -512,9 +514,9 @@ export function VerificadorApp() {
             <button
               type="button"
               onClick={removeFile}
-              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[#dc2626] hover:bg-[#fef2f2]"
+              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-[#dc2626] hover:bg-[#fef2f2]"
             >
-              <Trash2 className="size-4" aria-hidden />
+              <Trash2 className="size-3.5" aria-hidden />
               Eliminar
             </button>
           </div>
@@ -522,48 +524,49 @@ export function VerificadorApp() {
       </section>
 
       {(uiState === "processing" || uiState === "done") && (
-        <section className={`mb-6 ${cardClassName}`}>
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-base font-semibold text-[#0f172a] sm:text-lg">
+        <section className={`mb-3 ${cardClassName}`}>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-[13px] font-semibold text-[#0f172a] sm:text-sm">
               2. Procesando números
             </h2>
             {uiState === "processing" && (
               <button
                 type="button"
                 onClick={stopProcessing}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm font-medium text-[#475569] hover:bg-[#f8fafc]"
+                className="inline-flex items-center gap-1.5 rounded-md border border-[#cbd5e1] bg-white px-2.5 py-1.5 text-xs font-medium text-[#475569] hover:bg-[#f8fafc]"
               >
-                <Square className="size-3.5" aria-hidden />
+                <Square className="size-3" aria-hidden />
                 Detener proceso
               </button>
             )}
           </div>
 
-          <div className="mb-2 flex items-center justify-between text-sm text-[#64748b]">
+          <div className="mb-1 flex items-center justify-between text-xs text-[#64748b]">
             <span>
               {uiState === "processing" ? "Procesando..." : "Consulta completada"} ·{" "}
               {progress.processed} de {progress.total}
             </span>
             <span>{pct}%</span>
           </div>
-          <div className="mb-6 h-2.5 overflow-hidden rounded-full bg-[#e2e8f0]">
+          <div className="mb-3 h-2 overflow-hidden rounded-full bg-[#e2e8f0]">
             <div
               className="h-full rounded-full bg-[#2563eb] transition-all duration-300"
               style={{ width: `${pct}%` }}
             />
           </div>
 
-          <ul className="space-y-2.5 text-sm" aria-live="polite">
+          {uiState === "processing" && (
+            <ul className="space-y-1.5 text-xs" aria-live="polite">
             {liveItems.map((item, idx) => (
-              <li key={`${item.numero}-${idx}`} className="flex items-center gap-3 text-[#334155]">
+              <li key={`${item.numero}-${idx}`} className="flex items-center gap-2 text-[#334155]">
                 {item.state === "done" ? (
-                  <CheckCircle2 className="size-4 shrink-0 text-[#16a34a]" aria-hidden />
+                  <CheckCircle2 className="size-3.5 shrink-0 text-[#16a34a]" aria-hidden />
                 ) : item.state === "consulting" ? (
-                  <Loader2 className="size-4 shrink-0 animate-spin text-[#2563eb]" aria-hidden />
+                  <Loader2 className="size-3.5 shrink-0 animate-spin text-[#2563eb]" aria-hidden />
                 ) : (
-                  <Circle className="size-4 shrink-0 text-[#cbd5e1]" aria-hidden />
+                  <Circle className="size-3.5 shrink-0 text-[#cbd5e1]" aria-hidden />
                 )}
-                <span className="min-w-[130px] font-medium">{item.numero || "—"}</span>
+                <span className="min-w-[110px] font-medium">{item.numero || "—"}</span>
                 <span className="truncate text-[#64748b]">
                   {item.state === "consulting"
                     ? "Consultando..."
@@ -578,62 +581,63 @@ export function VerificadorApp() {
                 </span>
               </li>
             ))}
-          </ul>
+            </ul>
+          )}
         </section>
       )}
 
       {uiState === "done" && results.length > 0 && (
         <section className={cardClassName}>
-          <div className="mb-5">
-            <h2 className="text-base font-semibold text-[#0f172a] sm:text-lg">3. Resultados</h2>
-            <p className="mt-1 text-sm text-[#64748b]">
+          <div className="mb-3">
+            <h2 className="text-[13px] font-semibold text-[#0f172a] sm:text-sm">3. Resultados</h2>
+            <p className="mt-0.5 text-xs text-[#64748b]">
               Consulta completada · {results.length.toLocaleString("es-CL")} números procesados
             </p>
           </div>
 
-          <div className="mb-6 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-[#94a3b8]">
+          <div className="mb-3 grid gap-2 sm:grid-cols-3">
+            <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-[#94a3b8]">
                 Total números
               </p>
-              <p className="mt-1 text-2xl font-bold text-[#0f172a]">{results.length}</p>
+              <p className="mt-0.5 text-lg font-bold text-[#0f172a]">{results.length}</p>
             </div>
-            <div className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-[#94a3b8]">
+            <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-[#94a3b8]">
                 Encontrados
               </p>
-              <p className="mt-1 text-2xl font-bold text-[#16a34a]">{foundCount}</p>
+              <p className="mt-0.5 text-lg font-bold text-[#16a34a]">{foundCount}</p>
             </div>
-            <div className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-[#94a3b8]">
+            <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-[#94a3b8]">
                 No encontrados
               </p>
-              <p className="mt-1 text-2xl font-bold text-[#dc2626]">{notFoundCount}</p>
+              <p className="mt-0.5 text-lg font-bold text-[#dc2626]">{notFoundCount}</p>
             </div>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-[#e2e8f0]">
-            <table className="min-w-full text-left text-sm">
+          <div className="overflow-x-auto rounded-lg border border-[#e2e8f0]">
+            <table className="min-w-full text-left text-xs">
               <thead className="bg-[#f8fafc] text-[#475569]">
                 <tr>
-                  <th className="px-4 py-3 font-semibold">Número</th>
-                  <th className="px-4 py-3 font-semibold">Compañía</th>
+                  <th className="px-3 py-2 font-semibold">Número</th>
+                  <th className="px-3 py-2 font-semibold">Compañía</th>
                 </tr>
               </thead>
               <tbody>
                 {results.map((row, i) => (
                   <tr key={`${row.numero}-${i}`} className="border-t border-[#f1f5f9]">
-                    <td className="px-4 py-3 font-medium text-[#0f172a]">{row.numero}</td>
-                    <td className="px-4 py-3 text-[#334155]">{row.compania}</td>
+                    <td className="px-3 py-2 font-medium text-[#0f172a]">{row.numero}</td>
+                    <td className="px-3 py-2 text-[#334155]">{row.compania}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="flex items-start gap-2 text-xs text-[#64748b]">
-              <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="flex items-start gap-1.5 text-[11px] text-[#64748b]">
+              <Info className="mt-0.5 size-3 shrink-0" aria-hidden />
               El archivo descargado contiene únicamente las columnas{" "}
               <code className="rounded bg-[#f8fafc] px-1">numero</code> y{" "}
               <code className="rounded bg-[#f8fafc] px-1">compania</code>.
@@ -641,7 +645,7 @@ export function VerificadorApp() {
             <button
               type="button"
               onClick={() => downloadResultCsv(results, RESULT_FILENAME)}
-              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1d4ed8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]"
+              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[#2563eb] px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#1d4ed8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]"
             >
               <Download className="size-4" aria-hidden />
               Descargar CSV procesado
