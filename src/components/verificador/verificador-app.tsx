@@ -4,17 +4,20 @@ import { useCallback, useRef, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
-  Circle,
+  ClipboardList,
   Download,
   FileSpreadsheet,
   Info,
   Loader2,
   Lock,
+  Phone,
   Play,
   Search,
+  Smartphone,
   Square,
   Trash2,
   UploadCloud,
+  XCircle,
 } from "lucide-react";
 import {
   MAX_NUMBERS,
@@ -52,6 +55,75 @@ function isValidManualInput(raw: string): boolean {
 
 const cardClassName =
   "rounded-xl border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]";
+
+function ManualResultPanel({
+  loading,
+  result,
+}: {
+  loading: boolean;
+  result: ManualResult | null;
+}) {
+  const isFound = result?.kind === "found";
+  const panelTone = isFound
+    ? "border-[#dcfce7] bg-[#f0fdf4]"
+    : "border-[#e2e8f0] bg-[#f8fafc]";
+
+  return (
+    <div
+      className={`flex min-h-[92px] min-w-0 flex-col rounded-lg border p-4 ${panelTone}`}
+      aria-live="polite"
+    >
+      <div className="mb-2.5 flex items-start justify-between gap-2">
+        <p className="text-sm font-semibold text-[#0f172a]">Resultado de consulta</p>
+        {loading ? (
+          <Loader2 className="size-4 shrink-0 animate-spin text-[#2563eb]" aria-hidden />
+        ) : isFound ? (
+          <CheckCircle2 className="size-4 shrink-0 text-[#16a34a]" aria-hidden />
+        ) : null}
+      </div>
+
+      {loading ? (
+        <p className="text-xs text-[#64748b]">Consultando...</p>
+      ) : !result ? (
+        <p className="text-xs text-[#94a3b8]">Sin consulta</p>
+      ) : result.kind === "found" ? (
+        <div className="grid grid-cols-2 gap-5">
+          <div>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-[#94a3b8]">
+              Número
+            </p>
+            <p className="mt-0.5 text-sm font-semibold text-[#0f172a]">{result.numero}</p>
+          </div>
+          <div>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-[#94a3b8]">
+              Compañía
+            </p>
+            <p className="mt-0.5 text-sm font-semibold text-[#0f172a]">{result.compania}</p>
+          </div>
+        </div>
+      ) : result.kind === "not_found" ? (
+        <div className="grid grid-cols-2 gap-5">
+          <div>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-[#94a3b8]">
+              Número
+            </p>
+            <p className="mt-0.5 text-sm font-semibold text-[#0f172a]">{result.numero}</p>
+          </div>
+          <div>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-[#94a3b8]">
+              Compañía
+            </p>
+            <p className="mt-0.5 text-sm font-medium text-[#64748b]">No encontrado</p>
+          </div>
+        </div>
+      ) : (
+        <p className="text-xs text-[#b45309]">
+          Ingresa un número válido de Chile (9 a 12 dígitos, con o sin +56).
+        </p>
+      )}
+    </div>
+  );
+}
 
 export function VerificadorApp() {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -198,157 +270,105 @@ export function VerificadorApp() {
   const notFoundCount = results.filter(
     (r) => r.status === "done" && r.numero.trim() && !r.compania,
   ).length;
+  const invalidCount = results.filter((r) => r.status === "invalid").length;
+  const mobileCount = results.filter((r) => {
+    const n = normalizePhoneForLookup(r.numero);
+    return n !== null && n.startsWith("9");
+  }).length;
+  const fixedCount = results.filter((r) => {
+    const n = normalizePhoneForLookup(r.numero);
+    return n !== null && !n.startsWith("9");
+  }).length;
 
-  type LiveItem = {
-    numero: string;
-    compania: string;
-    state: "done" | "consulting" | "pending";
-    status?: ProcessedRow["status"];
-  };
-
-  const liveItems: LiveItem[] = (() => {
-    if (!loaded || (uiState !== "processing" && uiState !== "done")) return [];
-    const windowSize = 8;
-    const anchor = Math.max(0, progress.processed - 3);
-    const end = Math.min(loaded.rows.length, anchor + windowSize);
-    const items: LiveItem[] = [];
-
-    for (let i = anchor; i < end; i++) {
-      const source = loaded.rows[i];
-      const done = liveRows[i];
-      if (done) {
-        items.push({
-          numero: done.numero,
-          compania: done.compania,
-          state: "done",
-          status: done.status,
-        });
-      } else if (i === progress.processed && uiState === "processing") {
-        items.push({
-          numero: source.original || source.numero,
-          compania: "",
-          state: "consulting",
-        });
-      } else {
-        items.push({
-          numero: source.original || source.numero,
-          compania: "",
-          state: "pending",
-        });
-      }
-    }
-    return items;
-  })();
+  const metricCards = [
+    { label: "Total números", value: results.length, tone: "text-[#0f172a]", icon: ClipboardList, iconTone: "text-[#2563eb]" },
+    { label: "Encontrados", value: foundCount, tone: "text-[#16a34a]", icon: CheckCircle2, iconTone: "text-[#16a34a]" },
+    { label: "No encontrados", value: notFoundCount, tone: "text-[#dc2626]", icon: XCircle, iconTone: "text-[#dc2626]" },
+    { label: "Móviles", value: mobileCount, tone: "text-[#0f172a]", icon: Smartphone, iconTone: "text-[#ea580c]" },
+    { label: "Fijos", value: fixedCount, tone: "text-[#0f172a]", icon: Phone, iconTone: "text-[#7c3aed]" },
+    { label: "Inválidos", value: invalidCount, tone: "text-[#0f172a]", icon: XCircle, iconTone: "text-[#64748b]" },
+  ];
 
   return (
-    <main className="mx-auto w-full max-w-[1720px] px-5 py-3 sm:px-8 lg:px-12">
-      <section className="mb-3">
-        <h1 className="text-[22px] font-bold tracking-tight text-[#0f172a] sm:text-2xl">
+    <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-3 px-8 pb-6">
+      <section className="mt-6">
+        <h1 className="text-[28px] font-bold leading-tight text-[#0f172a]">
           Verificador de Numeración
         </h1>
-        <p className="mt-1 text-[13px] leading-snug text-[#64748b] sm:text-sm">
+        <p className="mt-1.5 text-sm text-[#64748b]">
           Consulta números de Chile utilizando la base oficial de numeración de SUBTEL.
         </p>
       </section>
 
-      <div className="mb-3 flex items-start gap-2 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-3 py-2 text-[12px] leading-snug text-[#1e40af] sm:text-[13px]">
-        <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+      <div className="flex min-h-11 items-center gap-2 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-3.5 text-[13px] text-[#1e40af]">
+        <Info className="size-4 shrink-0" aria-hidden />
         <p>
           La información corresponde al operador asignatario según SUBTEL y no necesariamente
           al operador actual del número.
         </p>
       </div>
 
-      <section className={`mb-3 ${cardClassName}`}>
-        <h2 className="mb-2.5 text-[13px] font-semibold text-[#0f172a] sm:text-sm">
-          Buscar número manualmente
-        </h2>
-        <form
-          className="flex flex-col gap-2 sm:flex-row sm:items-center"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void runManualSearch();
-          }}
-        >
-          <label className="sr-only" htmlFor="manual-number">
-            Número telefónico
-          </label>
-          <input
-            id="manual-number"
-            type="text"
-            inputMode="tel"
-            autoComplete="tel"
-            placeholder="Ej: 912345678"
-            value={manualInput}
-            onChange={(e) => {
-              setManualInput(e.target.value);
-              setManualResult(null);
-            }}
-            className="h-10 w-full flex-1 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm text-[#0f172a] outline-none transition placeholder:text-[#94a3b8] focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb]/20"
-          />
-          <button
-            type="submit"
-            disabled={manualLoading || !manualInput.trim()}
-            className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[#2563eb] px-5 text-[13px] font-semibold text-white transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb] sm:min-w-[120px]"
-          >
-            {manualLoading ? (
-              <>
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-                Consultando...
-              </>
-            ) : (
-              <>
-                <Search className="size-4" aria-hidden />
-                Consultar
-              </>
-            )}
-          </button>
-        </form>
-        <p className="mt-1.5 text-[11px] text-[#94a3b8] sm:text-xs">
-          Ingresa 9 a 12 dígitos, con o sin +56
-        </p>
-
-        {manualResult?.kind === "invalid" && (
-          <p className="mt-2 text-xs text-[#b45309]" role="alert">
-            Ingresa un número válido de Chile (9 a 12 dígitos, con o sin +56).
-          </p>
-        )}
-
-        {manualResult?.kind === "not_found" && (
-          <p className="mt-2 text-xs text-[#64748b]" role="status">
-            No encontramos una compañía para este número en la base de SUBTEL.
-          </p>
-        )}
-
-        {manualResult?.kind === "found" && (
-          <div className="mt-2.5 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3">
-            <p className="mb-2 text-xs font-semibold text-[#0f172a]">Resultado</p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <p className="text-[10px] font-medium uppercase tracking-wide text-[#94a3b8]">
-                  Número
-                </p>
-                <p className="mt-0.5 text-sm font-medium text-[#0f172a]">
-                  {manualResult.numero}
-                </p>
+      <section className={cardClassName}>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(360px,0.95fr)]">
+          <div className="min-w-0">
+            <h2 className="mb-2.5 text-[15px] font-semibold text-[#0f172a]">
+              Buscar número manualmente
+            </h2>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void runManualSearch();
+              }}
+            >
+              <div className="flex gap-2">
+                <label className="sr-only" htmlFor="manual-number">
+                  Número telefónico
+                </label>
+                <input
+                  id="manual-number"
+                  type="text"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  placeholder="Ej: 912345678"
+                  value={manualInput}
+                  onChange={(e) => {
+                    setManualInput(e.target.value);
+                    setManualResult(null);
+                  }}
+                  className="h-10 min-w-0 flex-1 rounded-lg border border-[#cbd5e1] bg-white px-3 text-sm text-[#0f172a] outline-none transition placeholder:text-[#94a3b8] focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb]/20"
+                />
+                <button
+                  type="submit"
+                  disabled={manualLoading || !manualInput.trim()}
+                  className="inline-flex h-10 min-w-[120px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[#2563eb] px-4 text-sm font-semibold text-white transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]"
+                >
+                  {manualLoading ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" aria-hidden />
+                      Consultando...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="size-4" aria-hidden />
+                      Consultar
+                    </>
+                  )}
+                </button>
               </div>
-              <div>
-                <p className="text-[10px] font-medium uppercase tracking-wide text-[#94a3b8]">
-                  Compañía
-                </p>
-                <p className="mt-0.5 text-sm font-medium text-[#0f172a]">
-                  {manualResult.compania}
-                </p>
-              </div>
-            </div>
+            </form>
+            <p className="mt-2 text-xs text-[#94a3b8]">
+              Ingresa 9 a 12 dígitos, con o sin +56
+            </p>
           </div>
-        )}
+
+          <ManualResultPanel loading={manualLoading} result={manualResult} />
+        </div>
       </section>
 
       {error && (
         <div
           role="alert"
-          className="mb-3 flex items-start gap-2 rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-xs text-[#b91c1c]"
+          className="flex items-start gap-2 rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-xs text-[#b91c1c]"
         >
           <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
           <p>{error}</p>
@@ -356,19 +376,17 @@ export function VerificadorApp() {
       )}
 
       {warning && uiState !== "error" && (
-        <div className="mb-3 flex items-start gap-2 rounded-lg border border-[#fde68a] bg-[#fffbeb] px-3 py-2 text-xs text-[#92400e]">
+        <div className="flex items-start gap-2 rounded-lg border border-[#fde68a] bg-[#fffbeb] px-3 py-2 text-xs text-[#92400e]">
           <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
           <p>{warning}</p>
         </div>
       )}
 
-      <section className={`mb-3 ${cardClassName}`}>
-        <h2 className="mb-3 text-[13px] font-semibold text-[#0f172a] sm:text-sm">
-          1. Cargar archivo CSV
-        </h2>
+      <section className={cardClassName}>
+        <h2 className="mb-3 text-[15px] font-semibold text-[#0f172a]">1. Cargar archivo CSV</h2>
 
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_200px_220px] xl:grid-cols-[minmax(0,1fr)_220px_240px]">
-          <div className="space-y-2.5">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.8fr)_minmax(260px,0.6fr)_minmax(300px,0.8fr)]">
+          <div className="min-w-0 space-y-3">
             {!loaded ? (
               <div
                 role="button"
@@ -383,19 +401,19 @@ export function VerificadorApp() {
                 onDragLeave={() => setDragOver(false)}
                 onDrop={onDrop}
                 onClick={() => inputRef.current?.click()}
-                className={`flex min-h-[128px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-5 text-center transition ${
+                className={`flex min-h-[140px] cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed px-4 py-4 text-center transition ${
                   dragOver
                     ? "border-[#2563eb] bg-[#eff6ff]"
                     : "border-[#cbd5e1] bg-[#fafbfd] hover:border-[#93c5fd] hover:bg-[#f8fbff]"
                 }`}
               >
-                <UploadCloud className="mb-2 size-8 text-[#2563eb]" aria-hidden />
+                <UploadCloud className="mb-2 size-7 text-[#2563eb]" aria-hidden />
                 <p className="text-sm font-medium text-[#0f172a]">
                   Arrastra tu archivo CSV aquí
                 </p>
                 <p className="mt-0.5 text-xs text-[#64748b]">o haz clic para seleccionar</p>
-                <p className="mt-2 text-[11px] text-[#94a3b8]">
-                  Formato: CSV · Máximo {MAX_NUMBERS.toLocaleString("es-CL")} números
+                <p className="mt-1.5 text-[11px] text-[#94a3b8]">
+                  Formato: CSV · Máximo: {MAX_NUMBERS.toLocaleString("es-CL")} números
                 </p>
                 <input
                   ref={inputRef}
@@ -407,16 +425,16 @@ export function VerificadorApp() {
                 />
               </div>
             ) : (
-              <div className="flex min-h-[128px] items-center justify-center rounded-lg border border-[#e2e8f0] bg-[#fafbfd] px-4 py-4 lg:hidden">
+              <div className="flex min-h-[140px] items-center justify-center rounded-lg border border-[#e2e8f0] bg-[#fafbfd] px-4 py-4 lg:hidden">
                 <p className="text-xs text-[#64748b]">Archivo cargado. Revisa el panel central.</p>
               </div>
             )}
 
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <div className="flex flex-wrap items-center gap-2">
               <a
                 href={PLANTILLA_PATH}
                 download="plantilla_verificador_numeracion_dumo.csv"
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-[#2563eb] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-xs font-medium text-[#2563eb] transition hover:bg-[#f8fafc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]"
               >
                 <Download className="size-3.5" aria-hidden />
                 Descargar plantilla CSV
@@ -441,9 +459,9 @@ export function VerificadorApp() {
             </div>
           </div>
 
-          <div className="hidden lg:block">
+          <div className="hidden min-w-0 lg:block">
             {loaded ? (
-              <div className="flex h-full min-h-[128px] flex-col justify-center rounded-lg border border-[#e2e8f0] bg-[#fafbfd] px-3 py-3">
+              <div className="flex h-full min-h-[140px] flex-col justify-center rounded-lg border border-[#e2e8f0] bg-[#fafbfd] px-3 py-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2">
                     <div className="grid size-8 shrink-0 place-items-center rounded-md bg-[#ecfdf3] text-[#059669]">
@@ -467,19 +485,19 @@ export function VerificadorApp() {
                 </div>
               </div>
             ) : (
-              <div className="flex h-full min-h-[128px] items-center justify-center rounded-lg border border-dashed border-[#e2e8f0] bg-[#fafbfd] px-3 text-center text-xs text-[#94a3b8]">
+              <div className="flex h-full min-h-[140px] items-center justify-center rounded-lg border border-dashed border-[#e2e8f0] bg-[#fafbfd] px-3 text-center text-xs text-[#94a3b8]">
                 Sin archivo cargado
               </div>
             )}
           </div>
 
-          <aside className="rounded-lg border border-[#dbeafe] bg-[#f8fbff] p-3">
+          <aside className="min-w-0 rounded-lg border border-[#dbeafe] bg-[#f8fbff] p-3">
             <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-[#0f172a]">
               <Info className="size-3.5 text-[#2563eb]" aria-hidden />
               Formato esperado
             </p>
             <p className="mb-2 text-[11px] leading-snug text-[#64748b]">
-              El CSV debe incluir una columna llamada{" "}
+              El archivo CSV debe contener una columna llamada{" "}
               <code className="rounded bg-white px-1">numero</code>.
             </p>
             <div className="overflow-hidden rounded-md border border-[#e2e8f0] bg-white text-xs">
@@ -524,16 +542,14 @@ export function VerificadorApp() {
       </section>
 
       {(uiState === "processing" || uiState === "done") && (
-        <section className={`mb-3 ${cardClassName}`}>
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-[13px] font-semibold text-[#0f172a] sm:text-sm">
-              2. Procesando números
-            </h2>
+        <section className={`${cardClassName} py-3`}>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h2 className="text-[15px] font-semibold text-[#0f172a]">2. Procesando números</h2>
             {uiState === "processing" && (
               <button
                 type="button"
                 onClick={stopProcessing}
-                className="inline-flex items-center gap-1.5 rounded-md border border-[#cbd5e1] bg-white px-2.5 py-1.5 text-xs font-medium text-[#475569] hover:bg-[#f8fafc]"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[#cbd5e1] bg-white px-2.5 py-1.5 text-xs font-medium text-[#475569] hover:bg-[#f8fafc]"
               >
                 <Square className="size-3" aria-hidden />
                 Detener proceso
@@ -541,92 +557,59 @@ export function VerificadorApp() {
             )}
           </div>
 
-          <div className="mb-1 flex items-center justify-between text-xs text-[#64748b]">
+          <div className="mb-1.5 h-2 overflow-hidden rounded-full bg-[#e2e8f0]">
+            <div
+              className="h-full rounded-full bg-[#2563eb] transition-all duration-300"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <div className="flex items-center justify-between text-xs text-[#64748b]">
             <span>
               {uiState === "processing" ? "Procesando..." : "Consulta completada"} ·{" "}
               {progress.processed} de {progress.total}
             </span>
             <span>{pct}%</span>
           </div>
-          <div className="mb-3 h-2 overflow-hidden rounded-full bg-[#e2e8f0]">
-            <div
-              className="h-full rounded-full bg-[#2563eb] transition-all duration-300"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-
-          {uiState === "processing" && (
-            <ul className="space-y-1.5 text-xs" aria-live="polite">
-            {liveItems.map((item, idx) => (
-              <li key={`${item.numero}-${idx}`} className="flex items-center gap-2 text-[#334155]">
-                {item.state === "done" ? (
-                  <CheckCircle2 className="size-3.5 shrink-0 text-[#16a34a]" aria-hidden />
-                ) : item.state === "consulting" ? (
-                  <Loader2 className="size-3.5 shrink-0 animate-spin text-[#2563eb]" aria-hidden />
-                ) : (
-                  <Circle className="size-3.5 shrink-0 text-[#cbd5e1]" aria-hidden />
-                )}
-                <span className="min-w-[110px] font-medium">{item.numero || "—"}</span>
-                <span className="truncate text-[#64748b]">
-                  {item.state === "consulting"
-                    ? "Consultando..."
-                    : item.state === "pending"
-                      ? "Pendiente"
-                      : item.compania ||
-                        (item.status === "empty"
-                          ? "Vacío"
-                          : item.status === "invalid"
-                            ? "Formato no válido"
-                            : "—")}
-                </span>
-              </li>
-            ))}
-            </ul>
-          )}
         </section>
       )}
 
       {uiState === "done" && results.length > 0 && (
         <section className={cardClassName}>
           <div className="mb-3">
-            <h2 className="text-[13px] font-semibold text-[#0f172a] sm:text-sm">3. Resultados</h2>
+            <h2 className="text-[15px] font-semibold text-[#0f172a]">3. Resultados</h2>
             <p className="mt-0.5 text-xs text-[#64748b]">
               Consulta completada · {results.length.toLocaleString("es-CL")} números procesados
             </p>
           </div>
 
-          <div className="mb-3 grid gap-2 sm:grid-cols-3">
-            <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-[#94a3b8]">
-                Total números
-              </p>
-              <p className="mt-0.5 text-lg font-bold text-[#0f172a]">{results.length}</p>
-            </div>
-            <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-[#94a3b8]">
-                Encontrados
-              </p>
-              <p className="mt-0.5 text-lg font-bold text-[#16a34a]">{foundCount}</p>
-            </div>
-            <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-[#94a3b8]">
-                No encontrados
-              </p>
-              <p className="mt-0.5 text-lg font-bold text-[#dc2626]">{notFoundCount}</p>
-            </div>
+          <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            {metricCards.map(({ label, value, tone, icon: Icon, iconTone }) => (
+              <div
+                key={label}
+                className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2"
+              >
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-[#94a3b8]">
+                    {label}
+                  </p>
+                  <Icon className={`size-3.5 shrink-0 ${iconTone}`} aria-hidden />
+                </div>
+                <p className={`text-lg font-bold ${tone}`}>{value}</p>
+              </div>
+            ))}
           </div>
 
           <div className="overflow-x-auto rounded-lg border border-[#e2e8f0]">
-            <table className="min-w-full text-left text-xs">
+            <table className="min-w-full border-collapse text-left text-[13px]">
               <thead className="bg-[#f8fafc] text-[#475569]">
                 <tr>
-                  <th className="px-3 py-2 font-semibold">Número</th>
-                  <th className="px-3 py-2 font-semibold">Compañía</th>
+                  <th className="border-b border-[#e2e8f0] px-3 py-2 font-semibold">Número</th>
+                  <th className="border-b border-[#e2e8f0] px-3 py-2 font-semibold">Compañía</th>
                 </tr>
               </thead>
               <tbody>
                 {results.map((row, i) => (
-                  <tr key={`${row.numero}-${i}`} className="border-t border-[#f1f5f9]">
+                  <tr key={`${row.numero}-${i}`} className="border-b border-[#f1f5f9] last:border-0">
                     <td className="px-3 py-2 font-medium text-[#0f172a]">{row.numero}</td>
                     <td className="px-3 py-2 text-[#334155]">{row.compania}</td>
                   </tr>
@@ -645,7 +628,7 @@ export function VerificadorApp() {
             <button
               type="button"
               onClick={() => downloadResultCsv(results, RESULT_FILENAME)}
-              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[#2563eb] px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#1d4ed8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]"
+              className="inline-flex shrink-0 items-center justify-center gap-1.5 self-end rounded-lg border border-[#2563eb] bg-white px-4 py-2 text-xs font-semibold text-[#2563eb] shadow-sm transition hover:bg-[#eff6ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb] sm:self-auto"
             >
               <Download className="size-4" aria-hidden />
               Descargar CSV procesado
