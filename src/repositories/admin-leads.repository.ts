@@ -222,12 +222,21 @@ class PostgresAdminLeadsRepository implements AdminLeadsRepository {
     // presencia (baño/almuerzo/desconectado). El admin puede tener razones
     // válidas para asignarle un chat a alguien aunque no esté "disponible"
     // en este momento.
+    //
+    // inbox_state = 'active' + reopened_at: asignar SIEMPRE debe significar
+    // que le aparece en su bandeja — si no, "reasignar" un chat que la
+    // asesora ya tipificó y cerró ("Guardar y cerrar" pone inbox_state =
+    // 'closed') cambiaba el dueño en la base pero la conversación seguía sin
+    // aparecerle a nadie. Mismos campos que reopenConversationToAdvisor()
+    // usa para el reabrir por inbound — asignar es, en el fondo, lo mismo.
     await sql`
       UPDATE lead_conversations SET
         assigned_advisor_id = ${advisor.id},
         assigned_advisor_name = ${advisor.name},
         assigned_advisor_at = now(),
-        admin_status = 'asignado'
+        admin_status = 'asignado',
+        inbox_state = 'active',
+        reopened_at = now()
       WHERE id = ${input.conversationId}
     `;
 
