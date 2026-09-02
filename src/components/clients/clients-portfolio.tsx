@@ -24,6 +24,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { DynamicTipificationBadge } from "@/components/shared/dynamic-tipification-badge";
 import { formatLongDate, getInitials } from "@/lib/format";
@@ -32,7 +39,9 @@ import {
   adminTableHeaderRowClass,
 } from "@/lib/admin-table-header-styles";
 import { cn } from "@/lib/utils";
+import { useAdminAdvisors, useAssignAdvisor } from "@/hooks/use-admin-leads";
 import type { CrmClient } from "@/types/crm-client";
+import type { AdminAdvisor } from "@/types/admin-lead";
 
 type DateRange = "today" | "week" | "month" | "all";
 
@@ -57,7 +66,13 @@ function inRange(dateIso: string, range: DateRange): boolean {
   return date >= monday && date <= sunday;
 }
 
-function buildColumns(showAdvisor: boolean, leadsHref: string) {
+function buildColumns(
+  showAdvisor: boolean,
+  leadsHref: string,
+  advisors: AdminAdvisor[],
+  onAssign: (conversationId: string, advisorId: string) => void,
+  assigningId: string | null,
+) {
   const columnHelper = createColumnHelper<CrmClient>();
 
   const base = [
@@ -92,7 +107,28 @@ function buildColumns(showAdvisor: boolean, leadsHref: string) {
     ? [
         columnHelper.accessor("advisorName", {
           header: "Asesora",
-          cell: (info) => <span className="text-muted">{info.getValue() || "—"}</span>,
+          cell: (info) => {
+            const row = info.row.original;
+            return (
+              <Select
+                value={row.advisorId || "none"}
+                onValueChange={(v) => v !== "none" && v !== row.advisorId && onAssign(row.conversationId, v)}
+                disabled={assigningId === row.conversationId}
+              >
+                <SelectTrigger className="h-9 w-[170px] text-[13px]">
+                  <SelectValue placeholder="Sin asignar" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin asignar</SelectItem>
+                  {advisors.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            );
+          },
         }),
       ]
     : [];
@@ -130,6 +166,18 @@ export function ClientsPortfolio({
 }) {
   const [range, setRange] = useState<DateRange>("all");
   const [search, setSearch] = useState("");
+  const [assigningId, setAssigningId] = useState<string | null>(null);
+
+  const { data: advisors } = useAdminAdvisors(showAdvisor);
+  const assignAdvisor = useAssignAdvisor();
+
+  const handleAssign = (conversationId: string, advisorId: string) => {
+    setAssigningId(conversationId);
+    assignAdvisor.mutate(
+      { conversationId, advisorId },
+      { onSettled: () => setAssigningId(null) },
+    );
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -145,8 +193,8 @@ export function ClientsPortfolio({
   }, [clients, range, search]);
 
   const columns = useMemo(
-    () => buildColumns(showAdvisor, leadsHref),
-    [showAdvisor, leadsHref],
+    () => buildColumns(showAdvisor, leadsHref, advisors ?? [], handleAssign, assigningId),
+    [showAdvisor, leadsHref, advisors, assigningId],
   );
   const table = useReactTable({
     data: filtered,

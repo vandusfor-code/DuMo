@@ -26,10 +26,11 @@ export function useAdminConversations() {
   });
 }
 
-export function useAdminAdvisors() {
+export function useAdminAdvisors(enabled = true) {
   return useQuery({
     queryKey: ["admin", "leads", "advisors"],
     queryFn: () => apiGet<AdminAdvisor[]>("/api/admin/leads?advisors=1"),
+    enabled,
   });
 }
 
@@ -61,6 +62,9 @@ export function useAssignAdvisor() {
       apiPost<AdminConversation>("/api/admin/leads", { action: "assign", ...input }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin", "leads"] });
+      // La vista Clientes (admin/clientes) muestra la misma asignación —
+      // sin esto, reasignar desde ahí no se refleja hasta el próximo refetch.
+      qc.invalidateQueries({ queryKey: ["crm-clients"] });
     },
   });
 }
