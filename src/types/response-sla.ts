@@ -53,8 +53,12 @@ export const RESPONSE_SLA_THRESHOLDS: Record<
   follow_up: { warningMinutes: 4, finalWarningMinutes: null, escalateMinutes: 5 },
 };
 
-/** Cooldown entre envíos de WhatsApp a admins para el mismo lead (Escenario C). */
-export const SLA_ADMIN_ALERT_COOLDOWN_MINUTES = 2;
+/**
+ * Cooldown entre envíos de WhatsApp a admins para el mismo lead (Escenario C).
+ * Con 2 min el mismo lead generaba ~30 mensajes por hora a cada admin mientras
+ * nadie respondiera — spam que tapaba las alertas nuevas.
+ */
+export const SLA_ADMIN_ALERT_COOLDOWN_MINUTES = 15;
 
 /** Escenario C — reintenta buscar asesora disponible cada minuto hasta que alguien responda o quede libre. */
 export const SLA_ESCALATION_RETRY_MS = 60_000;
@@ -81,6 +85,7 @@ export function buildSlaAdminAlertMessage(input: {
   channelLabel: string;
   conversationId: string;
 }): string {
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://crm.dulabs.co").replace(/\/$/, "");
   return `⚠️ DuMo - Alerta de respuesta
 
 Lead sin atender: ${input.customerName}
@@ -91,7 +96,7 @@ Canal: ${input.channelLabel}
 No hay otra asesora disponible para reasignar.
 
 Ver conversación:
-https://du-mo.vercel.app/admin/leads?conversationId=${input.conversationId}`;
+${appUrl}/admin/leads?conversationId=${input.conversationId}`;
 }
 
 /** Minuto (desde armed_at) del próximo umbral a evaluar tras `status` — null si no queda ninguno en RESP-1. */

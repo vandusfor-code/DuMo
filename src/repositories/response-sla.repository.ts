@@ -3,6 +3,7 @@ import { ensureSchema, getSql, hasDatabase, withDbRetry } from "@/server/db/clie
 import { ADVISOR_ONLINE_WINDOW_MINUTES } from "@/lib/advisor-presence";
 import {
   RESPONSE_SLA_THRESHOLDS,
+  SLA_ADMIN_ALERT_COOLDOWN_MINUTES,
   type ResponseSlaScenario,
   type ResponseSlaStatus,
   type ResponseSlaTimer,
@@ -388,7 +389,7 @@ class PostgresResponseSlaRepository implements ResponseSlaRepository {
 
       // Escenario C — sin candidata disponible.
       const isFirstEscalation = timer.escalationCycleCount === 0;
-      const cooldownMs = 2 * 60_000;
+      const cooldownMs = SLA_ADMIN_ALERT_COOLDOWN_MINUTES * 60_000;
       const cooldownOk =
         !timer.lastAdminAlertAt || Date.now() - new Date(timer.lastAdminAlertAt).getTime() >= cooldownMs;
 
